@@ -53,23 +53,27 @@ process without a law keeps the constants of its rows' condition.
 
 An optional ``culture.csv`` binds the existing ``culture_physiology``
 composition to a strain growing on one solid substrate: the substrate is
-consumed by one enzyme pool of the strain (``k_h E S / (K_h + S)``) and turned
-into biomass dry mass with an explicit yield, the remainder booked to a closure
-ledger; biomass is lost at a first-order rate; every enzyme pool of the culture
-is produced in proportion to biomass, induced by the substrate with one shared
-half-saturation constant, and lost at its own first-order rate. A row gives one
-role of one culture (strain, substrate, condition): a culture-level quantity
-with ``enzyme_class`` blank, or a quantity of one enzyme pool with its class.
-The pools are the classes the rows name; exactly one of them acts on the
-substrate and consumes it, the others are produced and lost only. Pools stay
-in their own units (a protein mass or an assay activity per volume), the
-substrate and the biomass are dry masses per volume in one unit, and a culture
-needs a ``solid_polymer`` substrate on a dry-mass basis. One culture model
-serves every strain that declares its consuming class; each role of each
-strain and condition is a parameter record or an explicit gap. A culture is
-never mixed with the enzyme-assay forms of ``kinetics.csv`` for the same strain
-and substrate, carries no response law and no time course in this version, and
-runs the existing process laws with no new numerics.
+consumed by the strain's enzyme pools that act on it, each by its own
+``k_h E S / (K_h + S)`` (several such pools act in parallel and their rates add,
+with no competition for sites and no synergy), and every consumed gram is
+turned into biomass dry mass with the culture's one explicit yield, the
+remainder booked to a closure ledger; biomass is lost at a first-order rate;
+every enzyme pool of the culture is produced in proportion to biomass, induced
+by the substrate with one shared half-saturation constant, and lost at its own
+first-order rate. A row gives one role of one culture (strain, substrate,
+condition): a culture-level quantity with ``enzyme_class`` blank, or a quantity
+of one enzyme pool with its class. The pools are the classes the rows name;
+those that act on the substrate (at least one) consume it, the others are
+produced and lost only. Pools stay in their own units (a protein mass or an
+assay activity per volume), the substrate and the biomass are dry masses per
+volume in one unit, and a culture needs a ``solid_polymer`` substrate on a
+dry-mass basis. One culture model serves every strain that declares one of its
+consuming classes; each role of each strain and condition is a parameter
+record or an explicit gap. A culture is never mixed with the enzyme-assay
+forms of ``kinetics.csv`` for the same strain and substrate nor combined with
+an enzyme network (no uptake law for a released soluble pool exists), carries
+no response law and no time course in this version, and runs the existing
+process laws with no new numerics.
 
 An optional ``enzyme_network`` block in the manifest (``entry_substrates``)
 makes every case of the dataset an enzyme network instead of the one class the
@@ -939,10 +943,11 @@ class UserDataset:
     fit description under ``manifest["fit"]``.
 
     With a ``culture.csv``, ``cultures`` lists one entry per strain and culture
-    substrate: the strain, the substrate, the consuming enzyme class, the
-    enzyme pools in template order, the generated fungus, substrate, template
-    and compatibility ids, and the culture.csv rows of that strain (none for a
-    strain whose culture cases are all gaps). It is empty without one.
+    substrate: the strain, the substrate, the (first) consuming enzyme class,
+    every consuming pool, the enzyme pools in template order, the generated
+    fungus, substrate, template and compatibility ids, and the culture.csv rows
+    of that strain (none for a strain whose culture cases are all gaps). It is
+    empty without one.
 
     With an ``enzyme_network`` block in the manifest, ``enzyme_networks`` lists
     one entry per entry substrate: its chain of pools, the final product, the
@@ -1568,21 +1573,35 @@ class _CultureRow:
 
 @dataclass(frozen=True)
 class _CulturePair:
-    """The culture model of one consuming enzyme class on one substrate, shared by every strain declaring the class.
+    """The culture model of the consuming enzyme classes on one substrate, shared by every strain declaring one.
 
-    ``pools`` are the enzyme pools in template order, the consuming class first;
-    ``pool_rows`` the culture.csv row that first named each pool (``None`` for a
-    pair no culture.csv row starts, whose only pool is the consuming class).
+    ``class_key`` is the first consuming class (it names the model's template);
+    ``consumers`` every pool whose class acts on the substrate and consumes it,
+    in culture.csv row order (empty means ``class_key`` alone); ``pools`` the
+    enzyme pools in template order, the consuming classes first; ``pool_rows``
+    the culture.csv row that first named each pool (``None`` for a model no
+    culture.csv row starts, whose only pools are its consuming classes).
     """
 
     class_key: str
     substrate_id: str
     pools: tuple[str, ...]
     pool_rows: Mapping[str, int | None]
+    consumers: tuple[str, ...] = ()
 
     @property
     def started(self) -> bool:
         return any(row is not None for row in self.pool_rows.values())
+
+    @property
+    def consuming_pools(self) -> tuple[str, ...]:
+        return self.consumers or (self.class_key,)
+
+    @property
+    def several(self) -> bool:
+        """Several pools consume the substrate in parallel (CULTURE-002); one keeps every USERDATA-009 identifier."""
+
+        return len(self.consuming_pools) > 1
 
 
 @dataclass(frozen=True)
@@ -4586,22 +4605,26 @@ def _cross_validate(parsed: _Parsed, context: _Context) -> None:
 
 
 def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
-    """Find each culture's consuming pool, build the culture models and refuse what they cannot run.
+    """Find each culture's consuming pools, build the culture models and refuse what they cannot run.
 
     A culture is the culture.csv rows of one strain on one substrate. Its
-    enzyme pools are the classes its rows name; exactly one of them acts on
-    the substrate and consumes it. The culture model of a consuming class and
-    a substrate (``parsed.culture_pairs``) has the pools every culture of that
-    pair names, and every strain that declares the class runs it on that
-    substrate, so such a strain must declare every pool and no other class that
-    acts on the substrate (FungMod builds one model per strain, substrate and
-    condition and does not choose between a culture and an enzyme assay). A
-    culture class runs the culture form on every substrate it acts on (a class
-    runs one process law), so kinetics.csv rows of a culture class are refused,
-    and so is a dissolved substrate it acts on. kinetics.csv rows of a strain
-    and substrate with a culture, and responses.csv rows of a culture, are
-    refused and left out of the later checks. The units of each case are
-    checked together with pint.
+    enzyme pools are the classes its rows name; every one whose class acts on
+    the substrate (at least one) consumes it, in parallel with the others
+    (CULTURE-002: their rates add, and every consumed gram feeds growth through
+    the one yield). Cultures of one substrate whose consuming pools overlap are
+    one culture model (``parsed.culture_pairs``, keyed by its first consuming
+    class) with the pools every such culture names, and every strain that
+    declares one of its consuming classes runs it on that substrate, so such a
+    strain must declare every pool and no other class that acts on the
+    substrate (FungMod builds one model per strain, substrate and condition and
+    does not choose between a culture and an enzyme assay). A culture class runs
+    the culture form on every substrate it acts on (a class runs one process
+    law), so kinetics.csv rows of a culture class are refused, and so is a
+    dissolved substrate it acts on; another solid it acts on becomes a culture
+    of gaps with the consuming classes of its model that act there.
+    kinetics.csv rows of a strain and substrate with a culture, and
+    responses.csv rows of a culture, are refused and left out of the later
+    checks. The units of each case are checked together with pint.
     """
 
     if not parsed.culture_rows:
@@ -4627,7 +4650,8 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
     by_culture: dict[tuple[str, str], list[_CultureRow]] = {}
     for row in parsed.culture_rows:
         by_culture.setdefault(row.culture_key, []).append(row)
-    pair_pools: dict[tuple[str, str], dict[str, int | None]] = {}
+    # The valid cultures in culture.csv order: (strain, substrate), the consuming pools, every pool named.
+    cultures: list[tuple[tuple[str, str], list[str], dict[str, int]]] = []
     for (strain_id, substrate_id), rows in by_culture.items():
         substrate = parsed.substrates[substrate_id]
         named: dict[str, int] = {}
@@ -4643,44 +4667,74 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
                 "enzyme_class",
                 f"The culture of {where} ({_rows_text(rows)}) names no enzyme pool whose class acts on the substrate "
                 f"(pools named: {', '.join(repr(item) for item in named) or 'none'}). A culture consumes its "
-                "substrate through one enzyme pool: give that pool's rows (for example its "
+                "substrate through at least one enzyme pool: give that pool's rows (for example its "
                 f"initial_enzyme_concentration) with a class that acts on {substrate_id!r} (substrate class "
                 f"{substrate.substrate_class!r}, bond classes {list(substrate.bond_classes)}).",
             )
             continue
-        if len(acting) > 1:
-            listed = ", ".join(f"{item!r} (row {named[item]})" for item in acting)
-            for class_key in acting[1:]:
-                context.add(
-                    file,
-                    named[class_key],
-                    "enzyme_class",
-                    f"The culture of {where} names {len(acting)} enzyme pools that act on the substrate ({listed}). "
-                    "The culture model consumes the substrate through exactly one pool (consumption = "
-                    "k_h E S / (K_h + S)); synergy between pools acting on one substrate is not modelled. Keep one "
-                    "consuming pool; the other pools of a culture are produced and lost only and must not act on "
-                    "the substrate.",
-                )
-            continue
-        consuming = acting[0]
+        consumers_text = (
+            f"the pool that consumes the substrate, {acting[0]!r} in the culture of {where};"
+            if len(acting) == 1
+            else f"a pool that consumes the substrate ({', '.join(repr(item) for item in acting)} in the culture of "
+            f"{where});"
+        )
         for row in rows:
-            if row.quantity in CULTURE_CONSUMPTION_QUANTITIES and row.class_key != consuming:
+            if row.quantity in CULTURE_CONSUMPTION_QUANTITIES and row.class_key not in acting:
                 context.add(
                     file,
                     row.row,
                     "enzyme_class",
-                    f"{row.quantity} belongs to the pool that consumes the substrate, {consuming!r} in the culture "
-                    f"of {where}; pool {row.class_key!r} does not act on {substrate_id!r} and is produced and lost "
-                    "only.",
+                    f"{row.quantity} belongs to {consumers_text} pool {row.class_key!r} does not act on "
+                    f"{substrate_id!r} and is produced and lost only.",
                 )
-        parsed.cultured[(strain_id, substrate_id)] = consuming
-        pools = pair_pools.setdefault((consuming, substrate_id), {})
-        pools.setdefault(consuming, named[consuming])
+        cultures.append(((strain_id, substrate_id), acting, named))
+    # Several pools acting on the substrate consume it in parallel (CULTURE-002): their rates add, and every consumed
+    # gram feeds growth through the culture's one yield. Cultures of one substrate whose consuming pools overlap are
+    # one culture model, because every strain that declares a consuming class runs that class's model.
+    parent: dict[tuple[str, str], tuple[str, str]] = {}
+
+    def root(node: tuple[str, str]) -> tuple[str, str]:
+        while parent[node] != node:
+            node = parent[node]
+        return node
+
+    for (_strain_id, substrate_id), acting, _named in cultures:
+        nodes = [(substrate_id, class_key) for class_key in acting]
+        for node in nodes:
+            parent.setdefault(node, node)
+        for node in nodes[1:]:
+            first, other = root(nodes[0]), root(node)
+            if first != other:
+                parent[other] = first
+    models: dict[tuple[str, str], tuple[list[str], dict[str, int | None]]] = {}
+    model_of: dict[tuple[str, str], tuple[str, str]] = {}
+    for key, acting, named in cultures:
+        model_key = root((key[1], acting[0]))
+        consumers, pools = models.setdefault(model_key, ([], {}))
+        for class_key in acting:
+            if class_key not in consumers:
+                consumers.append(class_key)
+            pools.setdefault(class_key, named[class_key])
         for class_key, line in named.items():
             pools.setdefault(class_key, line)
-    culture_classes = {pair[0] for pair in pair_pools}
+        model_of[key] = model_key
+    pair_pools: dict[tuple[str, str], dict[str, int | None]] = {}
+    pair_consumers: dict[tuple[str, str], list[str]] = {}
+    for (substrate_id, _class_key), (consumers, pools) in models.items():
+        pair_pools[(consumers[0], substrate_id)] = pools
+        pair_consumers[(consumers[0], substrate_id)] = consumers
+    for key, model_key in model_of.items():
+        parsed.cultured[key] = models[model_key][0][0]
+    consumer_pairs = {(class_key, pair[1]) for pair, consumers in pair_consumers.items() for class_key in consumers}
+    culture_classes = {class_key for consumers in pair_consumers.values() for class_key in consumers}
     culture_rows_text = {
-        class_key: _rows_text([row for row in parsed.culture_rows if parsed.cultured.get(row.culture_key) == class_key])
+        class_key: _rows_text(
+            [
+                row
+                for row in parsed.culture_rows
+                if row.culture_key in model_of and class_key in models[model_of[row.culture_key]][0]
+            ]
+        )
         for class_key in culture_classes
     }
     kept: list[_Kinetics] = []
@@ -4699,7 +4753,7 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
                 "strain, substrate and condition and does not choose between them, so one dataset uses one of them "
                 "for a strain and substrate: keep the assay kinetics in a separate dataset.",
             )
-        elif (row.class_key, row.substrate_id) in pair_pools:
+        elif (row.class_key, row.substrate_id) in consumer_pairs:
             context.add(
                 "kinetics.csv",
                 row.row,
@@ -4725,11 +4779,14 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
         else:
             kept.append(row)
     parsed.kinetics[:] = kept
+    # Consuming classes of one started model stay together on another substrate they act on.
+    linked = {class_key: tuple(consumers) for consumers in pair_consumers.values() for class_key in consumers}
+    gap_models: dict[tuple[str, tuple[str, ...]], tuple[str, str]] = {}
     for class_key in sorted(culture_classes):
         info = parsed.classes[class_key]
         for substrate in parsed.substrates.values():
             pair = (class_key, substrate.substrate_id)
-            if pair in pair_pools or _shared_bonds(info, substrate) is None:
+            if pair in consumer_pairs or _shared_bonds(info, substrate) is None:
                 continue
             if not substrate.is_solid:
                 context.add(
@@ -4742,12 +4799,25 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
                     "basis; leave this substrate out of the dataset, or give the culture in a separate dataset.",
                 )
                 continue
-            # A substrate the class acts on without culture rows takes the culture form with the consuming pool only;
-            # its roles are explicit gaps.
-            pair_pools[pair] = {class_key: None}
+            # A substrate the class acts on without culture rows takes the culture form with its consuming pools only
+            # (the classes of the class's culture model that act on it); its roles are explicit gaps.
+            group = (substrate.substrate_id, linked[class_key])
+            lead = gap_models.get(group)
+            if lead is None:
+                gap_models[group] = pair
+                pair_pools[pair] = {class_key: None}
+                pair_consumers[pair] = [class_key]
+            else:
+                pair_pools[lead][class_key] = None
+                pair_consumers[lead].append(class_key)
     for pair, pools in pair_pools.items():
+        consumers = tuple(pair_consumers[pair])
         parsed.culture_pairs[pair] = _CulturePair(
-            class_key=pair[0], substrate_id=pair[1], pools=tuple(pools), pool_rows=MappingProxyType(dict(pools))
+            class_key=pair[0],
+            substrate_id=pair[1],
+            pools=tuple(pools),
+            pool_rows=MappingProxyType(dict(pools)),
+            consumers=consumers if len(consumers) > 1 else (),
         )
     parsed.culture_classes.update(culture_classes)
     declared_by_strain: dict[str, dict[str, _StrainClass]] = {}
@@ -4755,9 +4825,12 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
         declared_by_strain.setdefault(item.strain_id, {})[item.class_key] = item
     for pair, culture in parsed.culture_pairs.items():
         substrate = parsed.substrates[pair[1]]
+        running: dict[str, _StrainClass] = {}
         for item in parsed.strain_classes:
-            if item.class_key != pair[0]:
-                continue
+            # Every strain that declares a consuming class runs the model, through the first one it declares.
+            if item.class_key in culture.consuming_pools:
+                running.setdefault(item.strain_id, item)
+        for item in running.values():
             declared = declared_by_strain[item.strain_id]
             for pool, pool_row in culture.pool_rows.items():
                 if pool not in declared:
@@ -4765,25 +4838,26 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
                         file,
                         pool_row,
                         "enzyme_class",
-                        f"Enzyme pool {pool!r} is part of the culture model of class {pair[0]!r} on substrate "
-                        f"{pair[1]!r}, which every strain that declares {pair[0]!r} runs on that substrate; strain "
-                        f"{item.strain_id!r} declares {pair[0]!r} ({item.file} row {item.row}) but not {pool!r}. "
-                        f"Declare {pool!r} for that strain (its rows then become explicit gaps until measured), or "
-                        "give that strain's culture in a separate dataset.",
+                        f"Enzyme pool {pool!r} is part of the culture model of class {item.class_key!r} on substrate "
+                        f"{pair[1]!r}, which every strain that declares {item.class_key!r} runs on that substrate; "
+                        f"strain {item.strain_id!r} declares {item.class_key!r} ({item.file} row {item.row}) but not "
+                        f"{pool!r}. Declare {pool!r} for that strain (its rows then become explicit gaps until "
+                        "measured), or give that strain's culture in a separate dataset.",
                     )
             for other_key, other in declared.items():
-                if other_key == pair[0] or _shared_bonds(parsed.classes[other_key], substrate) is None:
+                if other_key in culture.consuming_pools or _shared_bonds(parsed.classes[other_key], substrate) is None:
                     continue
                 context.add(
                     other.file,
                     other.row,
                     "enzyme_class",
                     f"Strain {item.strain_id!r} declares {other_key!r}, which acts on substrate {pair[1]!r}, and "
-                    f"{pair[0]!r}, whose cases on that substrate run the culture model ({file}). FungMod builds one "
-                    "model per strain, substrate and condition and does not choose between a culture and an "
-                    "enzyme-assay case; in a culture the consuming pool is the strain's only class acting on the "
-                    "substrate. Leave the other class out of this dataset (a class from a genome annotation: run the "
-                    "culture in a dataset without genomes.csv).",
+                    f"{item.class_key!r}, whose cases on that substrate run the culture model ({file}). FungMod builds "
+                    "one model per strain, substrate and condition and does not choose between a culture and an "
+                    "enzyme-assay case; in a culture the consuming pools are the strain's only classes acting on the "
+                    f"substrate. To make {other_key!r} a consuming pool of the culture, give its rows in {file} (the "
+                    "consuming pools act in parallel); otherwise leave the other class out of this dataset (a class "
+                    "from a genome annotation: run the culture in a dataset without genomes.csv).",
                 )
     kept_responses: list[_Response] = []
     for response in parsed.responses:
@@ -5541,7 +5615,7 @@ def _validate_pairs(parsed: _Parsed, context: _Context) -> None:
                 )
                 continue
             by_substrate_class[substrate.substrate_class] = substrate
-            if (class_key, substrate.substrate_id) in parsed.culture_pairs or parsed.network_dataset:
+            if _consumes_in_culture(parsed, class_key, substrate.substrate_id) or parsed.network_dataset:
                 # A culture model's state names are checked in _validate_cultures, a network's in _validate_networks.
                 continue
             states = _state_names(class_key, substrate, form=_pair_form(parsed, (class_key, substrate.substrate_id)))
@@ -5649,7 +5723,7 @@ def _generate_records(
         for class_key in used_classes
         for substrate in parsed.substrates.values()
         if _shared_bonds(parsed.classes[class_key], substrate) is not None
-        and (class_key, substrate.substrate_id) not in parsed.culture_pairs
+        and not _consumes_in_culture(parsed, class_key, substrate.substrate_id)
         and not parsed.network_dataset
     ]
     for class_key, substrate in pairs:
@@ -5748,6 +5822,14 @@ def _generate_records(
     _generate_culture_records(parsed, context, generated, namespace)
     _generate_network_records(parsed, context, generated, namespace)
     return generated
+
+
+def _consumes_in_culture(parsed: _Parsed, class_key: str, substrate_id: str) -> bool:
+    """Whether the class consumes the substrate in a culture model (as its first or another consuming pool)."""
+
+    return any(
+        pair[1] == substrate_id and class_key in culture.consuming_pools for pair, culture in parsed.culture_pairs.items()
+    )
 
 
 @dataclass(frozen=True)
@@ -7618,13 +7700,16 @@ def _generate_culture_records(
             _culture_template_mapping(culture, parsed=parsed, namespace=namespace, scientific=scientific),
             origin=origin,
         )
-        _emit(
-            generated,
-            context,
-            "process_compatibility",
-            _culture_compatibility_mapping(culture, parsed=parsed, namespace=namespace),
-            origin=origin,
-        )
+        # One compatibility per consuming class, all pointing to the one template: the preflight looks for a
+        # compatibility of every class of the strain that acts on the substrate.
+        for consumer in culture.consuming_pools:
+            _emit(
+                generated,
+                context,
+                "process_compatibility",
+                _culture_compatibility_mapping(culture, parsed=parsed, namespace=namespace, consumer=consumer),
+                origin=origin,
+            )
 
 
 def _culture_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, Any], ...]:
@@ -7644,11 +7729,17 @@ def _culture_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, A
                         "strain_id": item.strain_id,
                         "substrate_id": pair[1],
                         "enzyme_class": pair[0],
+                        # Every pool that consumes the substrate, in parallel; enzyme_class is the first of them.
+                        "consuming_pools": list(culture.consuming_pools),
                         "enzyme_pools": list(culture.pools),
                         "fungus_id": namespace.id(item.strain_id),
                         "substrate_record_id": substrate.registry_id or namespace.id(pair[1]),
                         "case_template_id": _culture_template_id(namespace, culture),
                         "process_compatibility_id": namespace.id(pair[0], pair[1], USER_DATASET_CULTURE_PROCESS_TYPE),
+                        "process_compatibility_ids": [
+                            namespace.id(consumer, pair[1], USER_DATASET_CULTURE_PROCESS_TYPE)
+                            for consumer in culture.consuming_pools
+                        ],
                         "file": CULTURE_TABLE,
                         "rows": rows,
                     }
@@ -7659,27 +7750,41 @@ def _culture_report(parsed: _Parsed, *, dataset_id: str) -> tuple[Mapping[str, A
 
 def _culture_role_keys(culture: _CulturePair) -> tuple[tuple[str, str], ...]:
     """(quantity, pool class) of every role of a culture model in record order; culture-level roles name the
-    consuming class."""
+    first consuming class, and the consumption roles each consuming pool."""
 
-    keys = [(quantity, culture.class_key) for quantity in (*CULTURE_LEVEL_QUANTITIES, *CULTURE_CONSUMPTION_QUANTITIES)]
+    keys = [(quantity, culture.class_key) for quantity in CULTURE_LEVEL_QUANTITIES]
+    keys.extend((quantity, pool) for pool in culture.consuming_pools for quantity in CULTURE_CONSUMPTION_QUANTITIES)
     for pool in culture.pools:
         keys.extend((quantity, pool) for quantity in CULTURE_POOL_QUANTITIES)
     return tuple(keys)
 
 
-def _culture_role(quantity: str, pool: str) -> str:
-    """The template role of a culture quantity: a fixed role, or ``<quantity>__<pool class>`` for a pool quantity."""
+def _culture_role(quantity: str, pool: str, *, several: bool = False) -> str:
+    """The template role of a culture quantity: a fixed role, or ``<quantity>__<pool class>`` for a pool quantity.
 
+    With several consuming pools (``several``) each consumption quantity is also per pool; one consuming pool keeps
+    the fixed USERDATA-009 roles ``hydrolysis_capacity`` and ``hydrolysis_half_saturation``.
+    """
+
+    if several and quantity in CULTURE_CONSUMPTION_QUANTITIES:
+        return f"{quantity}__{pool}"
     return _CULTURE_ROLE[quantity] if quantity in _CULTURE_ROLE else f"{quantity}__{pool}"
 
 
+def _culture_pool_part(culture: _CulturePair, quantity: str, pool: str) -> tuple[str, ...]:
+    """The pool in a symbol or record id: for a pool quantity, and for a consumption quantity of several consumers."""
+
+    per_pool = quantity in CULTURE_POOL_QUANTITIES or (culture.several and quantity in CULTURE_CONSUMPTION_QUANTITIES)
+    return (pool,) if per_pool else ()
+
+
 def _culture_symbol(namespace: _Namespace, culture: _CulturePair, quantity: str, pool: str) -> str:
-    pool_part = (pool,) if quantity in CULTURE_POOL_QUANTITIES else ()
+    pool_part = _culture_pool_part(culture, quantity, pool)
     return namespace.id("culture", quantity, *pool_part, culture.class_key, culture.substrate_id)
 
 
 def _culture_record_id(case: _CultureCase, quantity: str, pool: str) -> str:
-    pool_part = (pool,) if quantity in CULTURE_POOL_QUANTITIES else ()
+    pool_part = _culture_pool_part(case.culture, quantity, pool)
     return case.namespace.id(
         case.strain.strain_id, case.substrate.substrate_id, case.condition.condition_id, "culture", quantity, *pool_part
     )
@@ -7690,7 +7795,9 @@ def _culture_selectors(case: _CultureCase, quantity: str, pool: str) -> dict[str
     return {
         "parameter_symbol": _culture_symbol(namespace, case.culture, quantity, pool),
         "process_type": USER_DATASET_CULTURE_PROCESS_TYPE,
-        "enzyme_class": namespace.id(case.culture.class_key),
+        # With several consuming pools the selector is empty: the compatibility of each consuming class selects the
+        # one model's records (as for an enzyme network).
+        "enzyme_class": None if case.culture.several else namespace.id(case.culture.class_key),
         "substrate_class": substrate.substrate_class,
         "fungus_id": namespace.id(case.strain.strain_id),
         "substrate_id": substrate.registry_id or namespace.id(substrate.substrate_id),
@@ -8021,22 +8128,33 @@ def _culture_template_mapping(
     for ledger in ("ledger_unassimilated_substrate", "ledger_biomass_loss"):
         initial_state_mapping[ledger] = {"value": 0.0, "units_from_role": "initial_substrate"}
     product_map_id = namespace.id(culture.class_key, culture.substrate_id, "biomass_yield_map")
+    if culture.several:
+        # One consumption process per consuming pool (CULTURE-002), sharing the biomass-yield product map.
+        consumption_templates = [
+            _culture_consumption_template(culture, pool, parsed=parsed, namespace=namespace, product_map_id=product_map_id)
+            for pool in culture.consuming_pools
+        ]
+    else:
+        consumption_templates = [
+            {
+                "id": "substrate_consumption",
+                "process_type": USER_DATASET_PROCESS_TYPE,
+                "state_roles": {"substrate": "substrate", "enzyme": "enzyme", "product": "biomass"},
+                "parameter_roles": {"kcat": "hydrolysis_capacity", "km": "hydrolysis_half_saturation"},
+                "rate_units_from_state_role": "substrate",
+                "product_map": product_map_id,
+                "assumptions": [
+                    f"Bulk {substrate.name} consumption is proportional to the consuming enzyme pool ({info.name}) "
+                    "and saturates in the substrate (consumption = k_h E S / (K_h + S)); the substrate is a suspended "
+                    "solid on a dry-mass basis and the law is an apparent bulk law.",
+                    "Consumed substrate is converted to biomass dry mass with a constant explicit yield Y; the "
+                    "remaining (1 - Y) is booked to an explicit closure ledger, and soluble intermediates are not "
+                    "resolved.",
+                ],
+            }
+        ]
     process_templates: list[dict[str, Any]] = [
-        {
-            "id": "substrate_consumption",
-            "process_type": USER_DATASET_PROCESS_TYPE,
-            "state_roles": {"substrate": "substrate", "enzyme": "enzyme", "product": "biomass"},
-            "parameter_roles": {"kcat": "hydrolysis_capacity", "km": "hydrolysis_half_saturation"},
-            "rate_units_from_state_role": "substrate",
-            "product_map": product_map_id,
-            "assumptions": [
-                f"Bulk {substrate.name} consumption is proportional to the consuming enzyme pool ({info.name}) and "
-                "saturates in the substrate (consumption = k_h E S / (K_h + S)); the substrate is a suspended solid "
-                "on a dry-mass basis and the law is an apparent bulk law.",
-                "Consumed substrate is converted to biomass dry mass with a constant explicit yield Y; the remaining "
-                "(1 - Y) is booked to an explicit closure ledger, and soluble intermediates are not resolved.",
-            ],
-        },
+        *consumption_templates,
         {
             "id": "biomass_loss",
             "process_type": "first_order",
@@ -8088,7 +8206,7 @@ def _culture_template_mapping(
                 "enzyme_class": namespace.id(pool),
                 "target_bond_types": list(parsed.classes[pool].target_bond_classes),
                 "target_substrate_classes": list(parsed.classes[pool].compatible_substrate_classes),
-                "target_substrate_names": [substrate.name] if pool == culture.class_key else [],
+                "target_substrate_names": [substrate.name] if pool in culture.consuming_pools else [],
                 "validity_labels": [USER_DATASET_RECORD_MATURITY, "culture_enzyme_pool"],
                 "provenance": {
                     "source": parsed.classes[pool].source,
@@ -8096,7 +8214,7 @@ def _culture_template_mapping(
                     "confidence_level": "user_supplied",
                     "notes": (
                         "Consumes the substrate."
-                        if pool == culture.class_key
+                        if pool in culture.consuming_pools
                         else "Acts on no modelled state in this culture; it is produced and lost only."
                     )
                     + " The pool keeps the units of its culture.csv rows and is not converted.",
@@ -8114,10 +8232,11 @@ def _culture_template_mapping(
         row.row for row in parsed.culture_rows if parsed.cultured.get(row.culture_key) == culture.class_key
         and row.substrate_id == culture.substrate_id
     )
+    through = " and ".join(parsed.classes[pool].name for pool in culture.consuming_pools)
     return {
         "record_id": template_id,
         "case_template_id": template_id,
-        "name": f"Culture on {substrate.name} consumed through {info.name} template ({namespace.dataset_id})",
+        "name": f"Culture on {substrate.name} consumed through {through} template ({namespace.dataset_id})",
         "maturity": USER_DATASET_RECORD_MATURITY,
         "provenance": {
             "source": namespace.source,
@@ -8151,7 +8270,7 @@ def _culture_template_mapping(
         "process_state_metadata": {
             "config_name": (
                 f"User dataset {namespace.dataset_id}: culture of {{fungus_id}} on {_template_text(substrate.name)}, "
-                f"consumed through {_template_text(info.name)}"
+                f"consumed through {_template_text(through)}"
             ),
             "config_mode": mode,
             "config_maturity": mode,
@@ -8172,7 +8291,7 @@ def _culture_template_mapping(
                             "physical_state": substrate.physical_state,
                             "bond_types": list(substrate.bond_classes),
                             "accessible_bonds": list(substrate.bond_classes),
-                            "required_enzyme_classes": [namespace.id(culture.class_key)],
+                            "required_enzyme_classes": [namespace.id(pool) for pool in culture.consuming_pools],
                             "degradation_products": [],
                             "completeness": "partial",
                             "default_degradation_model": "unknown",
@@ -8236,16 +8355,20 @@ def _culture_template_mapping(
                 },
             },
         },
-        "limitations": [
-            (
-                f"Well-mixed batch culture of one strain on the suspended {substrate.physical_state} substrate "
-                f"{substrate.substrate_id} (dry-mass basis) from user dataset {namespace.dataset_id}, composed from "
-                "the registry's culture_physiology process laws: substrate consumption by one enzyme pool with an "
-                "explicit biomass yield, first-order biomass loss, biomass-proportional substrate-induced synthesis "
-                "and first-order loss of each enzyme pool."
-            ),
-            *_CULTURE_LIMITATIONS,
-        ],
+        "limitations": (
+            [
+                (
+                    f"Well-mixed batch culture of one strain on the suspended {substrate.physical_state} substrate "
+                    f"{substrate.substrate_id} (dry-mass basis) from user dataset {namespace.dataset_id}, composed "
+                    "from the registry's culture_physiology process laws: substrate consumption by one enzyme pool "
+                    "with an explicit biomass yield, first-order biomass loss, biomass-proportional substrate-induced "
+                    "synthesis and first-order loss of each enzyme pool."
+                ),
+                *_CULTURE_LIMITATIONS,
+            ]
+            if not culture.several
+            else _several_consumer_limitations(culture, parsed=parsed, namespace=namespace)
+        ),
         "validity_notes": [
             f"Values come from user dataset {namespace.dataset_id} (sha256 {namespace.digest}); FungMod did not "
             "check them against an external source.",
@@ -8257,19 +8380,117 @@ def _culture_template_mapping(
             f"Culture-physiology template generated from user dataset {namespace.dataset_id} for enzyme class "
             f"{culture.class_key} consuming substrate {culture.substrate_id}; enzyme pools "
             f"{', '.join(culture.pools)}."
+            if not culture.several
+            else f"Culture-physiology template generated from user dataset {namespace.dataset_id} for the enzyme "
+            f"classes {', '.join(culture.consuming_pools)} consuming substrate {culture.substrate_id} in parallel; "
+            f"enzyme pools {', '.join(culture.pools)}."
         ),
     }
 
 
-def _culture_compatibility_mapping(culture: _CulturePair, *, parsed: _Parsed, namespace: _Namespace) -> dict[str, Any]:
-    info = parsed.classes[culture.class_key]
+def _culture_consumption_template(
+    culture: _CulturePair,
+    pool: str,
+    *,
+    parsed: _Parsed,
+    namespace: _Namespace,
+    product_map_id: str,
+) -> dict[str, Any]:
+    """The consumption process of one of several consuming pools: the same law and product map as one pool's."""
+
+    substrate = parsed.substrates[culture.substrate_id]
+    name = parsed.classes[pool].name
+    return {
+        "id": f"substrate_consumption__{pool}",
+        "enzyme_class": namespace.id(pool),
+        "process_type": USER_DATASET_PROCESS_TYPE,
+        "state_roles": {"substrate": "substrate", "enzyme": _culture_pool_role(culture, pool), "product": "biomass"},
+        "parameter_roles": {
+            "kcat": _culture_role("hydrolysis_capacity", pool, several=True),
+            "km": _culture_role("hydrolysis_half_saturation", pool, several=True),
+        },
+        "rate_units_from_state_role": "substrate",
+        "product_map": product_map_id,
+        "assumptions": [
+            f"Bulk {substrate.name} consumption by {name} is proportional to that pool and saturates in the substrate "
+            "(its own k_h E S / (K_h + S)); the substrate is a suspended solid on a dry-mass basis and the law is an "
+            "apparent bulk law.",
+            f"{name} acts independently of the other consuming pools of the culture: their consumption rates add, "
+            "with no competition for substrate or adsorption sites and no synergy.",
+            "Consumed substrate is converted to biomass dry mass with the culture's one explicit yield Y, whichever "
+            "pool consumed it; the remaining (1 - Y) is booked to an explicit closure ledger, and soluble "
+            "intermediates are not resolved.",
+        ],
+    }
+
+
+def _several_consumer_limitations(culture: _CulturePair, *, parsed: _Parsed, namespace: _Namespace) -> list[str]:
+    """The limitations of a culture whose substrate is consumed by several pools in parallel (CULTURE-002)."""
+
+    substrate = parsed.substrates[culture.substrate_id]
+    consumers = ", ".join(parsed.classes[pool].name for pool in culture.consuming_pools)
+    others = [parsed.classes[pool].name for pool in culture.pools if pool not in culture.consuming_pools]
+    return [
+        (
+            f"Well-mixed batch culture of one strain on the suspended {substrate.physical_state} substrate "
+            f"{substrate.substrate_id} (dry-mass basis) from user dataset {namespace.dataset_id}, composed from the "
+            "registry's culture_physiology process laws: substrate consumption by several enzyme pools in parallel "
+            f"({consumers}), each by its own saturation law, with one explicit biomass yield, first-order biomass "
+            "loss, biomass-proportional substrate-induced synthesis and first-order loss of each enzyme pool."
+        ),
+        _CULTURE_LIMITATIONS[0],
+        _CULTURE_LIMITATIONS[1],
+        _CULTURE_LIMITATIONS[2],
+        (
+            "The consuming pools act on the substrate additively and independently: their consumption rates add, "
+            "with no competition for substrate or adsorption sites, no synergy (for example endo- and exo-acting "
+            "cooperation) and no product inhibition; every consumed gram feeds growth through the one yield, "
+            "whichever pool consumed it. "
+            + (
+                f"The other pools ({', '.join(others)}) are produced and lost only and have no feedback on "
+                "consumption. "
+                if others
+                else ""
+            )
+            + "All pools share one induction half-saturation constant."
+        ),
+        (
+            "Released soluble products are not resolved and do not feed growth: FungMod has no uptake law for a "
+            "soluble pool with an explicit yield that culture.csv binds, so a culture is not combined with an "
+            "enzyme network and no pool acts on a product of another."
+        ),
+        _CULTURE_LIMITATIONS[4],
+    ]
+
+
+def _culture_compatibility_mapping(
+    culture: _CulturePair,
+    *,
+    parsed: _Parsed,
+    namespace: _Namespace,
+    consumer: str,
+) -> dict[str, Any]:
+    """The compatibility of one consuming class of a culture model; every one points to the model's template."""
+
+    info = parsed.classes[consumer]
     substrate = parsed.substrates[culture.substrate_id]
     symbols = {
-        _culture_role(quantity, pool): _culture_symbol(namespace, culture, quantity, pool)
+        _culture_role(quantity, pool, several=culture.several): _culture_symbol(namespace, culture, quantity, pool)
         for quantity, pool in _culture_role_keys(culture)
     }
+    notes = (
+        f"Culture-physiology compatibility generated from user dataset {namespace.dataset_id}: every strain that "
+        f"declares {culture.class_key} grows on {substrate.substrate_id} and secretes the enzyme pools "
+        f"{', '.join(culture.pools)}; the class consumes the substrate through the bond classes listed."
+        if not culture.several
+        else f"Culture-physiology compatibility generated from user dataset {namespace.dataset_id}: every strain that "
+        f"declares {consumer} grows on {substrate.substrate_id} and secretes the enzyme pools "
+        f"{', '.join(culture.pools)}, of which {', '.join(culture.consuming_pools)} consume the substrate in "
+        f"parallel; {consumer} acts on it through the bond classes listed. Every consuming class has such a record, "
+        "all pointing to the one culture template."
+    )
     return {
-        "record_id": namespace.id(culture.class_key, culture.substrate_id, USER_DATASET_CULTURE_PROCESS_TYPE),
+        "record_id": namespace.id(consumer, culture.substrate_id, USER_DATASET_CULTURE_PROCESS_TYPE),
         "name": f"{info.name} on {substrate.name} culture physiology ({namespace.dataset_id})",
         "maturity": USER_DATASET_RECORD_MATURITY,
         "provenance": {
@@ -8277,7 +8498,7 @@ def _culture_compatibility_mapping(culture: _CulturePair, *, parsed: _Parsed, na
             "confidence_level": "user_supplied",
             USER_DATASET_PROVENANCE_KEY: namespace.provenance("substrates.csv", substrate.row),
         },
-        "enzyme_class": namespace.id(culture.class_key),
+        "enzyme_class": namespace.id(consumer),
         "substrate_class": substrate.substrate_class,
         "required_bond_classes": list(_shared_bonds(info, substrate) or ()),
         "process_type": USER_DATASET_CULTURE_PROCESS_TYPE,
@@ -8285,11 +8506,7 @@ def _culture_compatibility_mapping(culture: _CulturePair, *, parsed: _Parsed, na
         "parameter_roles": dict(symbols),
         "product_map_required": True,
         "case_template_id": _culture_template_id(namespace, culture),
-        "notes": (
-            f"Culture-physiology compatibility generated from user dataset {namespace.dataset_id}: every strain that "
-            f"declares {culture.class_key} grows on {substrate.substrate_id} and secretes the enzyme pools "
-            f"{', '.join(culture.pools)}; the class consumes the substrate through the bond classes listed."
-        ),
+        "notes": notes,
     }
 
 
@@ -8303,9 +8520,13 @@ _NETWORK_TABLE_REFUSALS = (
     (
         CULTURE_TABLE,
         "culture_rows",
-        "culture.csv is not combined with enzyme_network in this version: a culture binds one consuming enzyme pool "
-        "and grows biomass, while a network runs several enzyme classes at stated concentrations. Keep cultures in a "
-        "dataset without enzyme_network.",
+        "culture.csv is not combined with enzyme_network in this version. The secreted pools of a culture act "
+        "together in culture.csv itself: every pool whose class acts on the culture substrate consumes it, in "
+        "parallel, and the consumed substrate feeds growth through the culture's one yield. A network's released "
+        "pools cannot be part of a growing culture: FungMod has no uptake law for a released soluble pool with an "
+        "explicit yield, so the substrate a pool releases would either be counted twice (as biomass and as the "
+        "released pool) or feed nothing, and splitting it between them is a partition no table states. Keep "
+        "cultures in a dataset without enzyme_network.",
     ),
     (
         TIMECOURSE_TABLE,

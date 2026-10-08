@@ -1,0 +1,16 @@
+dataset_id: culture_parallel_pools
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for a user-defined fungus secreting two enzyme pools that consume a
+  user-defined cellulose-like solid in parallel and a third pool that acts on nothing in the
+  culture; no measurement, literature value or registry record stands behind them
+notes: >-
+  Non-specific culture case with several consuming pools (CULTURE-002): two induced
+  protein-mass pools consume the solid in parallel, each by its own saturation law, and
+  feed growth through one biomass yield; every value an estimate, so the case runs in
+  exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 144
+  units: hour
+  points: 145

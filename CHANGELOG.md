@@ -6,6 +6,30 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- A growing culture whose secreted pools act together (CULTURE-002): in
+  `culture.csv` every pool whose class acts on the culture substrate now
+  consumes it, each by its own existing homogeneous Michaelis-Menten law with
+  its own `hydrolysis_capacity` and `hydrolysis_half_saturation`; the
+  consumption processes add their rates (no competition for sites, no
+  synergy), every consumed gram feeds growth through the culture's one yield
+  with the closure ledger, and every pool is induced by the substrate with the
+  one shared constant. With several consuming pools the consumption roles are
+  per pool (`hydrolysis_capacity__<class>`), each consuming class gets a
+  compatibility pointing to the one template, the records' enzyme-class
+  selector is empty, and cultures of one substrate whose consuming pools
+  overlap are one model shared by every strain declaring one of its classes;
+  with one consuming pool every identifier, template and config is unchanged
+  (the existing culture fixtures and the shipped *T. harzianum* case assemble
+  byte-identically). Released soluble pools are not part of a culture:
+  FungMod has no uptake law for a soluble pool with an explicit yield that a
+  user table binds, so `culture.csv` stays refused in an `enzyme_network`
+  dataset, now with that reason. `UserDataset.cultures` entries gain
+  `consuming_pools` and `process_compatibility_ids`; `fungmod check-data`
+  lists every consuming pool. Fixtures `culture_parallel_pools` (two pools on a
+  cellulose-like solid and one acting on nothing) and `culture_shared_pools`
+  (two strains, ranges, a gap condition on a chitin-like solid); illustrative
+  estimates only. No new process law, numerics or output schema.
+
 - Temperature and pH response laws inside enzyme networks (NETWORK-003): in a
   dataset with an `enzyme_network` block, a `responses.csv` row (cardinal
   temperature, cardinal pH or Arrhenius) binds to the network process of its
@@ -849,6 +873,12 @@ All notable public releases of FungMod are documented here.
   remain explicit; no validated organism model or registry promotion is claimed.
 
 ### Changed
+
+- A culture naming two or more pools that act on its substrate is no longer
+  refused (CULTURE-002); the refusal of a declared class acting on a culture
+  substrate now says how to make it a consuming pool, and the refusal of
+  `culture.csv` in a network dataset gives the missing uptake law as its
+  reason.
 
 - `responses.csv` is no longer refused in an enzyme-network dataset
   (NETWORK-003); its laws bind per network process (see Added). Assembled

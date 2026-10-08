@@ -184,6 +184,25 @@ USER_DATA_FORBIDDEN_TOKENS = (
     # come from the tables.
     "network_chain_laws",
     "other_cutter",
+    # CULTURE-002 cultures with several consuming pools: strains, pools, solids and conditions come from culture.csv and
+    # its tables.
+    "culture_parallel_pools",
+    "culture_shared_pools",
+    "strain_g5",
+    "strain_g6",
+    "strain_k6",
+    "strain_k7",
+    "solid_g5",
+    "solid_k6",
+    "film_g5",
+    "endo_cutter_g5",
+    "exo_cutter_g5",
+    "third_cutter_g5",
+    "endo_cleaver_k",
+    "exo_cleaver_k",
+    "second_cutter_x",
+    "c28_ph5",
+    "c30_ph6",
 )
 
 

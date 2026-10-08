@@ -1536,8 +1536,9 @@ substrate and constants. The process laws and the assembler are the existing
 ones; FungMod adds no numerics for user cultures.
 
 ```text
-consumption:   dS/dt = - k_h · E · S / (K_h + S)            (one consuming enzyme pool E)
-growth:        dX/dt = + Y · k_h · E · S / (K_h + S) - k_d · X
+consumption:   r_i = k_h,i · E_i · S / (K_h,i + S)           (each consuming enzyme pool E_i)
+               dS/dt = - sum_i r_i
+growth:        dX/dt = + Y · sum_i r_i - k_d · X
 ledgers:       (1 - Y) of the consumed substrate -> consumed substrate not retained as biomass
                k_d · X                            -> biomass dry mass lost
 each pool P:   dP/dt = + q_P · X · S / (K_ind + S) - k_P · P
@@ -1546,11 +1547,12 @@ each pool P:   dP/dt = + q_P · X · S / (K_ind + S) - k_P · P
 `S` is the substrate's dry mass per volume, `X` the biomass dry mass per volume
 (in the same unit as `S`), and each pool `P` an enzyme amount per volume in its
 own unit: a protein mass (for example `mg/L`) or an activity in one of the
-registry's assay units (`FPU/L`, `BGU/L`). Exactly one pool, the one whose
-class acts on the substrate, consumes it; every other pool is produced and lost
-only. All pools share one induction constant `K_ind`, as in the registry case.
-`S + X` and both ledgers form one closed dry-mass balance, which every run
-checks.
+registry's assay units (`FPU/L`, `BGU/L`). Every pool whose class acts on the
+substrate consumes it, by its own law; with
+[several such pools](#several-pools-consuming-the-substrate) their rates add.
+Every other pool is produced and lost only. All pools share one induction
+constant `K_ind`, as in the registry case. `S + X` and both ledgers form one
+closed dry-mass balance, which every run checks.
 
 ### `culture.csv` (optional)
 
@@ -1577,14 +1579,14 @@ checks.
 | `biomass_yield` | blank | `biomass_yield` | dimensionless, above 0 and at most 1 g/g; `mg/g` or `percent` are converted with pint (350 mg/g is 0.35 g/g) | `g/g` |
 | `biomass_loss_rate` | blank | `biomass_loss_rate` | 1/time | `1/h` |
 | `induction_half_saturation` | blank | `induction_half_saturation` | dry mass per volume, above 0 | `g/L` |
-| `hydrolysis_capacity` | the consuming pool | `hydrolysis_capacity` | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
-| `hydrolysis_half_saturation` | the consuming pool | `hydrolysis_half_saturation` | dry mass per volume, above 0 | `g/L` |
+| `hydrolysis_capacity` | each consuming pool | `hydrolysis_capacity` (`hydrolysis_capacity__<class>` with several consuming pools) | substrate dry mass per time per pool amount | `g/FPU/h`, `g/mg/h` |
+| `hydrolysis_half_saturation` | each consuming pool | `hydrolysis_half_saturation` (`hydrolysis_half_saturation__<class>` with several) | dry mass per volume, above 0 | `g/L` |
 | `initial_enzyme_concentration` | each pool | `initial_enzyme_concentration__<class>` | protein mass or assay activity per volume | `FPU/L`, `mg/L` |
 | `specific_production_rate` | each pool | `specific_production_rate__<class>` | pool amount per biomass dry mass per time | `FPU/g/h`, `mg/g/h` |
 | `enzyme_loss_rate` | each pool | `enzyme_loss_rate__<class>` | 1/time | `1/h` |
 
 The units of a case are also checked together: `hydrolysis_capacity × E` must be
-the substrate's dry mass per volume per time with the consuming pool's own
+the substrate's dry mass per volume per time with each consuming pool's own
 units, and `specific_production_rate × X` an amount of the pool per volume per
 time, so a pool in `FPU/L` with a rate per protein mass (or the reverse) is
 refused on the rate's row. A molar amount is refused on every substrate-side,
@@ -1655,11 +1657,120 @@ consumes the cellulose and a beta-glucosidase (`BGU`) pool that is produced and
 lost only. Its biomass, cellulose, both activity and both ledger trajectories
 equal the registry case's at every loading (`tests/test_user_data_culture.py`).
 
+### Several pools consuming the substrate
+
+A fungus secretes several enzymes that attack its substrate at once. Every
+culture pool whose class acts on the culture substrate (the categorical rule,
+never a name) consumes it, each by its own `k_h,i E_i S / (K_h,i + S)` with its
+own `hydrolysis_capacity` and `hydrolysis_half_saturation` rows. The laws are
+the existing ones, composed as an enzyme network composes its classes: one
+homogeneous Michaelis-Menten process per consuming pool on the shared
+substrate, whose rates add. The decisions, none of which adds biology:
+
+- **What feeds growth.** Only the consumed culture substrate, as for one pool:
+  every consumed gram forms `Y` gram of biomass, whichever pool consumed it,
+  and `1 - Y` goes to the closure ledger. Soluble products are not resolved.
+- **Induction.** Every pool, consuming or not, is produced by the existing law
+  `q_P X S / (K_ind + S)`, induced by the culture substrate with the one shared
+  `K_ind`.
+- **One process, one law.** A consuming pool's process takes its constants from
+  `culture.csv` only (`hydrolysis_capacity` is its kcat per pool amount,
+  `hydrolysis_half_saturation` its apparent Km); `kinetics.csv` rows of a
+  culture class stay refused.
+- **Additive, independent action**, as in an enzyme network: no competition for
+  substrate or adsorption sites, no synergy, no product inhibition.
+- **No released pools.** A pool released by one enzyme and degraded by another
+  cannot be part of a growing culture: FungMod has no uptake law for a soluble
+  pool with an explicit yield that `culture.csv` could bind, so the substrate a
+  pool released would either be counted twice (as biomass and as the released
+  pool) or feed nothing, and splitting it between the two is a partition no
+  table states. `culture.csv` therefore stays refused in an `enzyme_network`
+  dataset, with this reason.
+
+`tests/fixtures/user_data/culture_parallel_pools/` is a user-defined strain
+whose endo- and exo-cutter-like pools (protein masses) consume a
+cellulose-like solid in parallel while a third pool acts on nothing in the
+culture; every value is an illustrative estimate:
+
+```text
+strain_id,substrate_id,condition_id,quantity,enzyme_class,value,lower,upper,units,evidence_type,method,source
+strain_g5,solid_g5,c28_ph5,substrate_initial_concentration,,12,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,initial_biomass,,0.15,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,biomass_yield,,0.4,,,g/g,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,biomass_loss_rate,,0.005,,,1/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,induction_half_saturation,,0.8,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_capacity,endo_cutter_g5_like,0.004,,,g/mg/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_half_saturation,endo_cutter_g5_like,6,,,g/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,initial_enzyme_concentration,endo_cutter_g5_like,0.5,,,mg/L,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,specific_production_rate,endo_cutter_g5_like,1.5,,,mg/g/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,enzyme_loss_rate,endo_cutter_g5_like,0.015,,,1/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_capacity,exo_cutter_g5_like,0.006,,,g/mg/h,estimate,illustrative estimate,<source>
+strain_g5,solid_g5,c28_ph5,hydrolysis_half_saturation,exo_cutter_g5_like,10,,,g/L,estimate,illustrative estimate,<source>
+...                                              (the initial levels, production and loss rates of both other pools)
+```
+
+```text
+$ fungmod check-data tests/fixtures/user_data/culture_parallel_pools
+...
+Kinetic values: 18; gaps: 0
+Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, culture_physiology): 1
+  strain     substrate  consuming pools                          enzyme pools                                                      culture.csv rows
+  strain_g5  solid_g5   endo_cutter_g5_like, exo_cutter_g5_like  endo_cutter_g5_like, exo_cutter_g5_like, dimer_hydrolase_g5_like  2-19
+
+$ fungmod run --user-data tests/fixtures/user_data/culture_parallel_pools --fungus strain_g5 \
+    --substrate solid_g5 --environment c28_ph5 --mode exploratory --samples 8 --seed 1 --output culture_pools_run
+...
+    final_substrate_remaining          0.007365 [0.007365, 0.007365] gram / liter (n=8)
+    maximum_substrate_depletion_rate   0.2276 [0.2276, 0.2276] gram / hour / liter (n=8)
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  42.87 [42.87, 42.87] hour (n=8)
+    time_to_50_percent_substrate_degradation  78.7 [78.7, 78.7] hour (n=8)
+    time_to_90_percent_substrate_degradation  102.4 [102.4, 102.4] hour (n=8)
+```
+
+The time series hold one `process_rate.substrate_consumption__<class>` per
+consuming pool (here about 6.6 g/L of the solid consumed by the endo-cutter-like
+pool and 5.4 g/L by the exo-cutter-like pool over the 144 hours), the biomass
+(peaking at 3.96 g/L near 112 hours), every pool in its own units and both
+ledgers. The tests check at every output time that the dry-mass closure
+`S + X + ledgers = S0 + X0` holds, that growth equals the yield times the
+consumed substrate (`X - X0 + biomass lost = Y (S0 - S)`), that each consumption
+rate is its own pool's law, that the degradation rate is their sum, and that
+each synthesis and loss rate is its own law; that a second consuming pool with
+a zero `hydrolysis_capacity` reproduces the one-pool culture; and the
+materially different `tests/fixtures/user_data/culture_shared_pools/`: two
+strains sharing one model of two consuming pools on a chitin-like solid, one
+with its consumption capacities as ranges (each sample follows its own sampled
+laws and closes), and a condition without rows whose every role is a gap
+(`tests/test_user_data_culture_pools.py`).
+
+With one consuming pool nothing changes: the roles, symbols, records,
+templates and compatibilities are those of the previous version, and the
+existing culture fixtures and the registry's *T. harzianum* case assemble
+byte-identically. With several:
+
+- cultures of one substrate whose consuming pools overlap are one culture
+  model, named by the first consuming pool in `culture.csv`; every strain that
+  declares one of its consuming classes runs it, so it must declare every pool
+  of the model (a pool without rows is a gap) and no other class acting on the
+  substrate;
+- the consumption roles become per pool (`hydrolysis_capacity__<class>`,
+  `hydrolysis_half_saturation__<class>`, symbol
+  `<dataset_id>__culture__<quantity>__<class>__<first class>__<substrate_id>`),
+  one consumption process per pool (`substrate_consumption__<class>`) shares
+  the yield's product map, every consuming class gets a compatibility pointing
+  to the one template, and the records' enzyme-class selector is empty so each
+  compatibility selects them;
+- another solid substrate a consuming class acts on without rows is a culture
+  of gaps with the classes of its model that act on it.
+
 ### What is generated
 
-One culture model per consuming enzyme class and substrate, shared by every
-strain that declares the class (the strain's records are selected by its
-fungus id, as for the rate forms): a `culture_physiology` process compatibility
+One culture model per consuming enzyme class (or set of
+[consuming classes](#several-pools-consuming-the-substrate)) and substrate,
+shared by every strain that declares the class (the strain's records are
+selected by its fungus id, as for the rate forms): a `culture_physiology`
+process compatibility
 (`<dataset>__<class>__<substrate>__culture_physiology`) and case template
 (`..._culture_template`) that composes the existing process laws (homogeneous
 Michaelis-Menten consumption with a stoichiometric biomass yield and closure
@@ -1671,10 +1782,10 @@ rate is in the units of the state it changes per unit of the dataset's time
 grid, so one template serves cases whose rows use different units. The
 template is scientific only when every bound record is exact and
 scientific-eligible; one estimate keeps it exploratory (the weakest input
-wins). The generated enzyme class of the consuming pool lists
+wins). The generated enzyme class of each consuming pool lists
 `culture_physiology` as its process; the other pools keep their own.
-`UserDataset.cultures` lists each strain's culture (consuming pool, pools,
-template and compatibility ids, rows).
+`UserDataset.cultures` lists each strain's culture (the first consuming pool,
+every consuming pool, the pools, template and compatibility ids, rows).
 
 ### Gaps
 
@@ -1695,10 +1806,11 @@ culture_estimates__strain_x1__xylan_lot_x1__c25__culture__specific_production_ra
 
 Nothing is defaulted. A condition with no rows makes every role a gap whose
 request says at which conditions the culture has values; a strain that declares
-the consuming class without rows has a culture of gaps; a solid substrate the
+a consuming class without rows has a culture of gaps; a solid substrate a
 consuming class acts on without rows is a culture of gaps with the consuming
-pool only. With `--runnable-only` (`blocked="report"`) a culture case runs
-beside its gap cases ([partial runs](cli.md)).
+pools of its model that act on it. With `--runnable-only`
+(`blocked="report"`) a culture case runs beside its gap cases
+([partial runs](cli.md)).
 
 ### Refused
 
@@ -1715,13 +1827,17 @@ Each refusal names its file, row and column:
   consuming class on any substrate. FungMod builds one model per strain,
   substrate and condition and does not choose between a culture and an assay;
   keep assay kinetics in a separate dataset.
-- A strain that declares the consuming class and another class acting on the
-  culture substrate (a class from a genome annotation included: run the
-  culture in a dataset without `genomes.csv`), and a strain that declares the
-  consuming class but not every pool of the culture.
-- A culture whose pools include no class acting on the substrate, or more
-  than one (synergy between pools is not modelled); `hydrolysis_capacity` or
-  `hydrolysis_half_saturation` on a pool that does not consume the substrate.
+- A strain that declares a consuming class and another class acting on the
+  culture substrate that is no pool of the culture (give that class's rows in
+  `culture.csv` to make it a consuming pool; a class from a genome annotation
+  included: run the culture in a dataset without `genomes.csv`), and a strain
+  that declares a consuming class but not every pool of the culture.
+- A culture whose pools include no class acting on the substrate;
+  `hydrolysis_capacity` or `hydrolysis_half_saturation` on a pool that does not
+  consume the substrate.
+- `culture.csv` in a dataset with `enzyme_network`: no released pool can be
+  part of a growing culture
+  ([several pools consuming the substrate](#several-pools-consuming-the-substrate)).
 - Units of the wrong dimension, units of one case that do not fit together
   (above), an initial biomass in other units than the initial substrate, a
   yield above 1 g/g or at zero, a zero half-saturation constant, an
@@ -1743,11 +1859,12 @@ Each refusal names its file, row and column:
 ### What is and is not modelled
 
 Modelled: one strain growing in a well-mixed batch on one suspended solid
-substrate (dry-mass basis); substrate consumption by one secreted enzyme pool
-with an apparent saturation law; biomass formation with an explicit yield and a
-closure ledger for the consumed substrate not retained as biomass; first-order
-biomass loss into a ledger; substrate-induced, biomass-proportional synthesis
-and first-order loss of every enzyme pool, each in its own units.
+substrate (dry-mass basis); substrate consumption by every secreted enzyme pool
+that acts on it, each with its own apparent saturation law, in parallel;
+biomass formation with one explicit yield and a closure ledger for the consumed
+substrate not retained as biomass; first-order biomass loss into a ledger;
+substrate-induced, biomass-proportional synthesis and first-order loss of every
+enzyme pool, each in its own units.
 
 Not modelled, and the template and outputs say so:
 
@@ -1763,8 +1880,11 @@ Not modelled, and the template and outputs say so:
   bound; the temperature and pH of a condition are metadata.
 - No soluble products: the product named in `substrates.csv` is not released
   by the culture (the row is still required by `substrates.csv`); consumed
-  substrate is biomass or ledger.
-- Pools other than the consuming one act on nothing; no synergy, product
+  substrate is biomass or ledger. No pool degrades a product of another, and no
+  released pool feeds growth: FungMod has no uptake law for a soluble pool with
+  an explicit yield that a user table binds.
+- Pools other than the consuming ones act on nothing; consuming pools act
+  additively and independently: no synergy, competition for sites, product
   inhibition, adsorption or surface law.
 - Constants are apparent and specific to the strain, substrate preparation and
   conditions at which they were obtained; nothing extrapolates them.
@@ -2221,8 +2341,10 @@ Each refusal names its file, row and column:
 - On an intermediate pool: an initial concentration (unless the pool is an
   entry), an `enzyme_dose` and a `reactivity_exponent`. Different initial
   concentrations of one entry on the rows of its classes (they are one pool).
-- The pH-ionization form in a network; `culture.csv` and `timecourse.csv` in
-  a network dataset.
+- The pH-ionization form in a network; `culture.csv` (no released pool can be
+  part of a growing culture; see
+  [several pools consuming the substrate](#several-pools-consuming-the-substrate))
+  and `timecourse.csv` in a network dataset.
 - A `responses.csv` law that a single-class case refuses (see
   [`responses.csv`](#responsescsv-optional)), applied per process: kinetic
   constants or a `ki` of the process off the law's reference condition, two
@@ -2271,8 +2393,11 @@ Not modelled, and the template and outputs say so:
   keeps the constants of its rows' condition at every temperature and pH, and
   no thermal inactivation, pH dynamics or interaction between conditions
   beyond the product of the factors is represented.
-- No time courses, comparison, fitting or cultures in a network yet. Networks
-  are drafted for a fungus by `assemble_user_tables(network=True)`
+- No time courses, comparison or fitting in a network yet, and no culture: a
+  culture's secreted pools act together on its substrate in `culture.csv`
+  itself ([several pools consuming the substrate](#several-pools-consuming-the-substrate)),
+  but a released pool cannot be part of a growing culture, because no uptake
+  law exists for it. Networks are drafted for a fungus by `assemble_user_tables(network=True)`
   ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
   dissolved pools only, so a link from a solid to a dissolved pool, with its
   yield, is written in `substrates.csv` by hand, and they carry no response
@@ -2339,7 +2464,7 @@ out of data you intend to simulate.
 | Vmax record (explicit row, derived, or from an assay activity) | `<dataset_id>__<strain>__<class>__<substrate>__<condition>__vmax` |
 | Response-law parameter record per `responses.csv` row | `<dataset_id>__<strain>__<class>__<substrate>__<law>__<parameter>`, or in a network `<dataset_id>__network__<entry>__<strain>__<law>__<parameter>__<class>__<pool>` |
 | Explicit unknown per missing role or law parameter | the same identifier with `__gap` |
-| Culture compatibility and case template per consuming class and culture substrate ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
+| Culture compatibility per consuming class and culture substrate, and one case template per culture model, named by its first consuming class ([fungal culture](#fungal-culture-growth-and-secretion)) | `<dataset_id>__<class>__<substrate_id>__culture_physiology`, `<dataset_id>__<class>__<substrate_id>__culture_template` |
 | Enzyme-network template per entry substrate, compatibility per class acting on it, and records per strain, condition and role ([several enzymes acting together](#what-a-network-generates)) | `<dataset_id>__<entry>__enzyme_network_template`, `<dataset_id>__<class>__<entry>__enzyme_network`, `<dataset_id>__network__<entry>__<strain>__<condition>__<role>` |
 | Culture parameter record per strain, condition and role (`<pool>` for a pool quantity only) | `<dataset_id>__<strain>__<substrate>__<condition>__culture__<quantity>[__<pool>]`, symbol `<dataset_id>__culture__<quantity>[__<pool>]__<class>__<substrate_id>` |
 
@@ -2877,18 +3002,18 @@ Limits of the SABIO-RK route:
   are rescaled by the law. When the dataset has several conditions for a case
   (gap records included) no condition-specific record is copied and the grid
   case reports the roles as missing.
-- Several enzyme classes act together only in an enzyme network
+- Several enzyme classes act together in an enzyme network
   ([several enzymes acting together](#several-enzymes-acting-together)):
   independent Michaelis-Menten processes whose rates add on shared pools, a
   chain of pools linked by explicit products with at most one basis change
-  (from a solid, through a stated unit-bearing yield), and
-  optionally one competitive inhibitor per process and response laws per
-  process; no synergy, competition for sites, competing substrates of one
-  enzyme, other inhibition forms, time courses or cultures in a network. Growth and secretion only through
-  `culture.csv`, which binds the registry's culture model (one consuming pool,
-  an explicit yield, induced synthesis; see
-  [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
-  soluble products.
+  (from a solid, through a stated unit-bearing yield), and optionally one
+  competitive inhibitor per process and response laws per process; no synergy,
+  competition for sites, competing substrates of one enzyme, other inhibition
+  forms, time courses or cultures in a network. Growth and secretion only
+  through `culture.csv`, which binds the registry's culture model (one or
+  several consuming pools in parallel, one explicit yield, induced synthesis;
+  see [what is and is not modelled](#what-is-and-is-not-modelled)); no uptake of
+  soluble products and no released pool in a culture.
 - Time courses measure the substrate state or the product formed of a
   simulated case; other observables (intermediates, biomass, rates) are not
   read. Comparison interpolates linearly on the simulated output grid and

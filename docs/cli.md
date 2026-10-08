@@ -506,12 +506,13 @@ Enzyme classes resolved from them: 5
 ```
 
 `check-data` also prints a dataset's cultures (one row per strain and
-culture substrate, with the consuming pool, every enzyme pool and the
+culture substrate, with the consuming pool or pools, every enzyme pool and the
 `culture.csv` rows; see
 [fungal culture](user-data.md#fungal-culture-growth-and-secretion)), its
 enzyme networks (each entry's chain of pools with the yields and strains, a
 unit-bearing yield with its evidence type, for example `(3.0838 mmol/g, estimate)`, and
-one row per process with its class, pool, rate form and competitive inhibitor;
+one row per process with its class, pool, rate form and competitive inhibitor,
+plus its response laws when `responses.csv` binds any;
 see [several enzymes acting together](user-data.md#several-enzymes-acting-together)), its time
 courses (one row per series, with its points, time range, units and how many
 observations carry an `sd`) and, for a fitted dataset, the fitted values with

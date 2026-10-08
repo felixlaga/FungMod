@@ -2253,17 +2253,25 @@ def _print_cultures(dataset: UserDataset) -> None:
         f"Cultures (culture.csv; the strain grows on the substrate and secretes its enzyme pools, "
         f"culture_physiology): {len(dataset.cultures)}"
     )
+    # Several pools may consume the substrate in parallel (CULTURE-002); one keeps the earlier column title.
+    several = any(len(item.get("consuming_pools", ())) > 1 for item in dataset.cultures)
     rows = [
         (
             str(item["strain_id"]),
             str(item["substrate_id"]),
-            str(item["enzyme_class"]),
+            ", ".join(str(pool) for pool in item.get("consuming_pools", (item["enzyme_class"],))),
             ", ".join(str(pool) for pool in item["enzyme_pools"]),
             _rows_text(item["rows"]) if item["rows"] else "none (every role a gap)",
         )
         for item in dataset.cultures
     ]
-    headers = ("strain", "substrate", "consuming pool", "enzyme pools", "culture.csv rows")
+    headers = (
+        "strain",
+        "substrate",
+        "consuming pools" if several else "consuming pool",
+        "enzyme pools",
+        "culture.csv rows",
+    )
     for line in _table(headers, rows):
         print(f"  {line}")
 

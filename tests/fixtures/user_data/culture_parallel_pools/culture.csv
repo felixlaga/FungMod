@@ -1,0 +1,19 @@
+strain_id,substrate_id,condition_id,quantity,enzyme_class,value,lower,upper,units,evidence_type,method,source
+strain_g5,solid_g5,c28_ph5,substrate_initial_concentration,,12,,,g/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 2
+strain_g5,solid_g5,c28_ph5,initial_biomass,,0.15,,,g/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 2
+strain_g5,solid_g5,c28_ph5,biomass_yield,,0.4,,,g/g,estimate,illustrative estimate,Illustrative test note CG-5 p. 2
+strain_g5,solid_g5,c28_ph5,biomass_loss_rate,,0.005,,,1/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 2
+strain_g5,solid_g5,c28_ph5,induction_half_saturation,,0.8,,,g/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 2
+strain_g5,solid_g5,c28_ph5,hydrolysis_capacity,endo_cutter_g5_like,0.004,,,g/mg/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 3
+strain_g5,solid_g5,c28_ph5,hydrolysis_half_saturation,endo_cutter_g5_like,6,,,g/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 3
+strain_g5,solid_g5,c28_ph5,initial_enzyme_concentration,endo_cutter_g5_like,0.5,,,mg/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 3
+strain_g5,solid_g5,c28_ph5,specific_production_rate,endo_cutter_g5_like,1.5,,,mg/g/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 3
+strain_g5,solid_g5,c28_ph5,enzyme_loss_rate,endo_cutter_g5_like,0.015,,,1/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 3
+strain_g5,solid_g5,c28_ph5,hydrolysis_capacity,exo_cutter_g5_like,0.006,,,g/mg/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 4
+strain_g5,solid_g5,c28_ph5,hydrolysis_half_saturation,exo_cutter_g5_like,10,,,g/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 4
+strain_g5,solid_g5,c28_ph5,initial_enzyme_concentration,exo_cutter_g5_like,0.3,,,mg/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 4
+strain_g5,solid_g5,c28_ph5,specific_production_rate,exo_cutter_g5_like,1,,,mg/g/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 4
+strain_g5,solid_g5,c28_ph5,enzyme_loss_rate,exo_cutter_g5_like,0.01,,,1/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 4
+strain_g5,solid_g5,c28_ph5,initial_enzyme_concentration,dimer_hydrolase_g5_like,0.2,,,mg/L,estimate,illustrative estimate,Illustrative test note CG-5 p. 5
+strain_g5,solid_g5,c28_ph5,specific_production_rate,dimer_hydrolase_g5_like,0.3,,,mg/g/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 5
+strain_g5,solid_g5,c28_ph5,enzyme_loss_rate,dimer_hydrolase_g5_like,0.02,,,1/h,estimate,illustrative estimate,Illustrative test note CG-5 p. 5

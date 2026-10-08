@@ -26,6 +26,174 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CULTURE-002 A Growing Culture Whose Secreted Pools Act Together
+
+Status: `partial` (2026-10-08): complete for several pools consuming the
+culture substrate in parallel; a pool released by one enzyme and degraded by
+another inside a growing culture is not implemented, because it needs an
+uptake law the core does not have (below). For the owner's goal ("i want fungi
+X on substrate Y in conditions Z ... and then the code calculates all the
+stuff"), `culture.csv` (USERDATA-009) bound the registry's `culture_physiology`
+model with exactly one consuming pool (a second class acting on the substrate
+was refused), and cultures were refused in network datasets. A fungus secretes
+several enzymes that attack its substrate at once.
+
+Design (note kept outside the repository; the decisions, all from existing
+laws, no new biology or numerics):
+
+- **What feeds growth.** Only the consumed culture substrate, as before: every
+  consuming pool's process forms biomass with the culture's one yield `Y` and
+  books `1 - Y` to the closure ledger (the existing product map, shared).
+- **Several pools on the solid.** Every culture pool whose class acts on the
+  substrate (categorical rule) consumes it by its own `k_h,i E_i S / (K_h,i + S)`
+  (the existing homogeneous Michaelis-Menten law, as in the one-pool culture);
+  the processes add their rates (the enzyme network's additive, independent
+  action: no competition for sites, no synergy).
+- **Induction.** Every pool, consuming or not, by the existing
+  `q_P X S / (K_ind + S)` with the culture substrate as inducer and the one
+  shared `K_ind`.
+- **One process, one law.** A consuming pool's constants come from
+  `culture.csv` only (`hydrolysis_capacity` is its kcat per pool amount,
+  `hydrolysis_half_saturation` its apparent Km); `kinetics.csv` rows of a
+  culture class stay refused (the USERDATA-009 mixing refusal).
+- **Released pools: not implemented, and refused with the reason.** If the
+  solid's consumption feeds growth, the same dry mass cannot also be released as
+  a pool (counted twice); if it is released instead, nothing feeds growth
+  without an uptake law; splitting it is a partition no table states. The only
+  uptake process in the core, the Pirt/Monod `resource_limited_growth`, needs
+  oxidant and nitrogen states, a maintenance demand and a molar macrochemical
+  stoichiometry in one concentration unit, none of which is a culture.csv role,
+  and a molar released pool cannot enter the dry-mass closure without a molar
+  mass. Missing for that step: (a) an uptake process for a soluble pool into
+  biomass with an explicit, unit-bearing yield bindable from user tables,
+  (b) a closure spanning a dry-mass and a molar basis (a stated dry mass per
+  amount of the released pool, hydrolysis water accounted for), (c) data stating
+  them. `culture.csv` therefore stays refused in an `enzyme_network` dataset,
+  now with this reason.
+- **Identity.** One consuming pool keeps every USERDATA-009 identifier, role,
+  symbol, selector, process id, template text and compatibility. With several:
+  cultures of one substrate whose consuming pools overlap are one model (union
+  over consuming classes), named by the first consuming pool in culture.csv;
+  every strain declaring one of its consuming classes runs it (all pools
+  declared, no other acting class, as before); consumption roles become
+  `hydrolysis_capacity__<class>` and `hydrolysis_half_saturation__<class>`; one
+  `substrate_consumption__<class>` process per consumer shares the yield's
+  product map; one compatibility per consuming class points to the one template
+  (the preflight looks for a compatibility of every class acting on the
+  substrate); the records' enzyme-class selector is empty (as for networks); a
+  consuming class's other solid substrate without rows is a culture of gaps
+  with its model's consumers that act there.
+
+Changed:
+
+- `api/user_data.py`: `_CulturePair.consumers`, `consuming_pools`, `several`;
+  `_validate_cultures` (consuming pools, union of overlapping cultures,
+  per-consumer refusals and messages, gap models with linked consumers, every
+  strain running a model checked through the first consuming class it
+  declares); `_consumes_in_culture` (no single-class pair for any consumer);
+  `_culture_role_keys`, `_culture_role(several=)`, `_culture_pool_part`,
+  `_culture_symbol`, `_culture_record_id`, `_culture_selectors`;
+  `_culture_template_mapping` (`_culture_consumption_template`,
+  `_several_consumer_limitations`); one `_culture_compatibility_mapping` per
+  consumer; `UserDataset.cultures` gains `consuming_pools` and
+  `process_compatibility_ids`; the network refusal of `culture.csv` states the
+  missing uptake law; the docstrings.
+- `cli.py`: `check-data` lists every consuming pool (the column title becomes
+  "consuming pools" only when a culture has several).
+- Fixtures `tests/fixtures/user_data/culture_parallel_pools/` (one strain, an
+  endo- and an exo-cutter-like protein-mass pool consuming a cellulose-like
+  solid in parallel, a third pool acting on nothing) and
+  `tests/fixtures/user_data/culture_shared_pools/` (two strains sharing one
+  two-pool model on a chitin-like solid, the second with capacity ranges and
+  its pools in the other order, a condition of gaps); illustrative estimates,
+  READMEs.
+- Docs: `docs/user-data.md` (the culture equations, roles, new "Several pools
+  consuming the substrate" with the decisions, worked example with real
+  `check-data` and `run` output and the identity rules; generated records,
+  refusals, what is and is not modelled, the network refusal and limits),
+  `docs/organism-physiology.md`, `docs/capabilities.md`, `README.md`,
+  `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_culture_pools.py` (19 test functions, 22
+cases): the consuming pools, processes, shared product map, per-pool roles,
+two compatibilities to one template, limitations and class processes; records
+per consuming pool with an empty selector, selected by the preflight; analytic
+checks at every output time of the parallel culture: dry-mass closure
+`S + X + L_u + L_d = S0 + X0`, growth `X - X0 + L_d = Y (S0 - S)`, ledger
+`L_u = (1 - Y)(S0 - S)`, each consumption rate `k_h,i E_i S / (K_h,i + S)`, the
+degradation rate their sum, each synthesis `q X S / (K_ind + S)` and loss
+`k E` (rtol 1e-9); thresholds and the closure diagnostic; a second consuming
+pool with zero capacity reproduces the one-pool `culture_estimates` trajectories
+(rtol 1e-7); the materially different fixture: one shared model for both
+strains whatever order they list their pools, ranges as range records, a gap
+condition with plain-words requests, and for each strain three samples that
+each close, grow by their yield and follow their own (sampled) laws; another
+solid of the consumers is a culture of gaps with both; measured rows make the
+culture scientific (`scientific_exact_unvalidated`) until one row is an
+estimate; refusals (culture in a network with the uptake reason, kinetics.csv
+rows of a consuming pool, a strain declaring only the second consumer, another
+acting class with the remedy, a consumption row on a non-consuming pool, no
+consuming pool, one consumer's units checked against its own pool, response
+laws on a consumer); `fungmod check-data` (both column titles) and a refusal as
+`file:row:column`; `fungmod run`. Modified: `tests/test_user_data_culture.py`
+(two acting pools now load, the second's missing roles are gaps; the remedy text
+of the other-class refusal), `tests/test_guardrails_no_hardcoding.py` (fixture
+tokens). Byte identity: the records and assembled configs of every earlier
+fixture, including both culture fixtures, and of the 19 shipped registry cases
+(the *T. harzianum* culture case among them) stay pinned by
+`tests/test_user_data_culture.py` and `tests/test_user_data_network_cross_basis.py`,
+and a digest script over all 14 earlier fixtures confirms them against an
+export of `b8e3abe`; `to_dict()` of the culture fixtures gains only
+`consuming_pools` and `process_compatibility_ids`.
+
+Not changed: no process law, factory, modifier, solver, kernel, registry
+record or case template, composition builder, result-table rule, output schema
+(2.2.1), preflight rule, fit or comparison.
+
+Scientific impact: a user's culture can now secrete several enzymes that
+attack its substrate together, each with its own measured capacity and
+half-saturation constant, so the substrate loss, growth, every pool, the rates
+and the threshold times reflect all of them, with the dry-mass balance closed
+and every consumed gram assigned to biomass or the ledger. What the culture
+still cannot represent, and says so: soluble hydrolysis products, their
+conversion by other secreted pools and their uptake.
+
+Compatibility: additive (cultures that were refused now load; new report keys;
+new refusal wording).
+
+Remaining ambiguities: the induction constant stays shared by every pool (the
+registry template's choice); which consuming pool names a multi-pool model
+depends on culture.csv row order (identifiers only); a class consuming in two
+started models on different substrates links its gap models through the last
+one.
+
+Commands and results (worktree on `claude/network-responses-culture`, after
+NETWORK-003, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data.py`, `cli.py` and both
+  new test files: 0 errors.
+- `mkdocs build --strict`: built (exit 0); the anchor
+  `several-pools-consuming-the-substrate` exists and its eight links resolve.
+- `tests/test_user_data_culture_pools.py`: 22 passed.
+- Targeted run (both new test files, culture, network, cross-basis, v2,
+  import, solid, genome, UniProt, time courses, pH-ionization, guardrails, CLI,
+  CLI workflow, documentation sync, hygiene, instruction hierarchy, roadmap,
+  shared progress, partial runs, organism case, registry case builder and
+  templates, case selection, config-driven assembly, culture processes,
+  modelability, network assembly, assembly): 872 passed in 8 min 49 s.
+- Digest script over every earlier fixture and the shipped registry against an
+  export of `b8e3abe`: records and assembled configs identical; a seeded
+  three-sample run of eleven existing cases (both culture fixtures, the two
+  chain networks, the oxidase and solid cases): final metrics, thresholds,
+  time series, conservation diagnostics, limitations and mechanism rows
+  byte-identical after normalising paths.
+
+Next task: an uptake process for a released soluble pool with an explicit
+biomass yield and a dry-mass-to-molar closure (new biology and numerics, to be
+sourced), which would let a culture resolve hydrolysis products; carrying
+`responses.csv` laws into assembled network drafts; the unit-bearing release
+for single-class solid cases.
+
 ## NETWORK-003 Temperature And pH Response Laws Inside Enzyme Networks
 
 Status: `complete` for the stated scope (2026-10-08). For the owner's goal ("i
@@ -182,8 +350,8 @@ Commands and results (worktree on `claude/network-responses-culture`, based on
 - Digest script over every fixture and the shipped registry against an export
   of `b8e3abe`: records and assembled configs identical.
 
-Next task: CULTURE-002 (a growing culture whose secreted pools act together);
-then carrying `responses.csv` laws into assembled network drafts, and the
+Next task: CULTURE-002 (above: a growing culture whose secreted pools act
+together); then carrying `responses.csv` laws into assembled network drafts, and the
 unit-bearing release for single-class solid cases.
 
 ## FIX-UNITS-001 A Dimensionless Coefficient In Scaled Units Is A Plain Fraction

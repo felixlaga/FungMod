@@ -1,0 +1,17 @@
+dataset_id: culture_shared_pools
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for two user-defined strains secreting the same two enzyme pools,
+  which consume a user-defined chitin-like solid in parallel; no measurement, literature
+  value or registry record stands behind them
+notes: >-
+  Materially different culture case with several consuming pools (CULTURE-002): two strains
+  share one culture model on an aminoglycan-like solid, the second states its consumption
+  capacities as ranges (sampled in exploratory mode) and lists its pools in the other
+  order, and a second condition has no rows, so its cases are explicit gaps. Every value is
+  an estimate, so the runnable cases run in exploratory mode only.
+simulation:
+  duration: 96
+  units: hour
+  points: 97
