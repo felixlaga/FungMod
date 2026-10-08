@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+c55_ph5,55,degC,5,Illustrative assay condition for the network inactivation fixture

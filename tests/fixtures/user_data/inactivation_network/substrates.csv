@@ -1,0 +1,2 @@
+substrate_id,registry_substrate,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+solid_w7,,Particulate polymer-like solid W7,particulate_like,solid_polymer,inner_link_like,dry_mass,fragment_w7,1,g/g,Illustrative test note IW-7 p. 2 (one gram of fragment-like product per gram of solid consumed; an assumed yield)

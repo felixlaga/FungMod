@@ -150,14 +150,19 @@ sit slightly below zero near depletion, so the compiled core evaluates rates at
 ## Your own strain on this model
 
 `culture.csv` in a user dataset binds this same composition to your own
-strain, solid substrate and constants (USERDATA-009): consumption by one
-enzyme pool, the biomass yield and its closure ledger, first-order biomass
-loss, and induced synthesis and loss of every pool you name, each pool in its
-own protein-mass or assay units. The generated template uses
-`rate_units_from_state_role` and a `null` geometry; the shipped
+strain, solid substrate and constants (USERDATA-009): consumption by the enzyme
+pools that act on the substrate, the biomass yield and its closure ledger,
+first-order biomass loss, and induced synthesis and loss of every pool you
+name, each pool in its own protein-mass or assay units. Several pools acting on
+the substrate consume it in parallel (CULTURE-002): one consumption process per
+pool, each with its own capacity and half-saturation constant, their rates
+adding and all of them feeding growth through the one yield; no released
+soluble pool is resolved, because no uptake law for one exists. The generated
+template uses `rate_units_from_state_role` and a `null` geometry; the shipped
 *T. harzianum* case assembles byte-identically, and re-entering its records in
 `culture.csv` reproduces its trajectories. See
-[fungal culture](user-data.md#fungal-culture-growth-and-secretion).
+[fungal culture](user-data.md#fungal-culture-growth-and-secretion) and
+[several pools consuming the substrate](user-data.md#several-pools-consuming-the-substrate).
 
 ## Next organism records
 

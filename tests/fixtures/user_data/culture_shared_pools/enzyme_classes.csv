@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+endo_cleaver_k_like,Endo-cleaver-like pool K,,aminoglycosidic_like_bond,aminoglycan_like_solid,Illustrative user-defined class for the culture test (no record of this pool exists)
+exo_cleaver_k_like,Exo-cleaver-like pool K,,aminoglycosidic_like_bond,aminoglycan_like_solid,Illustrative user-defined class for the culture test (no record of this pool exists)

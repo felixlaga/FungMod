@@ -18,6 +18,7 @@ HIGH_RISK_PATHS = (
     "src/fungal_model/api/user_data_sources.py",
     "src/fungal_model/api/user_data_assembly.py",
     "src/fungal_model/cli.py",
+    "src/fungal_model/cli_summary.py",
     "src/fungal_model/__main__.py",
 )
 

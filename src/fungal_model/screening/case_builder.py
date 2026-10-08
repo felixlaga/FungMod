@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import Any, Literal
 
 from fungal_model.core.units import Q_
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.modifiers.reactivity import SUBSTRATE_REACTIVITY_MODIFIER_TYPE
+from fungal_model.processes.inactivation import THERMAL_INACTIVATION_PROCESS_TYPE
 from fungal_model.registry.records import (
     CaseTemplateRecord,
     ParameterRecord,
@@ -105,6 +107,22 @@ _PH_IONIZATION_MM_PROCESS_PARAMETER_ROLES = {
     "minimum_ph": "minimum_ph",
     "maximum_ph": "maximum_ph",
 }
+# An enzyme-kinetics template (plain or pH-dependent Michaelis-Menten with an enzyme state) may declare, under this
+# process_state_metadata key, a loss process of its enzyme state.
+ENZYME_INACTIVATION_TEMPLATE_KEY = "enzyme_inactivation"
+#: The existing process laws such a template may bind as the loss of its enzyme state: the law's state field that
+#: takes the enzyme state, and the parameter fields the law reads. Bound without a product or inactive state, each
+#: changes the enzyme state only, so the substrate-product balance of the case is untouched.
+ENZYME_INACTIVATION_PROCESS_LAWS: Mapping[str, tuple[str, tuple[str, ...]]] = MappingProxyType(
+    {
+        "first_order": ("source", ("rate_constant",)),
+        THERMAL_INACTIVATION_PROCESS_TYPE: (
+            "active",
+            ("reference_rate_constant", "inactivation_energy", "reference_temperature"),
+        ),
+    }
+)
+_ENZYME_INACTIVATION_FIELDS = frozenset({"process_id", "process_type", "parameter_roles", "assumptions"})
 EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES = (
     "solid_substrate_initial_concentration",
     "cellulase_initial_concentration",
@@ -1779,7 +1797,10 @@ def _enzyme_kinetics_config_data(
     product and, for enzyme-explicit role sets, enzyme. The substrate entity
     carries the registry substrate's own physical state: a dissolved substrate
     uses the dissolved loader, any other substrate (a suspended solid on which
-    the same law runs as an apparent bulk law) the solid loader.
+    the same law runs as an apparent bulk law) the solid loader. A template
+    with an enzyme state may also declare a loss process of that state
+    (``process_state_metadata.enzyme_inactivation``); it becomes a second
+    process of the config, after the Michaelis-Menten process.
     """
 
     states = {role: _template_state(case_template, role) for role in state_roles}
@@ -1807,11 +1828,17 @@ def _enzyme_kinetics_config_data(
         registry=registry,
         environment_id=environment_id,
     )
+    inactivation = _template_enzyme_inactivation(
+        case_template=case_template,
+        parameter_records=parameter_records,
+        states=states,
+        process_id=process_id,
+    )
     environment_entity = _template_environment_entity(
         registry=registry,
         environment_id=environment_id,
         modifiers=modifiers,
-        process_types=(process_type,),
+        process_types=(process_type, *((str(inactivation["process_type"]),) if inactivation is not None else ())),
     )
     enzyme_class = registry.get_enzyme_class(compatibility.enzyme_class)
     entities: dict[str, Any] = {
@@ -1892,7 +1919,8 @@ def _enzyme_kinetics_config_data(
                     case_template,
                     (),
                 ),
-            }
+            },
+            *([inactivation] if inactivation is not None else []),
         ],
         "initial_state": _initial_state_from_template(
             case_template=case_template,
@@ -1920,6 +1948,80 @@ def _enzyme_kinetics_config_data(
             "save": ["record", "validation_report"],
             "plots": ["state_trajectories"],
         },
+    }
+
+
+def _template_enzyme_inactivation(
+    *,
+    case_template: CaseTemplateRecord,
+    parameter_records: Mapping[str, ParameterRecord],
+    states: Mapping[str, str],
+    process_id: str,
+) -> dict[str, Any] | None:
+    """The configured loss process of an enzyme-kinetics template's enzyme state, or None when it declares none.
+
+    ``process_state_metadata.enzyme_inactivation`` names the process id, one of
+    the existing laws in ``ENZYME_INACTIVATION_PROCESS_LAWS``, the parameter
+    role of every field that law reads (exactly those fields) and at least one
+    explicit assumption. The law acts on the enzyme state alone; nothing is
+    defaulted, and a role set without an enzyme state (the Vmax form) is
+    refused, since it represents no enzyme to lose.
+    """
+
+    raw = case_template.process_state_metadata.get(ENZYME_INACTIVATION_TEMPLATE_KEY)
+    if raw is None:
+        return None
+    label = f"Case template {case_template.case_template_id!r} {ENZYME_INACTIVATION_TEMPLATE_KEY}"
+    if not isinstance(raw, Mapping):
+        raise RegistryCaseBuildError(f"{label} must be a mapping.")
+    unknown = sorted(str(key) for key in raw if str(key) not in _ENZYME_INACTIVATION_FIELDS)
+    if unknown:
+        raise RegistryCaseBuildError(f"{label} has unsupported field(s): {', '.join(unknown)}.")
+    inactivation_id = raw.get("process_id")
+    if not _canonical_template_text(inactivation_id) or inactivation_id == process_id:
+        raise RegistryCaseBuildError(
+            f"{label} requires a nonblank process_id distinct from the template's process_id {process_id!r}."
+        )
+    process_type = str(raw.get("process_type", ""))
+    law = ENZYME_INACTIVATION_PROCESS_LAWS.get(process_type)
+    if law is None:
+        raise RegistryCaseBuildError(
+            f"{label} process_type {process_type!r} is not a law the enzyme state can be lost through; supported: "
+            f"{', '.join(ENZYME_INACTIVATION_PROCESS_LAWS)}."
+        )
+    if "enzyme" not in states:
+        raise RegistryCaseBuildError(
+            f"{label} binds {process_type!r} to the enzyme state, but the bound role set has no enzyme state "
+            f"(states: {', '.join(states)}); a maximum-rate role set represents no enzyme, so its loss cannot be "
+            "simulated."
+        )
+    state_field, fields = law
+    roles = raw.get("parameter_roles")
+    if not isinstance(roles, Mapping) or {str(key) for key in roles} != set(fields):
+        raise RegistryCaseBuildError(f"{label} parameter_roles must bind exactly {', '.join(fields)}.")
+    assumptions = raw.get("assumptions")
+    if (
+        not isinstance(assumptions, Sequence)
+        or isinstance(assumptions, (str, bytes))
+        or not assumptions
+        or not all(_canonical_template_text(item) for item in assumptions)
+    ):
+        raise RegistryCaseBuildError(f"{label} must declare at least one explicit assumption.")
+    parameters: dict[str, str] = {}
+    for field_name in fields:
+        role = str(roles[field_name])
+        record = parameter_records.get(role)
+        if record is None:
+            raise RegistryCaseBuildError(f"{label} parameter_roles.{field_name} references unresolved role {role!r}.")
+        parameters[field_name] = record.parameter_symbol
+    return {
+        "id": str(inactivation_id),
+        "process_type": process_type,
+        "states": {state_field: states["enzyme"]},
+        "parameters": parameters,
+        "modifiers": [],
+        "output_state_roles": dict(case_template.output_state_roles),
+        "assumptions": [str(item) for item in assumptions],
     }
 
 
@@ -2473,6 +2575,8 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
 
 
 __all__ = [
+    "ENZYME_INACTIVATION_PROCESS_LAWS",
+    "ENZYME_INACTIVATION_TEMPLATE_KEY",
     "HOMOGENEOUS_MM_PARAMETER_ROLES",
     "HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES",
     "PRIMARY_ROLE_SET_NAME",

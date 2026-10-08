@@ -51,9 +51,17 @@ modifiers:
 ```
 
 Single-process templates list modifiers under
-`process_state_metadata.process_modifiers`; `culture_physiology` templates list
-them per process template. A process law is bound by using its `process_type`
-in the template and mapping its parameter roles. In both cases assembly
+`process_state_metadata.process_modifiers`; `culture_physiology` and
+`enzyme_network` templates list them per process template, so a law scales the
+rate of the process it is listed under and of no other. A process law is bound
+by using its `process_type` in the template and mapping its parameter roles. A
+single-process enzyme-kinetics template (plain or pH-dependent Michaelis-Menten
+with an enzyme state) may also declare the loss of its enzyme state under
+`process_state_metadata.enzyme_inactivation`: a process id, the law
+(`first_order`, or `thermal_inactivation`, which reads temperature), its
+parameter roles and an explicit assumption; the assembler builds it as a second
+process on the enzyme state and refuses it on a role set without one. In
+all cases assembly
 requires an exact registry environment condition for every condition a law
 reads, generates an inline environment entity carrying exactly those
 conditions, and refuses to run otherwise. Nothing is inferred from the
@@ -63,10 +71,25 @@ those parameters.
 User datasets bind `temperature_cardinal_rosso`, `ph_cardinal_rosso` and
 `temperature_arrhenius_reference` through the same mechanism from an optional
 `responses.csv`, with the kinetic constants required at the law's reference
-condition. They bind the `ph_ionization_michaelis_menten` process law through
+condition: to the single process of a single-class case, or, in a dataset with
+an `enzyme_network` block, to the network process of the row's enzyme class and
+pool, where the process's competitive inhibition constant is also required at
+the reference condition and a process without a law keeps its rows' constants
+([response laws in a network](user-data.md#response-laws-in-a-network)).
+They bind the `ph_ionization_michaelis_menten` process law through
 the pH-ionization rate form of `kinetics.csv` (limiting constants, four pK
 values and the fitted pH range), with the condition pH required inside that
-range and no pH modifier on top; see [user-supplied data](user-data.md).
+range and no pH modifier on top; see [user-supplied data](user-data.md). They
+bind the `thermal_inactivation` process law to the enzyme state of a case (or of
+each network member) through a `kinetics.csv` `inactivation_rate`, the
+first-order constant at the reference temperature, and the `responses.csv` law
+`thermal_inactivation` (`activation_energy`, `reference_temperature`); without
+the law the `inactivation_rate` binds the constant `first_order` loss, which
+reads no condition ([enzyme inactivation](user-data.md#enzyme-inactivation-over-the-run)).
+The inactivation law rescales `k_d` only, so in a case whose rate has no
+temperature law a temperature grid is `active_response_model` through the
+enzyme's stability alone, and the case's limitations say that the catalytic
+constants keep their condition.
 
 ## What the output tables say
 
@@ -140,7 +163,8 @@ a statement about buffer or ionic-strength effects.
 
 The cardinal temperature, pH and water-activity laws and the thermal
 inactivation law are implemented, compiled and tested with artificial values,
-but no shipped case binds them. The repository holds no sourced cardinal
+but no shipped registry case binds them (user datasets bind the cardinal laws
+and thermal inactivation with the user's own values, as above). The repository holds no sourced cardinal
 temperatures, cardinal pH values, or inactivation energies for *T. harzianum* P49P11 or for the
 cellulase and beta-glucosidase activity pools of the Gelain 2020 cultures:
 the Gelain fit sits at one condition (29 degrees Celsius, pH 5) and its

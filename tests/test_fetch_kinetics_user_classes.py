@@ -49,6 +49,7 @@ from tests.test_assemble_network import (
     TEST_OLIGOMER_CLASS,
     _draft_digest,
     _registry_chain_draft,
+    _with_network_limitation_put_back,
     _with_registry_chain,
     _without_network_block,
 )
@@ -117,7 +118,8 @@ DIGESTS_E97E8E6 = {
 }
 # Digests at e97e8e6 of FETCH-002 lookups of registry classes, with the fetch clock fixed (_fixed_clock). FETCH-003
 # changes one sentence of their limitations (the lookup no longer leaves out classes a user dataset defines); with
-# that sentence put back, the drafts are byte-identical.
+# that sentence put back, the drafts are byte-identical (the network draft also with the no-law network limitation of
+# ASSEMBLE-003 put back: NETWORK-003 binds laws to network processes, so the sentence now says that no law is bound).
 LOOKUP_DIGESTS_E97E8E6 = {
     "k1_lookup_registry": "7fca33a05b2e6227f6d34f0b0935c100d227d25dbf83dbfff1344ace3b50e458",
     "g1_lookup_transfer": "59ea5e0bab96d0ab98d39b62c3be1022270e3ec5c1c2bf33021962e909fe0dff",
@@ -756,7 +758,10 @@ def test_lookups_of_registry_classes_change_only_the_lookup_limitation(
     new, old = json.dumps(_LOOKUP_LIMITATIONS[1])[1:-1], json.dumps(LOOKUP_LIMITATION_E97E8E6)[1:-1]
     # The sentence is in review.md and in assembly["limitations"], nowhere else.
     assert text.count(new) == 2 and old not in text
-    assert hashlib.sha256(text.replace(new, old).encode("utf-8")).hexdigest() == LOOKUP_DIGESTS_E97E8E6[name]
+    text = text.replace(new, old)
+    if "network" in draft.assembly:
+        text = _with_network_limitation_put_back(text, count=2)
+    assert hashlib.sha256(text.encode("utf-8")).hexdigest() == LOOKUP_DIGESTS_E97E8E6[name]
 
 
 def test_a_stored_lookup_has_the_same_bytes_on_every_platform(

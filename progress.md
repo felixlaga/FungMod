@@ -26,6 +26,38 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## PAPER-004 The JOSS Paper Brought Up To The Current Software
+
+Date: 2026-10-08
+
+Status: done; the author statements are still outstanding. `paper/joss/paper.md`
+now describes the capabilities added since PAPER-003's last update, each
+checked against the code that carries it:
+- the kinetics looked up in SABIO-RK by the EC numbers of a strain's classes,
+  the laboratory's own classes included (FETCH-002, FETCH-003);
+- temperature and pH laws per class of an enzyme network (NETWORK-003);
+- a culture whose several secreted enzymes consume the substrate in parallel
+  (CULTURE-002);
+- first-order enzyme inactivation, optionally temperature-dependent
+  (USERDATA-011);
+- the machine-readable summaries of the command line (CLI-003);
+- the quick-look figures of every state and process (PLOTS-001);
+- the walkthrough and the live-source check script (DOCS-WALK-001);
+- the analytic sparse Jacobians of the spatial module (SPATIAL-003).
+
+The test count reads "more than 3,100" (3192 passed on the combined branch).
+Older sentences were shortened to stay inside the journal's length limit:
+1,743 words without references, against 1,750.
+
+Changed: `paper/joss/paper.md`, `CHANGELOG.md`, this entry.
+
+Tests: `tests/test_joss_paper.py` (unchanged) passes. It checks the sections,
+the citations, the length and that no research results are reported.
+
+Not changed: any code, model, parameter, registry record or bibliography
+entry. Scientific impact: none. Open for the author: the research-impact
+evidence and the AI-usage statement, both still marked in the draft.
+
 ## SPATIAL-003 Analytic Sparse Jacobian For The Spatial Mycelium Core
 
 Status: `complete` for the stated scope (2026-10-08). The performance step
@@ -223,6 +255,381 @@ frozen plan, with the analytic LSODA band as the primary solver it now uses
 by default (about 0.5 s per 62-hour radial solve on this container), after
 the plan's owner confirms that the default Jacobian change needs no
 amendment.
+
+## ASSEMBLE-003 Response Laws Carried Into Enzyme-Network Drafts
+
+Status: `complete` for the stated scope (2026-10-08). Stacked on FETCH-003
+(#128) and NETWORK-003 (#125), which is merged into this branch: the loader
+binds each drafted law to the network process of its class and pool, so a
+reviewed network draft with laws loads and runs. Drafts should carry the
+conditions-dependence the user or the sources give. `fungmod assemble
+--responses FILE` drafted response-law rows for single-class cases, but
+`--network` refused `--responses` and the `responses.csv` rows of a
+`--user-data` dataset outright. Now a network draft writes each law against the
+network member it names, carries a member's kinetics to another requested
+condition only from the law's reference condition, and reports per member
+whether its drafted kinetic constants sit there; no new numerics, and no law
+is ever derived from data.
+
+Design decisions:
+
+- **Bound to a member.** The `responses` argument and the user dataset's
+  `responses.csv` rows for the fungus are written to the draft's
+  `responses.csv` against the strain, member class and pool they name
+  (`substrate`: a requested substrate or a pool it releases, found as in the
+  single-class draft). The single-class validation applies unchanged (the
+  columns, a law `responses.csv` binds, a class with evidence in the fungus, a
+  law the dataset already binds), plus `_check_network_law`: a class acting on
+  none of the pools of the networks that hold the named pool is "no member"
+  and a member naming a pool it does not act on is refused, each with the
+  reason (the categorical rule's reason and the pool the member does act on);
+  a substrate that is no pool is refused with the pools listed. A pool whose
+  categories are `REVIEW:` fields is decided when the reviewed tables load, as
+  in single-class drafts.
+- **The single-class route, per member.** Law-carried cases use the existing
+  machinery unchanged: a requested condition differing from the measured one
+  is reached only when the member's laws cover every difference, the pair's
+  kinetics sit at one condition, and the draft's `conditions.csv` rows are
+  that condition; it is then an `EnvironmentGrid` condition (NETWORK-003's law
+  records have no environment selector, so grid conditions reach them). A
+  member without a law keeps the condition of its rows, so its gap needs the
+  condition as a `conditions.csv` row and the other members' laws cannot carry
+  their kinetics there (the existing `_requested_rows` rule): the network is
+  blocked there, all or nothing.
+- **Reference condition.** `_apply_network_law_reference` (network drafts
+  with laws only) turns a law-carried case into a gap, with the existing
+  `_downgrade` wording ("...; the case is left as a gap", measured kinetics
+  kept and named by the measurement requests), unless the reused kinetics sit
+  at the reference condition of every law of the member, by the loader's rule
+  (`_reference_check`, mirroring `_validate_reference_condition`: the
+  condition's temperature or pH in the reference row's units equal to the
+  reference value, within that row's `reference_tolerance`, or declared with
+  `kinetics_at_reference = yes`; an unknown temperature or pH is not at the
+  reference; a `REVIEW:` field or an unreadable row is undecided). Single-class
+  drafts keep their behaviour (byte identity); the loader checks them at load.
+- **Report.** Only when a network draft holds laws: each member gets
+  `response_laws` (law, condition it reads, reference parameter and value,
+  origin, and per drafted condition with kinetic constants, including `ki`,
+  whether they sit at the reference and why) and `reference_condition`
+  (`REFERENCE_AT`, `REFERENCE_NOT_AT`, `REFERENCE_UNDETERMINED`,
+  `REFERENCE_NO_CONSTANTS`, `REFERENCE_NO_LAW`; `NETWORK_REFERENCE_STATUSES` as
+  `reference_condition_meaning`); each condition verdict gets
+  `in_conditions_csv` and `carried_from`; grid conditions are reported under
+  their requested IDs (`_network_report` assumed every requested condition was
+  a row) and reuse the entry's initial concentration of the draft's one
+  `conditions.csv` row, where `design` now writes it when that row is not
+  requested. `review.md` lists the laws per member; the command line prints
+  them under the member table and marks grid conditions. The last network
+  limitation is replaced by two law sentences.
+- **Loaded with NETWORK-003.** Before #125 was merged, the branch read the
+  loader's refusal of `responses.csv` in a network from `_NETWORK_TABLE_REFUSALS`
+  and stated it in drafts, with a strict `xfail` on the load; with #125 merged
+  that machinery is removed (no `loader_refusal` key, limitation or CLI line),
+  the load test passes for real, and the draft of the plain chain with the
+  laws is the same network as #125's hand-written `network_chain_laws`
+  fixture, laws included. The last limitation of a network draft without laws
+  ("Response laws, the pH-ionization form, cultures and time courses are not
+  combined with an enzyme network in this version; ...") now uses NETWORK-003's
+  wording: "The pH-ionization form, cultures and time courses are not combined
+  with an enzyme network in this version; no temperature or pH response law is
+  bound, so the network's kinetics apply at the condition of their rows only."
+- **No law from data.** SABIO-RK entries at several conditions stay listed
+  exactly as before ("kinetics are stated only at other conditions ..., which
+  FungMod does not reuse here without a response law", or, with a stated law,
+  a `conflict` "several measured kinetics could be carried here by the
+  response law ..., and FungMod does not choose the reference").
+
+Changed:
+
+- `api/user_data_assembly.py`: `_check_network_law` replaces
+  `_refuse_network_laws`; `collect_laws` (network checks, docstring);
+  `_law_references`, `_apply_network_law_reference`, `_member_laws`,
+  `_network_laws_markdown`; `_network_report` (grid conditions, member and
+  verdict keys, `reference_condition_meaning`),
+  `_network_design_initials` (the grid row), `_with_network_report`
+  (limitations), `_network_markdown`; `_LawReference`, `_reference_check`,
+  `_law_value_text`, `_member_laws_text`; constants `REFERENCE_*`,
+  `NETWORK_REFERENCE_STATUSES`, `_NETWORK_LAW_LIMITATIONS`,
+  `_LAW_REFERENCE_QUANTITIES`; the no-law network limitation (NETWORK-003's
+  wording); docstrings.
+- `cli.py` (assemble only): `_print_network_laws` and grid conditions in
+  `_print_assembly_network`; the `--network` epilog paragraph,
+  `--responses` help and module docstring. cli.py still names no database.
+- Docs: `docs/user-data.md` (new "Response laws in a network draft" with rules
+  and real output; the drafting rules, `responses` input, refusals and limits);
+  `docs/cli.md` (network section with the output, options table);
+  `docs/capabilities.md`; `README.md` (capability row); `CHANGELOG.md` (Added;
+  Changed).
+- Not changed by this entry: `api/user_data.py` (the loader; NETWORK-003's
+  changes come with the merge of #125), the core, any process law, registry
+  record, fixture, preflight rule or run output.
+
+Tests (`tests/test_assemble_network_responses.py`, 14 test functions, 28
+cases; `urlopen`, the SABIO-RK fetch module and `socket.connect` patched to
+fail): six drafts without the new combination byte-identical to 524df39
+(single-class drafts with laws from the argument, a temperature law with a
+pH-6 row, the plain chain with the laws on and off the reference, a network
+of three conditions, the registry chain at two conditions) and the stdout of a
+single-class `assemble --responses` (POSIX only); the plain `network_chain`
+copy with a cardinal temperature and a cardinal pH law on `depolymerase_like`
+and an Arrhenius law on `oligomer_hydrolase_like` (NETWORK-003's illustrative
+values): the rows against strain, class and pool (the intermediate pool too),
+user kinetics unchanged, 40 degC an `EnvironmentGrid` condition carried from
+`c30_ph5`, both members `at_reference` with their checks, verdicts, the
+limitation sentences (none says the loader refuses laws), review.md; the
+reviewed draft loads as the `network_chain_laws` fixture's network, laws
+included (its `responses.csv` row for row the fixture's), `check-data` lists
+each law on its process, and `fungmod run` at the grid condition 40 degC,
+pH 5 reports `active_response_model` and the fixture's own time to 50 %
+(and 64.77 minutes at `c30_ph5`);
+reference conditions (off by 5 degC, a tolerance of 4 and of 5 degC,
+`kinetics_at_reference = yes`, a kelvin reference): the reasons, the gap with
+the existing wording, the other member downgraded, the network blocked at
+40 degC; a member without a law keeping its rows' condition (`no_law`); the
+design loading written on the row a grid condition reuses, and blocked
+without it; the `oxidase_case` dataset's laws carried into a one-member
+network; refusals (no member, no evidence, wrong pool, no pool, a law
+`responses.csv` does not bind, missing columns, a law the dataset already
+binds); Reaction 618 entries at several conditions never becoming a law, with
+and without a stated law; the command line (`assemble --network --responses`:
+the file, the printed laws, grid line and run commands; a refusal exits 2 and
+writes nothing; help). `tests/test_assemble_network.py`: the two assertions
+that `responses` and a dataset's `responses.csv` are refused in a network now
+assert that an empty argument changes nothing, the dataset's rows are kept
+and a law on the wrong pool is refused; the command-line refusal test uses a
+substrate no class acts on; `_draft_digest(put_back=True)` and
+`_with_network_limitation_put_back` compare network drafts without laws with
+their one changed limitation put back. `tests/test_fetch_kinetics.py` and
+`tests/test_fetch_kinetics_user_classes.py`: their network pins (8a35ae5,
+e97e8e6; drafts and the network `assemble` stdout) are compared the same way,
+so no pin is re-pinned. `tests/test_guardrails_no_hardcoding.py`: the new test
+tokens (beside #125's).
+
+Commands and results before #125 was merged (worktree on
+`claude/assemble-response-laws`, based on `524df39`, Python 3.11 venv,
+`PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on the assembly, the CLI and the two
+  network assembly test modules: 0 errors.
+- `mkdocs build --strict`: built, no warnings; the anchor
+  `response-laws-in-a-network-draft` exists.
+- `tests/test_assemble_network_responses.py`: 28 passed, 1 xfailed.
+- Targeted run (both network assembly modules, assembly, both lookup modules,
+  fetch by name, CLI, CLI workflow, guardrails, documentation sync, hygiene,
+  instruction hierarchy, roadmap, shared progress, release configuration,
+  canonical API, network loader, import, partial runs, environment grids):
+  460 passed, 1 xfailed in 2 min 23 s.
+- Full suite (`pytest -n 2 --dist loadfile`, background): 2871 passed, 1 xfailed
+  in 23 min.
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+After merging #125 (`27572d4`, which contains main `29cff90`) into the branch
+(`48ae76e`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright` project-wide: 0 errors.
+- `mkdocs build --strict`: built, no warnings.
+- Targeted run (both network assembly modules, assembly, both lookup modules,
+  fetch by name, network loader, network responses, cross-basis, culture, CLI,
+  CLI workflow, guardrails, documentation sync, hygiene, instruction hierarchy,
+  roadmap, shared progress, release configuration, canonical API, import,
+  partial runs, environment grids): 601 passed in 4 min 37 s.
+- Full suite (`pytest -n 2 --dist loadfile`, background): 2917 passed in
+  31 min.
+
+Scientific impact: a network draft now carries the temperature and pH laws a
+user states, each scaling only its member's rate from the law's reference
+condition, and with NETWORK-003 the reviewed draft simulates them: the
+substrate loss, intermediate, product release, rates and threshold times of a
+drafted network respond to a requested temperature or pH (40 degC, pH 5: 50 %
+of the entry in 112.4 minutes against 64.77 at the 30 degC reference, in the
+illustrative chain). A requested condition is reached through laws only when
+every member's law carries its kinetics there; nothing is fitted, and kinetics
+measured at several conditions never become a law.
+
+Compatibility: additive API and report keys, present only in network drafts
+with laws; behaviour: `responses` (and a dataset's `responses.csv`) are no
+longer refused with `network=True`. Text: the last limitation of a network
+draft without laws (NETWORK-003's wording). Every other draft, single-class
+drafts with laws included, is byte-identical (pinned digests here; the
+56c8df4, 8a35ae5 and e97e8e6 pins pass, network drafts with that one sentence
+put back).
+
+Remaining ambiguities: single-class drafts still do not report the reference
+condition while drafting (the loader refuses off-reference kinetics at load);
+the origin of `--responses` rows is reported as "the responses argument", as
+in single-class drafts; a law on a pool whose categories are `REVIEW:` fields
+is accepted and decided at load; the NETWORK-003 and CULTURE-002 ledger
+entries below keep their "next task" wording of the time they were written.
+
+Next task: report the reference condition of a law in single-class drafts too
+(a deliberate text change to pinned drafts, with the changed sentence put
+back in the pins); then let a drafted network with laws be compared and
+fitted once time courses are combined with networks.
+
+## CLI-003 Machine-Readable --json Summaries Of The Command Line
+
+Status: `complete` for the stated scope (2026-10-08). CLI-001, CLI-002 and
+RUN-001 recommended a machine-readable `--json` summary so that scripts and
+pipelines can use `fungmod` results without parsing prose. `run`,
+`assemble`, `check-data` and `fit` now take `--json PATH` (`-` for standard
+output) and write one JSON document of what the command computed, printed
+and wrote. The printed text and the exit codes do not change (checked byte
+for byte on 14 commands, help included, against the base commit).
+
+Design decisions:
+
+- **Where the summary goes.** `--json PATH` writes a new file; the text stays
+  on standard output. `--json -` writes the summary alone to standard output
+  and the text the command prints to standard error (the handler runs under
+  `contextlib.redirect_stdout(sys.stderr)`), so standard output is one JSON
+  document. The path is refused before the command runs (exit code 2, no
+  summary) when it exists (nothing is overwritten), when its directory does
+  not exist (none is created), or when it lies inside `--output` (the output
+  directory holds only the files the command writes; the run manifest would
+  not list it). The summary is written for every exit code once the
+  arguments parse, errors included; an argparse error writes none. A summary
+  file that cannot be written exits with 2.
+- **What it holds.** Only what the command already computed: the API's
+  objects (`ModelabilityReport`, `DegradationScreenResult` and its tables,
+  `TimecourseComparison`, `AssembledTablesDraft.assembly`, `UserDataset`, the
+  fit report) and the files of the output directory (`output_manifest.json`,
+  `case_summary.csv`, `final_metrics.csv`, `threshold_times.csv`,
+  `summary_metrics.csv`, `limitations_table.csv`). No unit is converted, no
+  statistic is computed that the tables do not hold (a count of rows is the
+  only arithmetic), and no value is chosen for an unknown.
+- **Unknowns.** Every `null` has its reason in the `null_reasons` object of
+  the object holding it (`cli_summary.Unknown`); `finalize` refuses a bare
+  `None`, a non-finite number and any non-JSON value, and a non-finite table
+  value becomes `null` with the value quoted. Sections a stopped command did
+  not reach are `null` with "not reached: ...". Values that do not apply (no
+  seed in scientific mode, no error) follow the same rule, so a consumer
+  meets one rule for every null.
+- **Case statuses of `run`.** `ran`, `blocked` (the preflight blocks the case;
+  the reason is `case_summary.csv`'s `not_simulated_reason`, or the blocking
+  reason and next action when nothing was written), `refused` (runnable, but
+  another case is blocked and `--runnable-only` was not given: exit 3), and
+  `failed` (runnable, but the simulation failed after a passing preflight:
+  exit 1). The fourth status is added to the three requested because a failed
+  simulation is neither blocked nor refused.
+- **One table of exit-code meanings.** `EXIT_CODE_MEANINGS` in `cli.py` now
+  builds the exit-code lines of `--help` (unchanged text) and the summaries'
+  `exit_meaning`.
+- **No `compare` subcommand exists.** The time-course comparison is part of
+  the `run` summary (`timecourse_comparison`), refused comparisons included.
+  `preflight`, `list` and `draft-kinetics` have no `--json`.
+- **Where the code lives.** `fungal_model/cli_summary.py` builds the
+  summaries; `cli.py` records them as each step finishes (`_record`, run
+  only with `--json`) and writes them. The next-step printers of `assemble`
+  and `fit` now return their commands for the summary and print the same
+  text. The new module is added to the guardrail scans of `cli.py`
+  (no shortcut wording, no organism, substrate, enzyme or database token, no
+  low-level solver) and names no database and opens no connection.
+
+Changed:
+
+- `src/fungal_model/cli.py`: `--json` on `run`, `check-data`, `assemble` and
+  `fit` (`JSON_HELP`, `_add_json_argument`); `main` (summary, target check,
+  stdout redirect, writing: `_check_json_target`, `_write_summary`,
+  `_usage_error`, `_record`); `EXIT_CODE_MEANINGS`, `JSON_STDOUT`,
+  `_RUN_COMPLETION`; the four handlers record their sections
+  (`_refused_run`); `_assembly_proteome` returns the name resolution;
+  `_print_assembly_next_steps`, `_print_next_steps` and
+  `_print_fitted_dataset` return the next steps; `_issue_line` uses
+  `cli_summary.issue_location`; module docstring.
+- `src/fungal_model/cli_summary.py` (new): `SUMMARY_SCHEMA_VERSION`
+  (`"1.0.0"`), `Unknown`, `finalize`, `render`, `document`, `new_result`,
+  `RESULT_SECTIONS`, `RUN_CASE_STATUSES` and the builders per command.
+- Docs: `docs/cli.md` ("Machine-readable summaries: --json": options, the
+  document, the three rules, the field reference per command, real output of
+  `check-data` on the esterase fixture and excerpts of the Reaction 618
+  partial run; the introduction, the arguments list and the exit codes);
+  `README.md` (command-line paragraph and capability row); `CHANGELOG.md`.
+
+Tests (`tests/test_cli_json.py`, 19 test functions, 24 cases; the network
+refused, synthetic UniProt and kinetic-law responses served by the fakes of
+`tests/test_fetch_by_name.py` and `tests/test_fetch_kinetics.py`): the
+schema version is pinned and only the four commands take `--json`; a null
+needs a reason and NaN and infinity are refused; a partial Reaction 618 run
+gives the same text and exit code (4) with and without `--json`, its ran and
+blocked cases with reasons equal to `case_summary.csv` and the text, medians
+and 5th and 95th percentiles equal to `summary_metrics.csv` and printed to
+four significant figures, threshold times not reached as nulls with the
+printed reason, the bundle's paths, limitation counts by severity and
+measurement requests as written and printed; a refused run (refused and
+blocked cases, exit 3, nothing written), `--runnable-only` with nothing
+runnable, and a failed simulation (exit 1; `simulate` patched to raise);
+`--json -` gives pure JSON on standard output and the text on standard
+error; text and exit code unchanged with `--json` for six commands (exit 0
+and 2 of `check-data`, usage errors of `run`, `fit` and `assemble`, exit 3 of
+`run`); a usage error leaves every section not reached; refused `--json`
+paths (existing, inside `--output`, missing directory) before the command
+runs; `check-data` with a gap and its measurement request, and an invalid
+dataset with file, line and column of each issue (a file-level issue with a
+null line and column); `assemble` of the dbCAN fixture against
+`assemble_user_tables` and the text (classes, acting classes, each case's
+kinetics status, the counts of the five statuses, the eight `REVIEW:` fields,
+the written files, the next commands), a proteome found by name (candidates,
+chosen, snapshots) and by identifier offline, a proteome without a release
+header (null release with the reason), the kinetics lookup (query, counts,
+snapshot paths), and an enzyme network (members, statuses per condition);
+`fit` against `fit_report.json` and the text, the fitted dataset's
+`check-data` summary, a fit refused before it ran and an unidentified fit;
+`run --compare-timecourses` against `timecourse_comparison.csv`, and a
+refused comparison after a complete bundle (exit 2). Parametrize ids are
+short. `tests/test_guardrails_no_shortcuts.py`,
+`tests/test_guardrails_no_hardcoding.py` and
+`tests/test_guardrails_native_execution.py` scan the new module too.
+
+Commands and results (worktree on `claude/cli-json-summary`, based on
+`524df39`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests`: all checks passed.
+- `pyright` on `cli.py`, `cli_summary.py` and `tests/test_cli_json.py`: 0
+  errors (`cli.py` also 0 at the base commit).
+- `mkdocs build --strict -q`: built, no warnings.
+- Byte comparison of 14 commands (help texts, `run` exit 0, 2, 3 and 4 and
+  scientific, `check-data`, `assemble`, `fit`, `run --compare-timecourses`)
+  before and after the change: identical stdout, stderr and exit codes; the
+  help of the four commands differs only by the `--json PATH` option.
+- `tests/test_cli_json.py`: 24 passed. With `tests/test_cli.py`,
+  `tests/test_cli_user_data_workflow.py`, `tests/test_user_data*.py`, the four
+  guardrail modules, `tests/test_assemble_network.py`,
+  `tests/test_fetch_by_name.py`, `tests/test_fetch_kinetics.py` and
+  `tests/test_fetch_kinetics_user_classes.py`: 793 passed in 5 min 6 s.
+- Full suite (`pytest -q -n 2 --dist loadfile -p no:cacheprovider`,
+  background): 2867 passed in 41 min 10 s (run before two assertions on the
+  run case statuses were added to `tests/test_cli_json.py` and two docs
+  sentences reworded; that module was re-run after them and passed).
+- Not run: the CI matrix (macOS, Windows, Python 3.12 and 3.13).
+
+Not changed: the text and exit codes of every command, the API, the output
+bundle and its schema (still `2.2.1`), any table, report, preflight rule,
+process law or numerical result; `preflight`, `list` and `draft-kinetics`.
+
+Scientific impact: none. The summary repeats computed values and their
+units; it adds no value and fills no unknown.
+
+Compatibility: additive. New option `--json` on four subcommands, new module
+`fungal_model.cli_summary`, new public names `EXIT_CODE_MEANINGS` and
+`JSON_STDOUT` in `fungal_model.cli` (not in `__all__`). Help texts gain the
+option. Private helpers changed signature (`_assembly_proteome`,
+`_print_next_steps`).
+
+Remaining ambiguities and limitations: the summary is written at the end of
+the command, so a crash (an unexpected exception, not a refusal) writes none;
+`simulation.file_count` counts the manifest's files instead of listing them
+(the per-sample bundles make the list long); paths are as printed, so a
+relative `--output` stays relative; `preflight` has no summary; the format is
+version 1.0.0 and has no JSON Schema file yet; `fit` reports the objective's
+definition but not its value (its units depend on the error model).
+
+Risk: low. The default path is unchanged (byte-compared); the summary only
+reads results, and its contract (null reasons, finite numbers, schema
+version) is enforced when it is written and checked in tests.
+
+Recommended next task: `cases=` on `VirtualExperiment.simulate` for
+re-running chosen cases of a request with their original seeds (RUN-001's
+second recommendation), then a JSON Schema file for the summary format and a
+`preflight --json`.
 
 ## FETCH-003 Kinetics Of A Lab's Own Enzyme Classes Looked Up By Their EC Numbers
 
@@ -922,6 +1329,532 @@ environment of this task did not have.
 Not verified: the live services (the script is for the owner to run); the
 walkthrough's numbers come from synthetic fixtures and a design enzyme
 concentration and say nothing about any fungus.
+
+## USERDATA-011 Enzyme Inactivation Over The Run In User Data
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal ("i
+want fungi X on substrate Y in conditions Z ... and then the code calculates all
+the stuff"), every user enzyme was assumed perfectly stable over a long
+degradation run, although the core implements first-order enzyme inactivation
+(ENV-003: the `thermal_inactivation` process law with an Arrhenius constant;
+the `first_order` law the culture template uses for `enzyme_loss_rate`). Now a
+user's tables reach it, with no new process law or numerics.
+
+Design decisions:
+
+- **The quantity.** `kinetics.csv` quantity `inactivation_rate`: the constant
+  `k_d` of `dE/dt = -k_d E` at the row's condition, 1/time checked with pint
+  (the same rule on dissolved and solid substrates), zero or positive, exact or
+  a range, evidence type and method like every kinetics row, never `fitted`
+  (only `km`, `kcat` and `vmax` are fitted). A half-life is refused by its
+  dimension; FungMod converts none.
+- **Which law.** A row binds the existing `first_order` process law to the
+  enzyme state of its case (the law the culture's `enzyme_loss_rate` already
+  uses). The existing `thermal_inactivation` law needs an inactivation energy
+  and a reference temperature; binding it with an invented zero energy would be
+  a fabricated value, so it is bound only when `responses.csv` gives the
+  Arrhenius pair: new law `thermal_inactivation` (`activation_energy`,
+  `reference_temperature`), `ResponseLaw.scales = "inactivation"`. It
+  multiplies no rate: it replaces the constant loss by
+  `k_d(T) = k_d(T_ref) exp(-E_d/R (1/T - 1/T_ref))`, so it composes with a
+  temperature law on the rate of the same pair (its roles carry the law name:
+  `thermal_inactivation__activation_energy`), and the reference rule checks
+  the `inactivation_rate` (exact, `reference_tolerance` or
+  `kinetics_at_reference`) instead of the kinetic constants. Its
+  `ResponseLaw.condition` is empty (`reads` is temperature): it carries no
+  catalytic constant to another condition, so `assemble_user_tables` never
+  treats it as a route to another temperature.
+- **Where.** Single-class cases in the kcat and pH-ionization forms (dissolved
+  or solid; an enzyme in molar, protein-mass or assay units, or from an
+  `enzyme_dose`, decays in its own units) and every kcat-form member of an
+  enzyme network, each class's enzyme state by its own constant. Refused: the
+  Vmax form (no enzyme state) and culture pools, which keep their own
+  first-order `enzyme_loss_rate`: a second loss law on one pool would be one
+  constant stated twice (`culture.csv` stays the place for a culture pool's
+  loss, and the law stays refused on cultures).
+- **Pair-level binding, never a default.** All strains and conditions of one
+  class and substrate share one generated process, so any `inactivation_rate`
+  row or law on a pair binds the loss to every case of the pair, and a case
+  without its own row gets an explicit gap with a measurement request (as the
+  reactivity factor and response laws do). A pair without any row has no loss
+  term. When a dataset states inactivation for some pair, every other enzyme
+  state of the dataset gets the limitation "Enzyme activity assumed constant
+  over the run ... (FungMod applies no default constant)"; a dataset without
+  any row keeps every earlier record byte for byte (the parent's requirement of
+  an explicit limitation could not also hold for datasets without the rows
+  without changing their pinned records; the docs state the assumption there).
+- **Assembly.** The single-class enzyme-kinetics assembler built exactly one
+  process, so `screening/case_builder.py` gains an optional template-declared
+  loss of the enzyme state, `process_state_metadata.enzyme_inactivation`
+  (process id, law `first_order` or `thermal_inactivation`, exactly the law's
+  parameter roles, an assumption), built as a second process on the enzyme
+  state, its read conditions added to the environment entity; refused on a role
+  set without an enzyme state, for another law, for missing, extra or
+  unresolved roles, without an assumption and with the main process id. A
+  network template appends one process template per decaying class after the
+  Michaelis-Menten processes (the composition builder needed no change).
+- **Outputs.** Template limitations per enzyme state (the law with its scope:
+  irreversible single-exponential loss, no unfolding, proteolysis, protection,
+  adsorption or inactive pool); `UserDataset.enzyme_inactivation` and
+  `processes[].enzyme_inactivation` of `enzyme_networks`; a `fungmod
+  check-data` section printed only when a row binds one; one mechanism-summary
+  row per loss process (single-process cases get rows for every configured
+  process after the first; network rows of a process without a product map
+  carry that law's limitations); `environment_response` names
+  `thermal_inactivation` as the process law that reads temperature.
+
+Changed:
+
+- `api/user_data.py`: `inactivation_rate` quantity, units rule and gap
+  wording; `INACTIVATION_RATE_QUANTITY`, `INACTIVATION_LAW`,
+  `LAW_SCALES_RATE`/`LAW_SCALES_INACTIVATION`; `ResponseLaw.scales`, `reads`,
+  `condition`; the `thermal_inactivation` law and its domain check;
+  `_validate_inactivation`; culture refusals; the reference rule per law
+  (`_law_reference_quantities`, `_reference_conditions(..., law)`); single-class
+  records, roles (`_single_law_role`), template declaration, compatibility and
+  limitations; network roles, law roles, process templates, limitations and
+  report; `_inactivation_report`; docstrings.
+- `screening/case_builder.py`: `ENZYME_INACTIVATION_TEMPLATE_KEY`,
+  `ENZYME_INACTIVATION_PROCESS_LAWS`, `_template_enzyme_inactivation` in the
+  enzyme-kinetics assembler.
+- `api/result_tables.py`: mechanism rows for configured processes after the
+  first of a single-process case (`_companion_process_mechanism_rows`, shared
+  row builder with the network rows), families, laws and limitations of
+  `first_order` and `thermal_inactivation`.
+- `cli.py`: `check-data` prints the enzyme inactivation table.
+- Fixtures `tests/fixtures/user_data/inactivation_case/` (a user-defined amide
+  hydrolase-like class on a dissolved amide-like substrate, kcat form,
+  `k_d` 0.3 1/h) and `tests/fixtures/user_data/inactivation_network/` (two
+  user-defined cutter-like classes in parallel on a particulate polymer-like
+  solid, one with `k_d` 0.1 1/h at 55 degC and `E_d` 200 kJ/mol, one stable);
+  illustrative estimates, READMEs.
+- Docs: `docs/user-data.md` (new "Enzyme inactivation over the run" with the
+  quantity, the temperature law, worked examples with real `check-data` and
+  `run` output, the network case, generated records, refusals and scope; the
+  kinetics.csv table, the Vmax form, `responses.csv`, the reference rule, the
+  culture and network refusals, generated records and limits),
+  `docs/environment-response.md`, `docs/capabilities.md`, `README.md`,
+  `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_inactivation.py` (31 test functions, 74
+cases): the law is the existing process law and the losses are registered
+factories; the record, template declaration, compatibility role, limitation
+and `enzyme_inactivation` entry; the assembled config runs the `first_order`
+loss after the Michaelis-Menten process and reads no condition; analytic checks
+at every output time: `E(t) = E0 exp(-k_d t)` (rtol 1e-8), the exact substrate
+`Km ln(S/S0) + S - S0 = -kcat E0 (1 - exp(-k_d t))/k_d` through the Lambert W
+function (rtol 1e-6), `S + P = S0`, the loss rate `k_d E` and the degradation
+`kcat E S/(Km + S)`; with `S0/Km = 1e-4` the first-order closed form
+`S0 exp(-(kcat E0/Km)(1 - exp(-k_d t))/k_d)` within `1.5 S0/Km`; a range
+sampled per sample; a fit of `kcat` to time courses of the decaying enzyme
+recovers it (identified) and `inactivation_rate` is not fittable; an assembled
+draft keeps the rows and the law and turns another temperature into a gap; a
+second strain without the row gets a gap and is underparameterized; another
+pair of the dataset says its activity is assumed constant; byte identity of
+the records and configs of all 16 earlier fixtures and the 19 registry cases
+pinned to digests of 6567464; measured rows make the case scientific until
+`k_d` is an estimate; the network fixture binds the thermal law to one member
+only (roles, records in kelvin without environment, provenance); on a grid of
+50, 55 and 60 degC each enzyme follows its own closed form with
+`k_d(T)` computed independently, the stable one stays at 10 mg/L, each process
+rate is `kcat E S/(Km + S)` with its own enzyme, the degradation is their sum,
+`S + P = 20 g/L`, and hotter runs degrade less; `environment_response` and the
+mechanism rows name the law; a rate law and the inactivation law compose on one
+pair (kcat and `k_d` each rescaled by their own Arrhenius factor, exact
+substrate solution); a tolerance-admitted reference rescales `k_d`; the
+pH-ionization form and an FPU/L enzyme from a dose on a solid decay by the same
+law; refusals (molar units, a half-life, negative value, `fitted`, duplicate
+rows, the Vmax form for the row and the law, a culture pool for the row and the
+law, the law off its reference, a negative energy, a missing parameter,
+temperature bounds, energy units, an unknown temperature); the assembler's
+refusals of a malformed declaration and of a role set without an enzyme;
+`fungmod check-data` (table, absent without rows, a refusal as
+`file:row:column`) and `fungmod run` (a temperature grid of the network, the
+single-class case). Modified: `tests/test_user_data_v2.py` (the importable
+rate laws are modifiers; the inactivation law is the one process law),
+`tests/test_guardrails_no_hardcoding.py` (fixture and test-only tokens).
+
+Not changed: no process law, kernel, factory, modifier, solver, composition
+builder, registry record or case template, output schema (2.2.1), preflight
+rule or result-table policy. Every earlier fixture and the shipped registry
+generate byte-identical records and configs, and a seeded two-sample run of
+every runnable earlier fixture gives byte-identical case summaries, time
+series, final metrics, thresholds, sampled parameters, modelability,
+assumption, mechanism, uncertainty, conservation, limitation, missing-parameter,
+suggested-experiment and provenance tables (after normalising paths), compared
+by a digest script against 6567464. `to_dict()` gains `enzyme_inactivation`
+(empty) and `processes[].enzyme_inactivation` (null).
+
+Scientific impact: a user's enzyme can now lose activity over the run at a
+stated first-order constant, or at a constant that follows the Arrhenius law in
+temperature, so the substrate loss, product release, rates, threshold times and
+conversion plateaus (the enzyme's integrated activity `kcat E0/k_d`) reflect
+it; in a network each class decays by its own constant. An enzyme without a
+row is still assumed stable, and a dataset that states inactivation for some
+enzyme says so for the others.
+
+Compatibility: additive (new quantity, law, keys, template field, CLI section
+and mechanism rows only where inactivation is bound).
+
+Remaining ambiguities: a thermal law on the inactivation only makes a
+temperature grid `active_response_model` (ranking allowed) although the
+catalytic constants do not respond (the template says so; the result-table
+guardrail is per condition, not per process); the "assumed constant" sentence
+appears only in datasets that state inactivation somewhere; the loss acts on
+the whole enzyme state (no free and bound enzyme, no inactive pool, no substrate
+protection); pH-dependent stability and a temperature law on a culture's
+`enzyme_loss_rate` are not bound.
+
+Commands and results (worktree on `claude/user-data-enzyme-inactivation`, based
+on 6567464, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` (project-wide, as CI): 0 errors.
+- `mkdocs build --strict`: built (exit 0); the anchors
+  `enzyme-inactivation-over-the-run` and `in-an-enzyme-network` exist.
+- `tests/test_user_data_inactivation.py`: 74 passed.
+- Targeted run (v2, network responses, network, culture, culture pools, CLI,
+  CLI workflow, import, pH-ionization, solid, assembly, assemble network,
+  cross-basis, time courses, guardrails, genome, UniProt, sources,
+  documentation sync, hygiene, environment grids, partial runs, config-driven
+  assembly, BGL1A, thermal inactivation process, organism case, registry case
+  builder, no-shortcut and public-API guardrails): 814 passed.
+- Digest script over all 16 earlier fixtures and the registry against
+  6567464: records, configs and the 15 output tables identical.
+- Full suite `pytest -n 2 --dist loadfile tests` (pytest-xdist): 2906 passed in
+  41 min 43 s; no xdist-only failure to rerun serially.
+
+Next task: a temperature (and pH) law on a culture pool's `enzyme_loss_rate`
+(response laws on cultures); an inactive enzyme pool and reversible unfolding
+(new numerics, to be sourced); sourced inactivation constants for registry
+cases; carrying `responses.csv` laws into assembled network drafts.
+
+## CULTURE-002 A Growing Culture Whose Secreted Pools Act Together
+
+Status: `partial` (2026-10-08): complete for several pools consuming the
+culture substrate in parallel; a pool released by one enzyme and degraded by
+another inside a growing culture is not implemented, because it needs an
+uptake law the core does not have (below). For the owner's goal ("i want fungi
+X on substrate Y in conditions Z ... and then the code calculates all the
+stuff"), `culture.csv` (USERDATA-009) bound the registry's `culture_physiology`
+model with exactly one consuming pool (a second class acting on the substrate
+was refused), and cultures were refused in network datasets. A fungus secretes
+several enzymes that attack its substrate at once.
+
+Design (note kept outside the repository; the decisions, all from existing
+laws, no new biology or numerics):
+
+- **What feeds growth.** Only the consumed culture substrate, as before: every
+  consuming pool's process forms biomass with the culture's one yield `Y` and
+  books `1 - Y` to the closure ledger (the existing product map, shared).
+- **Several pools on the solid.** Every culture pool whose class acts on the
+  substrate (categorical rule) consumes it by its own `k_h,i E_i S / (K_h,i + S)`
+  (the existing homogeneous Michaelis-Menten law, as in the one-pool culture);
+  the processes add their rates (the enzyme network's additive, independent
+  action: no competition for sites, no synergy).
+- **Induction.** Every pool, consuming or not, by the existing
+  `q_P X S / (K_ind + S)` with the culture substrate as inducer and the one
+  shared `K_ind`.
+- **One process, one law.** A consuming pool's constants come from
+  `culture.csv` only (`hydrolysis_capacity` is its kcat per pool amount,
+  `hydrolysis_half_saturation` its apparent Km); `kinetics.csv` rows of a
+  culture class stay refused (the USERDATA-009 mixing refusal).
+- **Released pools: not implemented, and refused with the reason.** If the
+  solid's consumption feeds growth, the same dry mass cannot also be released as
+  a pool (counted twice); if it is released instead, nothing feeds growth
+  without an uptake law; splitting it is a partition no table states. The only
+  uptake process in the core, the Pirt/Monod `resource_limited_growth`, needs
+  oxidant and nitrogen states, a maintenance demand and a molar macrochemical
+  stoichiometry in one concentration unit, none of which is a culture.csv role,
+  and a molar released pool cannot enter the dry-mass closure without a molar
+  mass. Missing for that step: (a) an uptake process for a soluble pool into
+  biomass with an explicit, unit-bearing yield bindable from user tables,
+  (b) a closure spanning a dry-mass and a molar basis (a stated dry mass per
+  amount of the released pool, hydrolysis water accounted for), (c) data stating
+  them. `culture.csv` therefore stays refused in an `enzyme_network` dataset,
+  now with this reason.
+- **Identity.** One consuming pool keeps every USERDATA-009 identifier, role,
+  symbol, selector, process id, template text and compatibility. With several:
+  cultures of one substrate whose consuming pools overlap are one model (union
+  over consuming classes), named by the first consuming pool in culture.csv;
+  every strain declaring one of its consuming classes runs it (all pools
+  declared, no other acting class, as before); consumption roles become
+  `hydrolysis_capacity__<class>` and `hydrolysis_half_saturation__<class>`; one
+  `substrate_consumption__<class>` process per consumer shares the yield's
+  product map; one compatibility per consuming class points to the one template
+  (the preflight looks for a compatibility of every class acting on the
+  substrate); the records' enzyme-class selector is empty (as for networks); a
+  consuming class's other solid substrate without rows is a culture of gaps
+  with its model's consumers that act there.
+
+Changed:
+
+- `api/user_data.py`: `_CulturePair.consumers`, `consuming_pools`, `several`;
+  `_validate_cultures` (consuming pools, union of overlapping cultures,
+  per-consumer refusals and messages, gap models with linked consumers, every
+  strain running a model checked through the first consuming class it
+  declares); `_consumes_in_culture` (no single-class pair for any consumer);
+  `_culture_role_keys`, `_culture_role(several=)`, `_culture_pool_part`,
+  `_culture_symbol`, `_culture_record_id`, `_culture_selectors`;
+  `_culture_template_mapping` (`_culture_consumption_template`,
+  `_several_consumer_limitations`); one `_culture_compatibility_mapping` per
+  consumer; `UserDataset.cultures` gains `consuming_pools` and
+  `process_compatibility_ids`; the network refusal of `culture.csv` states the
+  missing uptake law; the docstrings.
+- `cli.py`: `check-data` lists every consuming pool (the column title becomes
+  "consuming pools" only when a culture has several).
+- Fixtures `tests/fixtures/user_data/culture_parallel_pools/` (one strain, an
+  endo- and an exo-cutter-like protein-mass pool consuming a cellulose-like
+  solid in parallel, a third pool acting on nothing) and
+  `tests/fixtures/user_data/culture_shared_pools/` (two strains sharing one
+  two-pool model on a chitin-like solid, the second with capacity ranges and
+  its pools in the other order, a condition of gaps); illustrative estimates,
+  READMEs.
+- Docs: `docs/user-data.md` (the culture equations, roles, new "Several pools
+  consuming the substrate" with the decisions, worked example with real
+  `check-data` and `run` output and the identity rules; generated records,
+  refusals, what is and is not modelled, the network refusal and limits),
+  `docs/organism-physiology.md`, `docs/capabilities.md`, `README.md`,
+  `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_culture_pools.py` (19 test functions, 22
+cases): the consuming pools, processes, shared product map, per-pool roles,
+two compatibilities to one template, limitations and class processes; records
+per consuming pool with an empty selector, selected by the preflight; analytic
+checks at every output time of the parallel culture: dry-mass closure
+`S + X + L_u + L_d = S0 + X0`, growth `X - X0 + L_d = Y (S0 - S)`, ledger
+`L_u = (1 - Y)(S0 - S)`, each consumption rate `k_h,i E_i S / (K_h,i + S)`, the
+degradation rate their sum, each synthesis `q X S / (K_ind + S)` and loss
+`k E` (rtol 1e-9); thresholds and the closure diagnostic; a second consuming
+pool with zero capacity reproduces the one-pool `culture_estimates` trajectories
+(rtol 1e-7); the materially different fixture: one shared model for both
+strains whatever order they list their pools, ranges as range records, a gap
+condition with plain-words requests, and for each strain three samples that
+each close, grow by their yield and follow their own (sampled) laws; another
+solid of the consumers is a culture of gaps with both; measured rows make the
+culture scientific (`scientific_exact_unvalidated`) until one row is an
+estimate; refusals (culture in a network with the uptake reason, kinetics.csv
+rows of a consuming pool, a strain declaring only the second consumer, another
+acting class with the remedy, a consumption row on a non-consuming pool, no
+consuming pool, one consumer's units checked against its own pool, response
+laws on a consumer); `fungmod check-data` (both column titles) and a refusal as
+`file:row:column`; `fungmod run`. Modified: `tests/test_user_data_culture.py`
+(two acting pools now load, the second's missing roles are gaps; the remedy text
+of the other-class refusal), `tests/test_guardrails_no_hardcoding.py` (fixture
+tokens). Byte identity: the records and assembled configs of every earlier
+fixture, including both culture fixtures, and of the 19 shipped registry cases
+(the *T. harzianum* culture case among them) stay pinned by
+`tests/test_user_data_culture.py` and `tests/test_user_data_network_cross_basis.py`,
+and a digest script over all 14 earlier fixtures confirms them against an
+export of `b8e3abe`; `to_dict()` of the culture fixtures gains only
+`consuming_pools` and `process_compatibility_ids`.
+
+Not changed: no process law, factory, modifier, solver, kernel, registry
+record or case template, composition builder, result-table rule, output schema
+(2.2.1), preflight rule, fit or comparison.
+
+Scientific impact: a user's culture can now secrete several enzymes that
+attack its substrate together, each with its own measured capacity and
+half-saturation constant, so the substrate loss, growth, every pool, the rates
+and the threshold times reflect all of them, with the dry-mass balance closed
+and every consumed gram assigned to biomass or the ledger. What the culture
+still cannot represent, and says so: soluble hydrolysis products, their
+conversion by other secreted pools and their uptake.
+
+Compatibility: additive (cultures that were refused now load; new report keys;
+new refusal wording).
+
+Remaining ambiguities: the induction constant stays shared by every pool (the
+registry template's choice); which consuming pool names a multi-pool model
+depends on culture.csv row order (identifiers only); a class consuming in two
+started models on different substrates links its gap models through the last
+one.
+
+Commands and results (worktree on `claude/network-responses-culture`, after
+NETWORK-003, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data.py`, `cli.py` and both
+  new test files: 0 errors.
+- `mkdocs build --strict`: built (exit 0); the anchor
+  `several-pools-consuming-the-substrate` exists and its eight links resolve.
+- `tests/test_user_data_culture_pools.py`: 22 passed.
+- Targeted run (both new test files, culture, network, cross-basis, v2,
+  import, solid, genome, UniProt, time courses, pH-ionization, guardrails, CLI,
+  CLI workflow, documentation sync, hygiene, instruction hierarchy, roadmap,
+  shared progress, partial runs, organism case, registry case builder and
+  templates, case selection, config-driven assembly, culture processes,
+  modelability, network assembly, assembly): 872 passed in 8 min 49 s.
+- Digest script over every earlier fixture and the shipped registry against an
+  export of `b8e3abe`: records and assembled configs identical; a seeded
+  three-sample run of eleven existing cases (both culture fixtures, the two
+  chain networks, the oxidase and solid cases): final metrics, thresholds,
+  time series, conservation diagnostics, limitations and mechanism rows
+  byte-identical after normalising paths.
+
+Next task: an uptake process for a released soluble pool with an explicit
+biomass yield and a dry-mass-to-molar closure (new biology and numerics, to be
+sourced), which would let a culture resolve hydrolysis products; carrying
+`responses.csv` laws into assembled network drafts; the unit-bearing release
+for single-class solid cases.
+
+## NETWORK-003 Temperature And pH Response Laws Inside Enzyme Networks
+
+Status: `complete` for the stated scope (2026-10-08). For the owner's goal ("i
+want fungi X on substrate Y in conditions Z ... and then the code calculates all
+the stuff"), `responses.csv` laws (cardinal temperature, cardinal pH, Arrhenius)
+bound only to single-class cases, and an `enzyme_network` dataset refused
+`responses.csv`, so in a network the conditions Z acted only through
+condition-specific constants. Now each `responses.csv` row binds to the network
+process of its strain, enzyme class and pool, with no new numerics: the
+composition builder already accepted environment modifiers per process template.
+(The unit-bearing release for single-class solid cases, named NETWORK-003 in the
+FIX-UNITS-001 entry, stays open as a later increment.)
+
+Design decisions:
+
+- **Binding.** A row names a strain, a class the strain declares and a substrate
+  the class acts on (both checked when the row is parsed); in a network dataset
+  that is exactly the process of that class on that pool, so the law binds there
+  and in every network that runs the process (an intermediate that is also an
+  entry). `_bind_network_laws` sets `_NetworkProcess.laws` (in `RESPONSE_LAWS`
+  order) from `parsed.laws` after the networks are built.
+- **The single-class rules, per process.** `_validate_responses` runs unchanged
+  on network bindings: every parameter once, the law's own domain, one law per
+  condition and process, the same law for a condition across the strains of a
+  process (they share one template), `design` refused, kinetic constants at the
+  law's reference condition (exact, within `reference_tolerance`, or
+  `kinetics_at_reference`), an unknown temperature or pH refused. Addition for
+  networks: the process's `ki` is one of the constants required at the
+  reference (`_LAW_REFERENCE_QUANTITIES`; `ki` exists only in networks, so
+  single-class datasets are unaffected). A row naming a class that is no member
+  (not declared by the strain) or a pool its class does not act on is refused by
+  the existing parse checks.
+- **Template.** Each law is the existing environment modifier on that process
+  template, with per-process roles `<law>__<parameter>__<class>__<pool>`, after
+  the reactivity and competitive-inhibition modifiers; the compatibility lists
+  the roles after the kinetics roles. A law changes only that process's rate.
+- **Records.** One per strain and law parameter, the single-class
+  `_response_mapping` (value, kelvin conversion, weakest-row maturity,
+  reference-condition provenance) or `_response_gap_mapping` (a strain without
+  the rows another strain gives), re-keyed by `_network_law_mapping`: id
+  `<dataset>__network__<entry>__<strain>__<role>`, the network symbol, process
+  type `enzyme_network`, empty enzyme-class selector, the entry's substrate
+  selectors, **no environment selector** (a law applies at every environment, so
+  `EnvironmentGrid` conditions reach it; the kinetics records of the dataset's
+  one condition are reused there exactly as for single-class cases), and the
+  network, role, class and pool in provenance. The process's kinetics records
+  name the laws in their validity range (`_CaseContext.laws`); the entry's
+  shared initial concentration does not.
+- **Honest limits in the outputs.** A network with laws replaces the last
+  network limitation ("... no temperature or pH response law is bound ...") by
+  "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or
+  uptake model." and adds one sentence per process: the laws that scale it (only
+  its rate; Km, Ki, concentrations and yields not rescaled), or that it has none
+  and keeps its rows' condition at any other temperature or pH, so the network
+  responds to that condition only through the other processes' laws. A network
+  without laws keeps its earlier text word for word. `environment_response`
+  names each law with the process it scales; `active_response_model` is
+  reported when one law reads the condition (unchanged result-table policy).
+
+Changed:
+
+- `api/user_data.py`: `_NetworkProcess.laws`; `_LAW_REFERENCE_QUANTITIES` in
+  `_validate_reference_condition` and `_reference_conditions`;
+  `_bind_network_laws`; `_network_law_roles`; `_network_law_mapping`; law
+  records in `_generate_network_records`; law modifiers and limitations in
+  `_network_template_mapping` (`_NETWORK_NOT_A_CULTURE`,
+  `_network_law_limitation`); law roles in `_network_compatibility_mapping`;
+  `response_laws` per process in `UserDataset.enzyme_networks`; the
+  `responses.csv` entry removed from `_NETWORK_TABLE_REFUSALS`.
+- `cli.py`: `check-data` adds a `response laws` column to the network table only
+  when a law is bound (the earlier table is unchanged otherwise).
+- Fixture `tests/fixtures/user_data/network_chain_laws/` (the `network_chain`
+  network at its reference condition, 30 degC and pH 5, with a cardinal
+  temperature law 5/30/45 degC and a cardinal pH law 3/5/8 on the first class
+  and an Arrhenius law 50 kJ/mol at 30 degC on the second; illustrative
+  estimates, README).
+- Docs: `docs/user-data.md` (new "Response laws in a network" with rules and a
+  worked example with real `check-data` and `run` output; the network formula,
+  roles, `enzyme_networks` keys, refusals, what is and is not modelled, the
+  drafting refusal wording, `responses.csv`, the generated-records table and
+  the limitations), `docs/environment-response.md` (where laws bind),
+  `docs/capabilities.md`, `README.md`, `CHANGELOG.md`.
+
+Tests: new `tests/test_user_data_network_responses.py` (20 test functions, 24
+cases): laws bind to the process of their class and pool (modifiers, roles,
+compatibility symbols, `response_laws`); law records equal the single-class
+records re-keyed (kelvin, maturity, no environment, provenance with the
+reference condition and the network role); the template names the laws per
+process and keeps a law-free network's text word for word; analytic checks on
+an `EnvironmentGrid` (30 and 37 degC x pH 5.0 and 5.5): each process rate equals
+`kcat E S / (Km + S)` times its own factors (CTMI x CPM for the first class,
+Arrhenius for the second) at every output time (rtol 1e-9) and the closure
+`8 P + 2 O + M = 40 mM` holds; the reference condition reproduces the
+`network_chain` run (rtol 1e-9); `environment_response` lists each law with its
+process; the materially different case (a cardinal pH law on the class that
+cuts the cellulose-like solid of `network_solid_chain`, g/L -> mmol/L through
+the stated yield, no law on the competitively inhibited disaccharide step): the
+solid rate follows `gamma_pH`, the dimer rate stays its own competitive law at
+every pH, the mass-to-mole closure holds, pH 5 degrades fastest; a one-class
+network with the oxidase fixture's two laws reproduces the single-class case on
+a six-point grid (rtol 1e-7); measured kinetics and laws make the network
+scientific (`scientific_exact_unvalidated` at a grid condition) until one law row
+is an estimate; a second strain without the laws gets eight law gaps with the
+single-class request and is underparameterized; refusals (kinetics off the
+reference, a tolerance admitting them, a `ki` off the reference condition,
+two temperature laws on one process, a pool the class does not act on, a class
+that is no member, a law `responses.csv` does not bind, different laws for one
+process across strains, an unknown temperature); `fungmod check-data` (the
+column, and no column without laws), a refusal as `file:row:column`, and `fungmod
+run` on a temperature grid (exit 0, `active_response_model`). Byte identity: the
+records and assembled configs of the two NETWORK-002 fixtures are pinned to
+digests of base commit `b8e3abe`; the earlier fixtures and the 19 shipped
+registry cases stay pinned by `tests/test_user_data_network_cross_basis.py`.
+Modified: `tests/test_user_data_network.py` (`responses.csv` is no longer a
+refused table; culture.csv still is); `tests/test_guardrails_no_hardcoding.py`
+(fixture and test-only tokens).
+
+Not changed: no process law, modifier, factory, solver, kernel, registry record
+or case template, result-table policy, output schema (2.2.1), preflight rule,
+fit or comparison; the assembler (`api/user_data_assembly.py`, worked on in
+parallel) still refuses laws in network drafts. Every existing dataset
+generates byte-identical records and assembled configs (checked with a script
+over all 13 earlier fixtures and the 19 registry cases against an export of
+`b8e3abe`); `UserDataset.to_dict()` of the four earlier network fixtures gains
+only `processes[].response_laws: []`.
+
+Scientific impact: in a user's enzyme network a temperature or pH (a registry
+condition or an `EnvironmentGrid` point) now changes each class's rate through
+that class's own stated law, so the substrate loss, intermediates, product
+release, rates and threshold times respond to the conditions Z of the request;
+a process without a law is honestly constant in temperature and pH and says so.
+
+Compatibility: additive (a new kind of accepted `responses.csv` row, a new
+`processes[].response_laws` key, a conditional CLI column).
+
+Remaining ambiguities: with a law on only some processes, a grid varying that
+condition is "covered" for ranking although the law-free processes do not
+respond (the per-process limitation says so; the result-table guardrail is
+per condition, not per process); laws are per strain, class and pool, so one
+class acting on a pool in two networks runs the same law in both.
+
+Commands and results (worktree on `claude/network-responses-culture`, based on
+`b8e3abe`, Python 3.11 venv, `PYTHONPATH=src`):
+- `ruff check src tests scripts/run_*.py`: all checks passed.
+- `pyright --pythonpath <venv python>` on `api/user_data.py`, `cli.py` and the
+  new test file: 0 errors.
+- `mkdocs build --strict`: built (exit 0); the anchor
+  `response-laws-in-a-network` exists.
+- `tests/test_user_data_network_responses.py`: 24 passed.
+- Targeted run (the new tests, network, cross-basis, v2, culture, import,
+  pH-ionization, solid, guardrails, CLI, CLI workflow, documentation sync,
+  hygiene, instruction hierarchy, roadmap, shared progress, partial runs,
+  environment grids, network assembly): 555 passed in 5 min 51 s.
+- Digest script over every fixture and the shipped registry against an export
+  of `b8e3abe`: records and assembled configs identical.
+
+Next task: CULTURE-002 (above: a growing culture whose secreted pools act
+together); then carrying `responses.csv` laws into assembled network drafts, and the
+unit-bearing release for single-class solid cases.
 
 ## FETCH-002 Kinetics Of The Fungus's Enzyme Classes Looked Up By EC Number
 

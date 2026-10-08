@@ -1,0 +1,4 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+endo_cutter_g5_like,Endo-cutter-like pool G5,,glycosidic_like_bond,glucan_like_solid,Illustrative user-defined class for the culture test (no record of this pool exists)
+exo_cutter_g5_like,Exo-cutter-like pool G5,,glycosidic_like_bond,glucan_like_solid,Illustrative user-defined class for the culture test (no record of this pool exists)
+dimer_hydrolase_g5_like,Dimer hydrolase-like pool G5,,glycosidic_like_bond,dimer_like,Illustrative user-defined class for the culture test; it acts on no substrate of the dataset (no record of this pool exists)

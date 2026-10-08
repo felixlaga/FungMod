@@ -144,6 +144,7 @@ def test_high_level_workflows_do_not_construct_low_level_solvers_directly() -> N
         ROOT / "src" / "fungal_model" / "workflows",
         ROOT / "src" / "fungal_model" / "plugins" / "pet",
         ROOT / "src" / "fungal_model" / "cli.py",
+        ROOT / "src" / "fungal_model" / "cli_summary.py",
         ROOT / "src" / "fungal_model" / "__main__.py",
         ROOT / "notebooks" / "examples",
     )

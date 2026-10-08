@@ -1,0 +1,19 @@
+dataset_id: inactivation_network
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for a user-defined strain whose two user-defined cutter-like
+  classes act in parallel on a particulate polymer-like solid; one loses activity with an
+  Arrhenius temperature dependence, the other is stable; no measurement, literature value
+  or registry record stands behind them
+notes: >-
+  Non-specific enzyme-inactivation case of the user-data route (USERDATA-011) in an enzyme
+  network on a solid substrate: the inactivation_rate of one member is stated at the
+  reference temperature of a thermal_inactivation law in responses.csv, every value an
+  estimate, so the case runs in exploratory mode only.
+simulation:
+  duration: 48
+  units: hour
+  points: 97
+enzyme_network:
+  entry_substrates: [solid_w7]

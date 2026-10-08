@@ -1,0 +1,3 @@
+class_id,name,ec_number,target_bond_classes,compatible_substrate_classes,source
+depolymerase_like,Depolymerase-like class N1,,inner_glycosidic_like,soluble_polymer_like,Illustrative user-defined class for the enzyme-network fixture (no record of this class exists)
+oligomer_hydrolase_like,Oligomer hydrolase-like class N1,,inner_glycosidic_like,oligomer_like,Illustrative user-defined class for the enzyme-network fixture (no record of this class exists)

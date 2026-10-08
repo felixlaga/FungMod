@@ -1,0 +1,3 @@
+condition_id,temperature,temperature_units,ph,notes
+c30_ph6,30,degC,6.0,Illustrative batch culture condition
+c37_ph6,37,degC,6.0,Illustrative condition without culture rows (every role a gap)

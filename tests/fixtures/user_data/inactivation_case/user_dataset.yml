@@ -1,0 +1,15 @@
+dataset_id: inactivation_demo
+contributor: FungMod maintainers
+date: 2026-10-08
+source: >-
+  Illustrative estimates for a user-defined strain whose user-defined amide hydrolase-like
+  class acts on a dissolved amide-like substrate and loses activity over the run; no
+  measurement, literature value or registry record stands behind them
+notes: >-
+  Non-specific enzyme-inactivation case of the user-data route (USERDATA-011): the kcat form
+  with a first-order inactivation_rate, every value an estimate, so the case runs in
+  exploratory mode only and scientific mode refuses it.
+simulation:
+  duration: 480
+  units: minute
+  points: 97

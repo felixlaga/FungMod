@@ -18,6 +18,7 @@ import yaml
 from fungal_model import UserDataError, UserDataset, environment_grid, load_user_dataset, virtual_experiment
 from fungal_model.api import VirtualExperimentError
 from fungal_model.api.user_data import (
+    LAW_SCALES_RATE,
     RESPONSE_LAWS,
     USER_DATASET_MATURITY_ORDER,
     VMAX_ROUTES,
@@ -1018,9 +1019,13 @@ def test_second_strain_without_responses_gets_law_gaps_and_must_share_the_rate_f
 
 
 def test_importable_laws_are_existing_template_modifiers_with_their_roles() -> None:
-    assert set(RESPONSE_LAWS) <= ENVIRONMENT_MODIFIER_TYPES
+    # The laws that scale the catalytic rate; the law that scales the enzyme's inactivation constant is the existing
+    # thermal_inactivation process law (USERDATA-011, tests/test_user_data_inactivation.py).
+    rate_laws = {name: law for name, law in RESPONSE_LAWS.items() if law.scales == LAW_SCALES_RATE}
+    assert set(RESPONSE_LAWS) - set(rate_laws) == {"thermal_inactivation"}
+    assert set(rate_laws) <= ENVIRONMENT_MODIFIER_TYPES
     assert VMAX_ROUTES == ("vmax", "specific_activity", "assay_activity")
-    for name, law in RESPONSE_LAWS.items():
+    for name, law in rate_laws.items():
         fields = _MODIFIER_COMPATIBILITY_ROLE_BY_FIELD[name]
         for parameter in law.parameters:
             assert fields[f"{parameter.name}_role"] == parameter.name

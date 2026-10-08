@@ -14,7 +14,7 @@ authors:
 affiliations:
   - name: KU Leuven, Leuven, Belgium
     index: 1
-date: 6 October 2026
+date: 8 October 2026
 bibliography: paper.bib
 ---
 
@@ -57,10 +57,9 @@ conditions before running experiments has no tool that composes the model
 from what is known and states what is not. FungMod is written for that
 researcher: experimental mycologists, bioprocess and enzyme engineers who
 plan or interpret degradation experiments, and modellers who want such
-models in a form other tools can read. It supplies three things together.
-First, composition: a model is built from declared records by matching the
-enzyme classes of a source to the substrate and its bond classes through
-declared process-compatibility records. Second, honesty about evidence: an
+models in a form other tools can read. First, composition: a model is
+built by matching the enzyme classes of a source to the substrate's bond
+classes through declared compatibility records. Second, honesty about evidence: an
 unknown input stays unknown, so a case with a missing constant is reported as
 underparameterised with the missing items listed, and exploratory
 assumptions run only on explicit request and are labelled in every output.
@@ -89,8 +88,8 @@ classifications but do not simulate. Continuum models of mycelial growth
 We built FungMod rather than extending one of these tools because its new
 parts, the record registry, the evidence gating and the provenance carried
 into every output, concern biological bookkeeping, not numerics, and have no
-natural place in a general simulator. Where the general tools are strong,
-FungMod contributes to them instead of replacing them: its models export to
+natural place in a general simulator. FungMod complements these tools
+instead of replacing them: its models export to
 SBML and PEtab so that COPASI and PEtab-based estimators can simulate and fit
 them, and the repository includes a check that re-runs an exported
 estimation problem in COPASI and compares it with FungMod.
@@ -113,7 +112,8 @@ scientific mode refuses to run unless every input is sourced and valid, and
 says that this does not mean experimentally validated. Both modes write
 versioned tables (time series, final metrics, threshold times, uncertainty,
 conservation, solver and thermodynamic diagnostics, provenance, limitations,
-missing parameters, suggested experiments) and a manifest.
+missing parameters, suggested experiments), quick-look figures of every
+state and process, and a manifest.
 
 **Numerics.** Process laws compile to array kernels with units resolved once
 at build time using Pint; SciPy [@virtanen2020] integrates them. Uncertainty
@@ -127,22 +127,23 @@ any fit, and every recorded result cites the digest of its plan.
 
 **User data.** A dataset schema lets a laboratory run its own strains,
 enzymes, substrates, conditions and kinetics without editing the registry:
-kcat with an enzyme concentration, Vmax (stated, or derived from a specific
-activity and an enzyme loading, or from a saturating assay activity), or a
-diprotic pH-ionisation law, with optional temperature and pH response laws.
-A suspended solid substrate runs as an apparent law on a dry-mass basis, with
-enzyme doses per gram of substrate and an optional conversion-dependent
-reactivity term [@kadam2004]. A culture table binds the shipped culture model
-to the laboratory's own fungus, which then grows on the substrate and
-secretes its enzymes. An enzyme network runs every class of a strain
-together: rates add on shared pools, a product feeds the next class only
-where the data state that link, and a measured inhibition constant slows a
-class through competitive product inhibition. All three reuse the existing
-process laws. The loader checks every row, reports each problem by file, row and column,
-and turns each missing value into an explicit unknown with a measurement
-request. Measured time courses can be compared with a simulation, and Km with
-kcat or Vmax can be fitted to them; fitted values carry their fit report and
-stay exploratory.
+kcat with an enzyme concentration, Vmax (stated or derived from assay
+activities) or a diprotic pH-ionisation law, with optional temperature and pH
+response laws. An enzyme can lose activity at a stated first-order rate,
+optionally temperature-dependent. A suspended solid substrate runs as an
+apparent law on a dry-mass basis, with enzyme doses per gram of substrate and
+an optional conversion-dependent reactivity term [@kadam2004]. A culture table
+binds the shipped culture model to the laboratory's own fungus, which then
+grows on the substrate and secretes its enzymes, several of which may consume
+it in parallel. An enzyme network runs every class of a strain together: rates
+add on shared pools, a product feeds the next class only where the data state
+that link, and a measured inhibition constant slows a class through
+competitive product inhibition; temperature and pH laws apply per class. All
+reuse the existing process laws. The loader checks every row, reports each
+problem by file, row and column, and turns each missing value into an explicit
+unknown with a measurement request. Measured time courses can be compared with
+a simulation, and Km with kcat or Vmax can be fitted to them; fitted values
+carry their fit report and stay exploratory.
 
 **From a name to a draft.** A strain's enzyme classes can come from a dbCAN
 annotation of its genome [@zheng2023] or from a UniProt proteome
@@ -150,30 +151,33 @@ annotation of its genome [@zheng2023] or from a UniProt proteome
 explicitly allows network access: an ambiguous name is refused with its
 candidates listed, and every response is frozen as a digest-checked snapshot
 so that later runs are offline and identical. Both routes resolve through a
-curated CAZy family map and the registry's EC numbers; neither ever supplies
-a rate. SABIO-RK kinetic-law entries, fetched only on request into
-digested snapshots, are converted into user tables whose open decisions are
-marked for review. One call assembles a reviewable dataset for a fungus, its
-substrates and its conditions from these sources and reports, per case,
-whether the kinetics are the laboratory's, published for the same species,
-transferred from another organism (and then only an estimate), conflicting or
-missing; kinetics are never reused at another condition without a stated
-response law. A command-line interface assembles, checks, runs, compares
-and fits these datasets, and simulates the runnable cases of a request while
-reporting the blocked ones with their measurement requests.
+curated CAZy family map and the registry's EC numbers; neither ever supplies a
+rate. SABIO-RK kinetic-law entries, chosen by the user or looked up by the EC
+numbers of the strain's classes, are fetched only on request into
+digest-checked snapshots and converted into user tables marked for review. One
+call assembles a reviewable dataset for a fungus, its substrates and its
+conditions from these sources and reports, per case, whether the kinetics are
+the laboratory's, published for the same species, transferred from another
+organism (and then only an estimate), conflicting or missing; kinetics are
+never reused at another condition without a stated response law. A
+command-line interface assembles, checks, runs, compares and fits these
+datasets, simulates the runnable cases of a request while reporting the
+blocked ones with their measurement requests, and writes a machine-readable
+summary of each command on request. A walkthrough documents this route, and a
+script checks live database responses against FungMod's readers.
 
 **Spatial mycelium.** An exploratory module simulates hyphal and tip
 densities with tip extension, branching, anastomosis, uptake and
 translocation [@edelstein1982; @boswell2003] on conservative finite-volume
-grids (one to three Cartesian dimensions, or axisymmetric), with sparse or
-banded Jacobians. It is verified against analytic front speeds,
+grids (one to three Cartesian dimensions, or axisymmetric), with analytic
+sparse Jacobians. It is verified against analytic front speeds,
 conservation, symmetry and solver agreement, carries no organism parameters
 and is not yet connected to the registry.
 
 # Research impact statement
 
 FungMod 0.1.1 is released on PyPI under the MIT licence, with documentation
-at https://fungmod.readthedocs.io/. More than 2,600 automated tests run on Linux,
+at https://fungmod.readthedocs.io/. More than 3,100 automated tests run on Linux,
 macOS and Windows for Python 3.11 to 3.13. The repository includes four
 reproducible case studies on the published *Trichoderma harzianum* P49P11
 cellulose cultures [@gelain2020] (holdout benchmarks, posterior sampling,
@@ -183,9 +187,8 @@ regenerates every table and figure from those results. The registry is
 deliberately small: one calibrated whole organism, two enzyme-level cases
 sourced from SABIO-RK (one with a pH response), categorical records of
 further enzyme classes and polysaccharides without kinetic values, and
-labelled development records. A documented worked example runs the
-calibrated organism and the pH-response case from these stored records, and
-a test reruns every command it shows.
+labelled development records. A documented worked example runs both
+literature cases from these stored records, tested command by command.
 [Author: add any realised use, such as groups or projects using FungMod,
 talks, teaching or citations. If there is none yet, keep this paragraph as
 the evidence of near-term significance and do not claim more.]
