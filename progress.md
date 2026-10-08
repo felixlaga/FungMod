@@ -216,7 +216,8 @@ on 6567464, Python 3.11 venv, `PYTHONPATH=src`):
   builder, no-shortcut and public-API guardrails): 814 passed.
 - Digest script over all 16 earlier fixtures and the registry against
   6567464: records, configs and the 15 output tables identical.
-- FULL_SUITE_RESULT
+- Full suite `pytest -n 2 --dist loadfile tests` (pytest-xdist): 2906 passed in
+  41 min 43 s; no xdist-only failure to rerun serially.
 
 Next task: a temperature (and pH) law on a culture pool's `enzyme_loss_rate`
 (response laws on cultures); an inactive enzyme pool and reversible unfolding
