@@ -63,11 +63,14 @@ them locally first:
 ```bash
 python -m ruff check src tests
 python -m pyright --pythonpath "$(python -c 'import sys; print(sys.executable)')"
-python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml
+python -m pytest --cov=fungal_model --cov-report=term-missing --cov-report=xml -n auto --dist loadfile
 python -m mkdocs build --strict
 python -m build
 python -m twine check dist/*
 ```
+
+`-n auto --dist loadfile` (pytest-xdist, in the `dev` extra) runs the test files
+in parallel on every core, as CI does; drop it to run serially.
 
 You can run all of them at once with:
 
