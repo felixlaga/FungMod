@@ -134,9 +134,10 @@ def _normalized(text: str) -> str:
 
 
 def _slashes(text: str) -> str:
-    """Windows prints paths with backslashes; both sides of a comparison are read with forward slashes there."""
+    """Windows prints paths with backslashes and quotes a printed argument with double quotes (``shell_quote``);
+    there both sides of a comparison are read with forward slashes and single quotes."""
 
-    return text.replace("\\", "/") if os.sep == "\\" else text
+    return text.replace("\\", "/").replace('"', "'") if os.sep == "\\" else text
 
 
 def _cli(directory: Path, argv: list[str]) -> _Result:
