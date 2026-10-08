@@ -174,6 +174,12 @@ USER_DATA_FORBIDDEN_TOKENS = (
     "strain fix-",
     "up9999900",
     "x9b2p",
+    # ASSEMBLE-002 network drafts: the test-only registry record, its class and the illustrative classes and pools of
+    # tests/test_assemble_network.py come from the request, the registry and the tables, never from code.
+    "cellotetraose",
+    "cello_oligosaccharide",
+    "cleaver_t1",
+    "entry_e1",
 )
 
 

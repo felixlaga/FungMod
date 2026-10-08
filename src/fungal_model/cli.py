@@ -21,7 +21,9 @@ repertoire of ``assemble`` can be a UniProt proteome (``--proteome UP...``, or
 ``--fetch-proteome`` for the reference proteome found under the fungus's name
 by ``fungal_model.sources.uniprot``); its frozen snapshots are read from disk,
 and the network is reached only with ``assemble --fetch``, the one network
-opt-in of the command line.
+opt-in of the command line. ``assemble --network`` drafts an enzyme network
+(``enzyme_network``: every class of the repertoire acting on a pool the
+requested substrates release acts together) instead of single-class cases.
 
 The command line only parses arguments and prints what the API returns; every
 scientific decision (name resolution, modelability, the simulation rule of each
@@ -67,6 +69,7 @@ from fungal_model.api.user_data import (
     load_user_dataset,
 )
 from fungal_model.api.user_data_assembly import (
+    NETWORK_BLOCKED,
     STATUS_CONFLICT,
     STATUS_GAP,
     AssembledTablesDraft,
@@ -197,6 +200,14 @@ the enzyme repertoire from a UniProt proteome (instead of --annotation):
   CAZy cross-references give the classes; no kinetic value comes from a proteome. --fetch is the only route to
   the network; without it the frozen snapshots under --snapshot-dir are read.
 
+several enzymes acting together (--network):
+  The draft declares enzyme_network with the requested substrates as entry substrates: the pools each releases
+  are followed through stated products only (the user dataset's substrates.csv, a registry record's single
+  product, or the request) that equal a substrate_id or a registry substrate id, never a name, and every class of
+  the repertoire acting on a pool is a member with its own kinetics status. A network runs at a condition only
+  when every member has kinetics there (all or nothing); a member without kinetics is a gap, never left out.
+  Response laws (--responses) are refused; --user-data may then be a network dataset.
+
 examples:
   fungmod assemble --fungus "Strain G1" --substrate NAME --temperature-c 30 --temperature-c 40 --ph 5 \\
       --annotation overview.txt --annotation-tool "dbCAN 4.1.4" \\
@@ -205,6 +216,8 @@ examples:
       --dataset-id strain_g1_draft --output strain_g1_draft
   fungmod assemble --fungus "Strain G2" --scientific-name "Genus species" --fetch-proteome --fetch \\
       --substrate NAME --temperature-c 30 --ph 5 --dataset-id strain_g2_draft --output strain_g2_draft
+  fungmod assemble --fungus STRAIN --user-data my_dataset --substrate SUBSTRATE_ID --temperature-c 30 --ph 5 \\
+      --network --dataset-id strain_network_draft --output strain_network_draft
 """
 _DRAFT_EPILOG = f"""what the draft holds:
   One strain per organism and expression host, enzyme classes resolved by EC number, substrates resolved by name,
@@ -572,6 +585,15 @@ def _add_assemble_parser(commands: Any) -> None:
         nargs=3,
         metavar=("DURATION", "UNITS", "POINTS"),
         help="simulation time grid, for example 10 hour 61; without it (and without --user-data) a REVIEW: field",
+    )
+    request.add_argument(
+        "--network",
+        action="store_true",
+        help=(
+            "draft an enzyme network (enzyme_network in user_dataset.yml) instead of single-class cases: every "
+            "class of the repertoire acting on a requested substrate, or on a pool it releases through a stated "
+            "product, acts together (assemble_user_tables(network=True))"
+        ),
     )
     output = assemble.add_argument_group("output")
     output.add_argument("--dataset-id", required=True, metavar="ID", help="lowercase snake_case id of the draft")
@@ -1042,6 +1064,7 @@ def _assemble(args: argparse.Namespace) -> int:
         "time_grid": _time_grid(args.time_grid),
         "entry_ids": args.entry_ids,
         "cache_dir": args.cache_dir,
+        "network": True if args.network else None,
     }
     try:
         draft = assemble_user_tables(
@@ -1799,6 +1822,12 @@ def _print_assembly(draft: AssembledTablesDraft) -> None:
         f"{fungus['resolved_as']}{registry_fungus})"
     )
     for item in report["substrates"]:
+        if item.get("network_role") == "intermediate":
+            print(
+                f"  pool {item['substrate_id']} -> {item['name']} ({item['resolved_as']}; released by "
+                f"{item['released_by']}, an intermediate of the enzyme network)"
+            )
+            continue
         print(f"  substrate {item['input']!r} -> {item['name']} ({item['substrate_id']}, {item['resolved_as']})")
     for item in report["requested_conditions"]:
         where = "conditions.csv" if item["in_conditions_csv"] else "an EnvironmentGrid condition, not a conditions.csv row"
@@ -1848,6 +1877,8 @@ def _print_assembly(draft: AssembledTablesDraft) -> None:
             print(f"  acting without evidence in the fungus, not added: {entry['enzyme_class']}: {entry['reason']}")
         if item["undetermined"]:
             print(f"  undetermined: {item['undetermined']}")
+    if "network" in report:
+        _print_assembly_network(report["network"])
 
     cases = report["cases"]
     print()
@@ -1892,6 +1923,49 @@ def _print_assembly(draft: AssembledTablesDraft) -> None:
     print("Limitations of this draft:")
     for text in report["limitations"]:
         print(f"  - {text}")
+
+
+def _print_assembly_network(network: Mapping[str, Any]) -> None:
+    print()
+    print(
+        f"Enzyme network (--network; user_dataset.yml {network['manifest_field']}, entry substrates "
+        f"{', '.join(network['entry_substrates'])}): the member classes act together, all or nothing per condition"
+    )
+    for item in network["networks"]:
+        links = []
+        for link in item["links"]:
+            product = link["product"] or "a product under review"
+            amount = (
+                f"{link['product_yield']} {link['yield_basis']}" if link["product_yield"] else "yield under review"
+            )
+            final = "" if link["releases_pool"] else ", final product"
+            links.append(f"{link['substrate_id']} -> {product} ({amount}{final})")
+        print(f"  from {item['entry_substrate']}: {', '.join(links)}")
+        conditions = [str(entry["condition"]) for entry in item["conditions"]]
+        rows = [
+            (
+                member["enzyme_class"],
+                f"{member['pool']} ({member['pool_role']})",
+                *(member["kinetics_status"].get(condition, "-") for condition in conditions),
+            )
+            for member in item["members"]
+        ]
+        for line in _table(("member class", "pool", *conditions), rows):
+            print(f"  {line}")
+        if item["undetermined_pools"]:
+            print(
+                f"  members on {', '.join(item['undetermined_pools'])} are decided when the reviewed tables are loaded "
+                "(substrate class or bond classes under review)"
+            )
+        for entry in item["conditions"]:
+            blocked = f": {'; '.join(entry['blocked_by'])}" if entry["blocked_by"] else ""
+            print(
+                f"  {entry['condition']}: {entry['status']} (initial concentration of {item['entry_substrate']}: "
+                f"{entry['initial_concentration']}){blocked}"
+            )
+        for member in item["not_members"]:
+            reasons = "; ".join(member["reasons"]) or "the pools are under review"
+            print(f"  not a member (acts on no pool of this network): {member['enzyme_class']}: {reasons}")
 
 
 def _print_draft(draft: UserTablesDraft, *, provider: str, source: str) -> None:
@@ -1956,6 +2030,7 @@ def _print_assembly_next_steps(draft: AssembledTablesDraft, output: Path) -> Non
         *(
             part
             for item in report["substrates"]
+            if item.get("network_role") != "intermediate"
             for part in ("--substrate", shell_quote(item["registry_substrate"] or item["name"]))
         ),
     ]
@@ -1989,6 +2064,8 @@ def _assembly_run_command(
     preflight blocks it; without ``--runnable-only`` the whole command would then simulate nothing (exit 3).
     """
 
+    if "network" in report:
+        return _network_run_command(report["network"], selection, conditions, condition_ids)
     gaps = [
         case
         for case in report["cases"]
@@ -2005,6 +2082,29 @@ def _assembly_run_command(
         "the preflight blocks them, so without the flag nothing is simulated (exit code 3); with it the runnable "
         f"cases are simulated and the blocked ones are listed with their measurement requests (exit code "
         f"{EXIT_PARTIAL})."
+    )
+    return " ".join(("fungmod run", *selection, *conditions, "--runnable-only")), [note]
+
+
+def _network_run_command(
+    network: Mapping[str, Any], selection: Sequence[str], conditions: Sequence[str], condition_ids: Sequence[str]
+) -> tuple[str, list[str]]:
+    """The ``fungmod run`` command of a network draft, with ``--runnable-only`` when a network case is blocked."""
+
+    blocked = [
+        f"the network from {item['entry_substrate']} at {entry['condition']} ({'; '.join(entry['blocked_by'])})"
+        for item in network["networks"]
+        for entry in item["conditions"]
+        if entry["condition"] in condition_ids and entry["status"] == NETWORK_BLOCKED
+    ]
+    if not blocked:
+        return " ".join(("fungmod run", *selection, *conditions)), []
+    note = (
+        f"--runnable-only because {len(blocked)} enzyme-network case(s) of this command are blocked "
+        f"({'; '.join(blocked)}): a network runs at a condition only when every member class has kinetics and its "
+        "entry an initial concentration, so the preflight blocks these, and without the flag nothing is simulated "
+        f"(exit code {EXIT_NOT_RUNNABLE}); with it the runnable network cases are simulated and the blocked ones are "
+        f"listed with their measurement requests (exit code {EXIT_PARTIAL}; {EXIT_NOT_RUNNABLE} when none is runnable)."
     )
     return " ".join(("fungmod run", *selection, *conditions, "--runnable-only")), [note]
 

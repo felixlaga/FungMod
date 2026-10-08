@@ -19,7 +19,7 @@ fungmod run --help
 | `fungmod preflight` | Preflight only; optionally write the preflight tables. |
 | `fungmod check-data DIR` | Validate a [user dataset](user-data.md) and list its gaps, genome or proteome resolution, [cultures](user-data.md#fungal-culture-growth-and-secretion), [enzyme networks](user-data.md#several-enzymes-acting-together), time courses, fitted values, or every unfilled `REVIEW:` field. |
 | `fungmod list` | List the fungi, substrates and environments that can be named. |
-| `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation (or its UniProt proteome, by identifier or [found under its name](#from-a-fungus-name-its-uniprot-reference-proteome)), the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`). |
+| `fungmod assemble` | Draft one reviewable user dataset for a fungus on substrates at conditions from its annotation (or its UniProt proteome, by identifier or [found under its name](#from-a-fungus-name-its-uniprot-reference-proteome)), the classes you assert, a user dataset and kinetics sources (`assemble_user_tables`); with [`--network`](#several-enzymes-acting-together-network), one enzyme network of every class acting on the substrates and the pools they release. |
 | `fungmod draft-kinetics SOURCE` | Draft user tables from a SABIO-RK export or frozen snapshot (`user_tables_from_sabiork`). |
 | `fungmod fit DIR` | Fit Km with kcat or Vmax of one case to the dataset's time courses and write the fitted dataset (`fit_user_dataset`). |
 
@@ -40,7 +40,8 @@ shell is: [`assemble`](#fungus-x-on-substrate-y-at-conditions-z-from-your-source
 the sources you have into a draft (the enzyme repertoire can come from the
 UniProt reference proteome
 [found under the fungus's name](#from-a-fungus-name-its-uniprot-reference-proteome)),
-fill its `REVIEW:` fields,
+with [`--network`](#several-enzymes-acting-together-network) for all of its
+enzyme classes acting together, fill its `REVIEW:` fields,
 `check-data`, `run` (with [`--runnable-only`](#run-the-runnable-cases-of-a-request)
 while the draft still has gaps), [compare](#compare-with-your-time-courses)
 with your time courses and [fit](#fit-kinetic-constants-to-your-time-courses)
@@ -453,6 +454,7 @@ The options map one to one onto the arguments of `assemble_user_tables`:
 | `--user-data DIR` | `user_data` |
 | `--responses FILE` | `responses`: a CSV with the columns of `responses.csv`, `substrate` in place of `strain_id` and `substrate_id` |
 | `--design QUANTITY=VALUE UNITS` or `QUANTITY=LOWER:UPPER UNITS` (repeatable) | `design` (`substrate_initial_concentration`, `enzyme_concentration`, `enzyme_loading`) |
+| `--network` | `network=True`: an enzyme network instead of single-class cases (see [several enzymes acting together](#several-enzymes-acting-together-network)) |
 | `--time-grid DURATION UNITS POINTS` | `time_grid` |
 | `--cache-dir DIR`, `--registry PATH` | `cache_dir`, `registry` |
 | `--dataset-id ID`, `--output DIR` | `dataset_id`; the new or empty directory `draft.write` writes |
@@ -569,6 +571,144 @@ A condition that a temperature or pH law reaches from the measured one (see
 [assembling](user-data.md#assembling-fungus-substrate-and-conditions)) is
 not a `conditions.csv` row; `assemble` then prints a second `fungmod run`
 command with `--temperature-c` and `--ph` for that grid condition.
+
+## Several enzymes acting together: --network
+
+Without `--network` the draft holds single-class cases, and the preflight
+selects one enzyme class per strain, substrate and condition. With
+`--network`, `assemble` drafts an
+[enzyme network](user-data.md#several-enzymes-acting-together): the requested
+substrates are the network's entry substrates, the pools each releases are
+followed through stated products only (the `product` of a `--user-data`
+substrate, or a registry record's single product, that equals a `substrate_id`
+of `--user-data` or a registry substrate id; never a name), and every class of
+the repertoire acting on a pool is a member with its own kinetics status. A
+member without kinetics is a gap, never left out, and a network runs at a
+condition only when every member has kinetics there and its entry an initial
+concentration (all or nothing). The rules, refusals and report are those of
+[drafting an enzyme network](user-data.md#drafting-an-enzyme-network).
+
+The example takes `my_chain`, a copy of
+`tests/fixtures/user_data/network_chain/` with its `enzyme_network` block
+removed: a plain dataset whose two user-defined classes act on a soluble
+polymer-like substrate and on the oligomer-like pool that substrate's
+`substrates.csv` product names (illustrative estimates at 30 degC only).
+
+```bash
+fungmod assemble --fungus strain_n1 --user-data my_chain --substrate polymer_p1 \
+  --temperature-c 30 --temperature-c 40 --ph 5 --network \
+  --dataset-id chain_draft --output chain_draft
+```
+
+```text
+Assembled draft: chain_draft
+  fungus 'strain_n1' -> Illustrative network strain N1 (strain strain_n1, user_data_strain)
+  substrate 'polymer_p1' -> Soluble polymer-like substrate P1 (polymer_p1, user_data)
+  pool oligomer_o1 -> Oligomer-like pool O1 (user_data; released by polymer_p1, an intermediate of the enzyme network)
+  condition c30_ph5: 30 degC, pH 5 (conditions.csv)
+  condition c40_ph5: 40 degC, pH 5 (conditions.csv)
+
+Enzyme classes of the fungus: 2
+  class                    declared in  evidence
+  depolymerase_like        enzymes.csv  assumed secreted activity (illustrative)
+  oligomer_hydrolase_like  enzymes.csv  assumed secreted activity (illustrative)
+On Soluble polymer-like substrate P1 (polymer_p1): acting classes depolymerase_like
+  not acting: oligomer_hydrolase_like: substrate class 'soluble_polymer_like' is not among the class's substrate classes ['oligomer_like']
+On Oligomer-like pool O1 (oligomer_o1): acting classes oligomer_hydrolase_like
+  not acting: depolymerase_like: substrate class 'oligomer_like' is not among the class's substrate classes ['soluble_polymer_like']
+
+Enzyme network (--network; user_dataset.yml enzyme_network, entry substrates polymer_p1): the member classes act together, all or nothing per condition
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol, final product)
+  member class             pool                        c30_ph5    c40_ph5
+  depolymerase_like        polymer_p1 (entry)          user_data  gap
+  oligomer_hydrolase_like  oligomer_o1 (intermediate)  user_data  gap
+  c30_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated)
+  c40_ph5: blocked (initial concentration of polymer_p1: missing): depolymerase_like on polymer_p1 (gap); oligomer_hydrolase_like on oligomer_o1 (gap); the initial concentration of polymer_p1 (no source states it; give design={'substrate_initial_concentration': ...} or a kinetics.csv row)
+
+Cases: 4 (enzyme class x substrate x condition)
+  #  fungus                          class                    substrate    condition  kinetics status  route           source ids
+  1  Illustrative network strain N1  depolymerase_like        polymer_p1   c30_ph5    user_data        same_condition  user dataset network_chain kinetics.csv rows 2, 3, 4, 5
+  2  Illustrative network strain N1  depolymerase_like        polymer_p1   c40_ph5    gap              none            user dataset network_chain kinetics.csv rows 2, 3, 4, 5
+  3  Illustrative network strain N1  oligomer_hydrolase_like  oligomer_o1  c30_ph5    user_data        same_condition  user dataset network_chain kinetics.csv rows 6, 7, 8
+  4  Illustrative network strain N1  oligomer_hydrolase_like  oligomer_o1  c40_ph5    gap              none            user dataset network_chain kinetics.csv rows 6, 7, 8
+  ...
+Limitations of this draft:
+  ...
+  - Enzyme network draft: the member classes act together as independent Michaelis-Menten processes whose rates add on shared pools; no synergy, no competition for substrate binding or adsorption sites, and no inhibition unless a ki row states a competitive inhibitor.
+  ...
+
+Draft written to chain_draft:
+  ...
+
+Fields to fill (1); check-data refuses the directory until each REVIEW: field is filled:
+  user_dataset.yml:-:contributor: REVIEW: name of the person who reviewed these tables
+
+Next:
+  1. Fill the 1 REVIEW: field(s) above; chain_draft/review.md explains every decision.
+  2. fungmod check-data chain_draft
+  3. Run it (exploratory mode samples ranges and estimates; scientific mode takes exact measured, literature or design values only):
+     fungmod run --user-data chain_draft --fungus 'Illustrative network strain N1' --substrate 'Soluble polymer-like substrate P1' --condition c30_ph5 --condition c40_ph5 --runnable-only \
+       --mode exploratory --samples N --seed S --output RUN_DIR
+     --runnable-only because 1 enzyme-network case(s) of this command are blocked (the network from polymer_p1 at c40_ph5 (depolymerase_like on polymer_p1 (gap); ...)): a network runs at a condition only when every member class has kinetics and its entry an initial concentration, so the preflight blocks these, and without the flag nothing is simulated (exit code 3); with it the runnable network cases are simulated and the blocked ones are listed with their measurement requests (exit code 4; 3 when none is runnable).
+```
+
+The pool `oligomer_o1` is in the network only because the `substrates.csv`
+product of `polymer_p1` is that `substrate_id`; the run command names the
+entry substrate only. After the reviewer is filled in, `fungmod check-data
+chain_draft` lists the network as for any network dataset:
+
+```text
+Enzyme networks (user_dataset.yml enzyme_network; the classes act together on shared pools, enzyme_network): 1
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol); strains strain_n1
+  enzyme class             pool         rate form  competitive inhibitor
+  depolymerase_like        polymer_p1   kcat       none
+  oligomer_hydrolase_like  oligomer_o1  kcat       none
+```
+
+and the printed command (`--mode exploratory --samples 8 --seed 1 --output
+runs/chain`) simulates the 30 degC network and lists the 40 degC one with its
+seven measurement requests, exit code 4:
+
+```text
+Preflight in exploratory mode:
+  #  fungus                  substrate                environment           status              runnable
+  1  chain_draft__strain_n1  chain_draft__polymer_p1  chain_draft__c30_ph5  modelable           yes
+  2  chain_draft__strain_n1  chain_draft__polymer_p1  chain_draft__c40_ph5  underparameterized  no
+...
+Case case_0000: chain_draft__strain_n1 + chain_draft__polymer_p1 + chain_draft__c30_ph5
+  ...
+  Threshold times (median [5th, 95th percentile] over samples):
+    time_to_10_percent_substrate_degradation  11.85 [11.85, 11.85] minute (n=8)
+    time_to_50_percent_substrate_degradation  64.77 [64.77, 64.77] minute (n=8)
+    time_to_90_percent_substrate_degradation  151.8 [151.8, 151.8] minute (n=8)
+
+Case case_0001: chain_draft__strain_n1 + chain_draft__polymer_p1 + chain_draft__c40_ph5
+  not simulated: blocked_by_preflight: ...
+Partial run: 1 of 2 requested case(s) were blocked by the preflight and not simulated (case_0001); exit code 4.
+```
+
+From a fungus name, `--fetch-proteome --fetch --network` drafts the network of
+the classes of its UniProt reference proteome. With the **synthetic test
+responses** of `tests/fixtures/uniprot_proteome_search/` (not UniProt data),
+`--scientific-name "Synthetic fixture mould B2"`, `--substrate cellobiose`,
+the frozen Reaction 618 export with `--entry-id 35622` and design amounts, the
+network block reads:
+
+```text
+Enzyme network (--network; user_dataset.yml enzyme_network, entry substrates cellobiose): the member classes act together, all or nothing per condition
+  from cellobiose: cellobiose -> beta_D_glucose (2 mol/mol, final product)
+  member class      pool                c30_ph5
+  beta_glucosidase  cellobiose (entry)  transferred_estimate
+  c30_ph5: all_members_have_kinetics (initial concentration of cellobiose: stated)
+  not a member (acts on no pool of this network): chitinase: cellobiose: substrate class 'cellobiose' is not among the class's substrate classes ['chitin']
+  not a member (acts on no pool of this network): endo_xylanase: cellobiose: substrate class 'cellobiose' is not among the class's substrate classes ['xylan']
+```
+
+and its printed `fungmod run` command has no `--runnable-only`, because
+nothing is blocked. `--responses` and a `--user-data` dataset whose
+`responses.csv` binds laws to a pool are refused (exit code 2), and so is
+everything else a network cannot run; `--user-data` may itself be a network
+dataset with `--network` (its `ki` rows are kept) and is refused without it.
 
 ## From a fungus name: its UniProt reference proteome
 
@@ -887,7 +1027,9 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
   fitted dataset `<input id>_fitted` (the API's default) unless
   `--fitted-dataset-id` is given. All three require a new or empty
   `--output`; nothing is overwritten. `assemble` takes one `--fungus` and
-  needs both `--temperature-c` and `--ph`, like the `run` grid.
+  needs both `--temperature-c` and `--ph`, like the `run` grid. `assemble
+  --network` is an explicit opt-in: without it the draft holds single-class
+  cases, byte for byte as before.
 - An option of `assemble`, `draft-kinetics` or `fit` that you do not give is
   not passed to the API: the decision stays a `REVIEW:` field of the draft, or
   the API's own documented default applies (stated in `--help`).

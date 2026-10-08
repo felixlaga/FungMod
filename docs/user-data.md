@@ -139,7 +139,11 @@ same draft and prints the per-case report, the `REVIEW:` fields and the next
 commands ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).
 With `--fetch-proteome --fetch` in place of the annotation, the repertoire
 comes from the UniProt reference proteome found under the fungus's name
-([from a fungus name](#from-a-fungus-name)).
+([from a fungus name](#from-a-fungus-name)). With `network=True`
+(`--network`) the draft is one [enzyme network](#several-enzymes-acting-together)
+in which every class of the fungus acting on the requested substrate, or on a
+pool it releases, acts together
+([drafting an enzyme network](#drafting-an-enzyme-network)).
 When a case of the draft is a `gap` or a `conflict`, the printed `fungmod
 run` command carries `--runnable-only` and a line says why: once loaded, that
 case's kinetic constants are explicit gaps, so the preflight blocks it, and
@@ -207,6 +211,9 @@ mode both cases are refused, because the transferred values are estimates.
   (`substrate_initial_concentration`, `enzyme_concentration`,
   `enzyme_loading`) and the simulation time grid. Without them these are
   `REVIEW:` fields; the time grid of `user_data` is used when you give one.
+- `network`: `True` drafts an enzyme network instead of single-class cases
+  ([drafting an enzyme network](#drafting-an-enzyme-network)); the default
+  `False` drafts what earlier versions drafted, byte for byte.
 
 ### Kinetics status of a case
 
@@ -300,6 +307,130 @@ cases of a registry fungus.
   ([command line](cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)); kelvin temperatures, explicit condition ids
   and notes, and the categories of a new substrate are set in the Python API
   or while reviewing the tables.
+
+### Drafting an enzyme network
+
+A draft without `network` holds single-class cases: once loaded, the preflight
+selects one enzyme class per strain, substrate and condition. With
+`network=True` (`fungmod assemble --network`) the draft is an
+[enzyme network](#several-enzymes-acting-together) instead: `user_dataset.yml`
+declares `enzyme_network` with the requested substrates as `entry_substrates`,
+and every class of the fungus's repertoire that acts on a pool of a network
+runs its own Michaelis-Menten process together with the others once the draft
+is loaded.
+
+```python
+draft = fm.assemble_user_tables(
+    dataset_id="chain_draft",
+    fungus="strain_n1",
+    substrates=["polymer_p1"],                # each requested substrate is an entry substrate
+    conditions=[
+        {"temperature": 30, "temperature_units": "degC", "ph": 5},
+        {"temperature": 40, "temperature_units": "degC", "ph": 5},
+    ],
+    user_data="my_chain",                     # a plain dataset, or a network dataset (its ki rows are kept)
+    network=True,
+)
+network = draft.assembly["network"]["networks"][0]
+print(network["pools"], network["final_product"])
+for member in network["members"]:
+    print(member["enzyme_class"], member["pool"], member["kinetics_status"])
+for condition in network["conditions"]:
+    print(condition["condition"], condition["status"], condition["blocked_by"])
+```
+
+- **Pools come from stated products only.** From each entry substrate the
+  draft follows the product its `substrates.csv` row will state: the `product`
+  you give in the request, the product of the substrate's row in `user_data`,
+  or a registry record's product when the record lists exactly one. A product
+  links to another pool only when it equals a `substrate_id` of `user_data` or
+  a registry substrate ID (the draft's `substrate_id` of a registry
+  substrate); that pool joins the draft as an intermediate
+  (`network_role: intermediate` in `draft.assembly["substrates"]`), and the
+  chain ends at the first product that is no such substrate, the network's
+  final product. Names and aliases are never matched: a product that names a
+  registry substrate by its name stays the final product, and a decision says
+  so. The written `substrates.csv` must link exactly these pools; a converted
+  SABIO-RK product that would change a chain is refused with the remedy
+  (state the product in the request).
+- **Members.** Every class of the repertoire (annotation, proteome export,
+  asserted classes, registry record, user dataset) that acts on a pool by the
+  categorical rule is a member, with the [kinetics status](#kinetics-status-of-a-case)
+  of its pool at every requested condition: your own rows, same-species
+  literature, a cross-organism transfer kept as an estimate, a conflict or a
+  gap. A member without kinetics is drafted as a `gap`: `load_user_dataset`
+  records its gaps with measurement requests, and the network does not run at
+  that condition (all or nothing). A class is never left out. Classes that
+  act on no pool are listed per network as not members, with each pool's
+  reason, like the "does not act on" lines of a single-class draft.
+- **Initial concentrations.** An intermediate pool starts at zero, so an
+  initial concentration stated for it (a SABIO-RK assay concentration, or a
+  row of your dataset) is listed as not converted or not used. An entry has
+  one initial concentration per condition: your dataset's rows win (they must
+  agree among themselves), a source's value that disagrees with them is
+  listed, source values that disagree with each other become one `REVIEW:`
+  field naming each value, and `design={'substrate_initial_concentration':
+  ...}` is written once per entry and condition where nothing states it.
+- **Per condition**, `draft.assembly["network"]` says whether each network can
+  run: `all_members_have_kinetics` (every member has kinetics from a source
+  and the entry an initial concentration; `check-data` lists any role still
+  missing), `blocked` (with what blocks it) or `undetermined` (a pool's
+  categories are `REVIEW:` fields, so its members are decided when the
+  reviewed tables load). The printed `fungmod run` command names the entry
+  substrates only and carries `--runnable-only` when a network case of it is
+  blocked.
+- **Refused**, with the reason, as `load_user_dataset` refuses them in a
+  network: `responses` and `responses.csv` rows of `user_data` on its pools
+  (laws are not bound to network processes yet), a cycle of products, a
+  product that equals the registry substrate of a row with another
+  `substrate_id`, a product that is a solid substrate (drafts hold dissolved
+  substrates only), a class acting on two pools of one network, an entry no
+  class of the fungus acts on, colliding state names, and initial
+  concentrations of one entry that disagree in your rows. Kinetics in the
+  pH-ionization form are not bound in a network: their case is a `gap` with
+  that reason.
+- `kinetics.csv` of a network draft has the `inhibitor` column, so the `ki`
+  rows of a network dataset given as `user_data` are kept, and you can add a
+  [competitive inhibitor](#competitive-product-inhibition-ki) while reviewing.
+  Without `network=True` a network dataset as `user_data` is refused, because
+  a single-class draft would drop its network.
+- `review.md` adds an "Enzyme network" section (pools and links, a member
+  table by condition, the verdict per condition, the classes that are not
+  members) and the network's limitations.
+
+With a copy of the `network_chain` fixture whose `enzyme_network` block is
+removed (`my_chain`, a plain dataset: two user-defined classes, a soluble
+polymer-like substrate whose product is the oligomer-like pool; illustrative
+estimates at 30 degC only), `fungmod assemble --fungus strain_n1 --user-data
+my_chain --substrate polymer_p1 --temperature-c 30 --temperature-c 40 --ph 5
+--network --dataset-id chain_draft --output chain_draft` drafts the chain and
+prints:
+
+```text
+Enzyme network (--network; user_dataset.yml enzyme_network, entry substrates polymer_p1): the member classes act together, all or nothing per condition
+  from polymer_p1: polymer_p1 -> oligomer_o1 (4 mol/mol), oligomer_o1 -> monomer_m1 (2 mol/mol, final product)
+  member class             pool                        c30_ph5    c40_ph5
+  depolymerase_like        polymer_p1 (entry)          user_data  gap
+  oligomer_hydrolase_like  oligomer_o1 (intermediate)  user_data  gap
+  c30_ph5: all_members_have_kinetics (initial concentration of polymer_p1: stated)
+  c40_ph5: blocked (initial concentration of polymer_p1: missing): depolymerase_like on polymer_p1 (gap); oligomer_hydrolase_like on oligomer_o1 (gap); the initial concentration of polymer_p1 (no source states it; give design={'substrate_initial_concentration': ...} or a kinetics.csv row)
+```
+
+Once its reviewer is filled in, the draft loads as the same network as the
+fixture (`check-data` lists it), the printed `fungmod run ... --condition
+c30_ph5 --condition c40_ph5 --runnable-only` simulates 30 degC and lists the
+40 degC network with its seven measurement requests (exit code 4), and
+`--condition c30_ph5` alone runs with exit code 0 and the fixture's metrics
+(50 % of the entry degraded at 64.77 minutes). The materially different cases
+of `tests/test_assemble_network.py`: a registry chain from a hand-written
+dbCAN annotation (a test-only registry record whose single product is the
+shipped `cellobiose` record; the member without kinetics blocks the network),
+a UniProt proteome found by name (synthetic responses; beta-glucosidase is the
+member on cellobiose with transferred SABIO-RK kinetics, the proteome's
+xylanase and chitinase classes are listed as not members, and the network
+runs), the parallel network fixture as `user_data` with its `ki` row, and a
+registry fungus whose same-species literature network is `modelable` in
+scientific mode.
 
 ## Directory layout
 
@@ -1664,6 +1795,11 @@ byte-identical to those of the previous version. `y` is a pure number on a
 link between pools of one basis; on the one link from a solid to a dissolved
 pool it is a [unit-bearing yield](#a-solid-releasing-a-dissolved-pool) you
 state, converted by pint once when the model is compiled.
+To have the block, the pools,
+the links and every class's kinetics rows drafted for a fungus from its
+annotation, proteome, asserted classes, registry record, a user dataset and
+SABIO-RK, use `assemble_user_tables(network=True)` (`fungmod assemble
+--network`; see [drafting an enzyme network](#drafting-an-enzyme-network)).
 
 ### Pools and links
 
@@ -1988,7 +2124,8 @@ Each refusal names its file, row and column:
 - Unknown or repeated entries, an entry no declared class acts on, and a
   substrate that is part of no network.
 - `assemble_user_tables` (and `fungmod assemble`) with a network dataset as
-  `user_data`: drafts are single-class tables and would drop the network.
+  `user_data` unless `network=True` (`--network`): a single-class draft would
+  drop the network.
 
 ### What a network does and does not model
 
@@ -2014,8 +2151,12 @@ Not modelled, and the template and outputs say so:
   final product, and only through a yield you state with its evidence; no
   dissolved pool releases a solid one, and FungMod derives no conversion from a
   molar mass.
-- No response laws, time courses, comparison, fitting, cultures or assembly
-  drafting of networks yet; the values hold at the condition of their rows.
+- No response laws, time courses, comparison, fitting or cultures in a
+  network yet; the values hold at the condition of their rows. Networks are
+  drafted for a fungus by `assemble_user_tables(network=True)`
+  ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
+  dissolved pools only, so a link from a solid to a dissolved pool, with its
+  yield, is written in `substrates.csv` by hand.
 - An enzyme-kinetics model at stated enzyme concentrations, not a fungus
   growing and secreting; the strain's class list decides which classes act.
 
@@ -2657,3 +2798,6 @@ Limits of the SABIO-RK route:
   condition other than the measured one only through a response law at an
   `EnvironmentGrid` condition (see
   [assembling fungus, substrate and conditions](#assembling-fungus-substrate-and-conditions)).
+  A network draft follows pools only through stated products that equal a
+  `substrate_id` or a registry substrate ID, holds dissolved pools only, and
+  carries no response law ([drafting an enzyme network](#drafting-an-enzyme-network)).
