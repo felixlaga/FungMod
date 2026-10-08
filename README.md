@@ -170,7 +170,12 @@ query form was not verified against a live SABIO-RK response
 The whole route, from a fungus name to the run and its outputs, is shown step
 by step with real output on synthetic test fixtures, together with the script
 that checks the live UniProt and SABIO-RK formats, in
-[from a fungus name to a simulation](docs/walkthrough.md).
+[from a fungus name to a simulation](docs/walkthrough.md). The registry's two
+literature-backed cases (*T. harzianum* P49P11 on cellulose, Gelain 2020; the
+*P. chrysosporium* beta-glucosidase BGL1A over pH 4 to 8, SABIO-RK entry
+38522) are run from stored records, with their outputs read and every number
+traced to its source, in
+[a worked example on stored literature data](docs/real-example.md).
 
 `fungmod draft-kinetics SOURCE --provider sabiork` drafts tables from
 SABIO-RK entries alone ([user-data workflow](docs/cli.md#fungus-x-on-substrate-y-at-conditions-z-from-your-sources)).

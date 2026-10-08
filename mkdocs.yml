@@ -69,6 +69,7 @@ nav:
   - Quickstart: quickstart.md
   - Command line: cli.md
   - From a fungus name to a simulation: walkthrough.md
+  - A worked example on stored literature data: real-example.md
   - Scientific user guide: user-guide.md
   - Core concepts:
       - Virtual experiments: concepts/virtual-experiments.md

@@ -39,6 +39,12 @@ gap with a measurement request, not a case left out.
     access (`--fetch`), and the live service formats are not yet verified
     (see [verifying the live lookups](#verifying-the-live-lookups)).
 
+The same kinds of output on real data, with every number traced to a paper
+or a database entry, are in
+[a worked example on stored literature data](real-example.md). It runs the
+registry's two literature-backed cases: *T. harzianum* P49P11 on cellulose,
+and the *P. chrysosporium* beta-glucosidase BGL1A over pH 4 to 8.
+
 ## 1. Assemble the draft
 
 For your own fungus, on a machine with internet access:

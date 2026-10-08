@@ -26,6 +26,80 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## EXAMPLE-001 A Worked Example On Stored Literature Data
+
+Status: `complete` for the stated scope (2026-10-08). Documentation and tests
+only; no change to `src/` or to any registry record, so no scientific or
+numerical behaviour changed.
+
+The walkthrough (DOCS-WALK-001) shows the route on synthetic fixtures. This
+entry adds the worked example whose numbers come from real records already in
+the registry.
+
+- Survey. `fungmod list` names five registry fungi. Two carry published
+  kinetics or physiology for a fungus, and `fungmod run` runs both from
+  stored records with no network:
+  - `trichoderma_harzianum_p49p11` on `cellulose_celufloc_200` at the three
+    Gelain 2020 loadings, in scientific mode;
+  - `phanerochaete_chrysosporium_k3` on `cellobiose` at the five Tsukada 2008
+    pH environments, in exploratory mode only, because the assay loadings
+    are `exploratory_prior` records.
+
+  The Reaction 618 pilot (`sabiork_beta_glucosidase_source`, entry 35622) is
+  a rice enzyme. `toy_fungus_alpha` and `generic_cellulase_source` are
+  fixtures. Nothing blocked the route, so no code changed.
+- `docs/real-example.md` ("A worked example on stored literature data", in
+  the nav after the walkthrough) shows for each case:
+  - what the source measured, and what is fitted or assumed;
+  - the command and its real output;
+  - how to read it: substrate loss, product release (none for the culture,
+    with the closure ledger explained), rates (for BGL1A the maximum
+    depletion rate is the time-zero rate at the assumed loadings), threshold
+    times, why there is no uncertainty band, and the environment-effect
+    status;
+  - a provenance table: value, units and maturity, plus the posterior class,
+    the 95 % credible interval and whether the value lies inside it for the
+    nine fitted constants, or the SABIO-RK parameter and the deposited SD for
+    BGL1A;
+  - the important limitation rows, the suggested experiments with the
+    page's own follow-ups (labelled as such), and what the page does not
+    show.
+
+  The culture case also has a stdlib snippet that sets the run's cellulose,
+  biomass and filter-paper activity beside the deposited duplicate means
+  (`data/benchmarks/gelain_2020_v2/observations.json`). It is labelled
+  in-sample, names three visible misfits, and cites the joint comparison's
+  holdout errors (the hydrolysis candidate failed its screen) as the only
+  out-of-sample test. Values that round to zero print as `0.00` (format
+  `z`), and the CLI's near-zero final cellulose is shown as `...`, because
+  its sign is solver noise and differs between platforms.
+- `tests/test_real_example_doc.py` (24 tests, about 30 s) checks:
+  - each marked command, rerun in a temporary directory, and the snippet
+    (with the observations path made absolute): every shown output line;
+  - each table against the run's `provenance_table.csv`,
+    `limitations_table.csv`, `suggested_experiments.csv`,
+    `summary_metrics.csv` and `threshold_times.csv`;
+  - each table against the registry records (value at four significant
+    digits, units, maturity, posterior fields, fit artifact path and
+    SHA-256) and the archived SABIO-RK export (value, deposited SD, raw
+    SHA-256);
+  - that the survey lists every registry fungus, and that each row's "Runs
+    in" claim matches the preflight exit codes in both modes;
+  - that only the loading differs between the three cultures, the maturity
+    labels by record type, the holdout errors quoted from the joint
+    comparison page, the time grids, and the nav position and links.
+
+  `tests/test_walkthrough_doc.py` now exposes `marked_blocks(doc, prefix)`,
+  `assert_lines_shown(...)` and `offline()` for reuse; its own checks are
+  unchanged.
+- Links: `README.md`, `docs/index.md` and `docs/walkthrough.md` (one each);
+  one sentence in `paper/joss/paper.md`; `CHANGELOG.md`.
+
+Not shown, and said so on the page: any validation against independent data
+(none is bundled), any prediction outside the stored scope, the published
+Gelain equations, a fungus degrading anything in the BGL1A case, and
+uncertainty bands (both cases are exact).
+
 ## DOCS-WALK-001 Walkthrough From A Fungus Name To A Simulation, And A Live-Source Check
 
 Status: `complete` for the stated scope (2026-10-08). Documentation, fixtures,

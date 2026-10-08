@@ -6,6 +6,32 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- A worked example on stored literature data (EXAMPLE-001):
+  `docs/real-example.md` runs, offline and from the registry's stored records
+  alone, the two cases whose numbers come from published sources.
+  *T. harzianum* P49P11 on Celufloc 200 cellulose at 10, 20 and 30 g/L
+  (Gelain 2020; `fungmod run --mode scientific`) is read for substrate loss,
+  rates, threshold times, the missing product pool and the absent
+  uncertainty band. A short snippet sets its time courses beside the
+  deposited duplicate means they were fitted to, labelled as in-sample
+  agreement, with the joint comparison's holdout errors cited as the only
+  out-of-sample test. The *P. chrysosporium* BGL1A pH law (SABIO-RK entry
+  38522, Tsukada 2008; `fungmod run --mode exploratory` over pH 4 to 8) is
+  shown with a per-pH table of degradation, glucose release, initial rate
+  and threshold times, and the scientific-mode preflight that names the two
+  assumed assay loadings. Each case has a provenance table (value, units,
+  maturity, posterior class and credible interval, or SABIO-RK parameter and
+  deposited standard deviation), its important limitations, its follow-up
+  measurements and what the page does not show. A survey table lists every
+  registry fungus, what its source measured and the modes it runs in.
+  `tests/test_real_example_doc.py` reruns every command and the snippet,
+  checks every output line shown, checks each table against the run's
+  tables, the registry records and the archived SABIO-RK export, and checks
+  each survey row's modes with the preflight. `tests/test_walkthrough_doc.py`
+  now exposes its block parser and line matcher for reuse. The page is in
+  the nav after the walkthrough and linked from `README.md`, `docs/index.md`
+  and `docs/walkthrough.md`. No scientific or numerical behaviour changed.
+
 - A walkthrough from a fungus name to a simulation (DOCS-WALK-001):
   `docs/walkthrough.md` runs `fungmod assemble --fetch-proteome
   --fetch-kinetics --network`, resolves the draft's conflict with

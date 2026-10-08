@@ -183,7 +183,9 @@ regenerates every table and figure from those results. The registry is
 deliberately small: one calibrated whole organism, two enzyme-level cases
 sourced from SABIO-RK (one with a pH response), categorical records of
 further enzyme classes and polysaccharides without kinetic values, and
-labelled development records.
+labelled development records. A documented worked example runs the
+calibrated organism and the pH-response case from these stored records, and
+a test reruns every command it shows.
 [Author: add any realised use, such as groups or projects using FungMod,
 talks, teaching or citations. If there is none yet, keep this paragraph as
 the evidence of near-term significance and do not claim more.]

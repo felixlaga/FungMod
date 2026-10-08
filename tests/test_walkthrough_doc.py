@@ -43,7 +43,6 @@ SNAPSHOTS = ROOT / "tests" / "fixtures" / "walkthrough"
 SHOWN_SNAPSHOTS = "tests/fixtures/walkthrough"
 UNIPROT_FIXTURES = ROOT / "tests" / "fixtures" / "uniprot_proteome_search"
 SABIO_FIXTURES = ROOT / "tests" / "fixtures" / "sabiork_kinetics_queries"
-MARKER = re.compile(r"<!-- walkthrough-(?P<kind>[a-z-]+): (?P<key>[a-z0-9-]+) -->")
 # Values for the page's template of your own measurements: TEST VALUES, not measurements of anything.
 TEST_VALUES = {
     "<Km>": "3",
@@ -61,7 +60,9 @@ def _forbidden(*_args: object, **_kwargs: object) -> None:
 
 
 @contextlib.contextmanager
-def _offline() -> Iterator[None]:
+def offline() -> Iterator[None]:
+    """Fail any attempt to reach the network (also used by ``tests/test_real_example_doc.py``)."""
+
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(urllib.request, "urlopen", _forbidden)
         patch.setattr(sabiork_fetch, "urlopen", _forbidden)
@@ -69,19 +70,24 @@ def _offline() -> Iterator[None]:
         yield
 
 
-def _blocks() -> dict[tuple[str, str], str]:
-    """The page's marked blocks: the fenced block or table right after each marker, keyed by (kind, key)."""
+def marked_blocks(doc: Path, prefix: str) -> dict[tuple[str, str], str]:
+    """A page's marked blocks: the fenced block or table right after each marker, keyed by (kind, key).
 
-    lines = DOC.read_text(encoding="utf-8").splitlines()
+    A marker is ``<!-- <prefix>-<kind>: <key> -->`` on its own line (also used by
+    ``tests/test_real_example_doc.py``).
+    """
+
+    marker = re.compile(rf"<!-- {re.escape(prefix)}-(?P<kind>[a-z-]+): (?P<key>[a-z0-9-]+) -->")
+    lines = doc.read_text(encoding="utf-8").splitlines()
     blocks: dict[tuple[str, str], str] = {}
     index = 0
     while index < len(lines):
-        match = MARKER.fullmatch(lines[index].strip())
+        match = marker.fullmatch(lines[index].strip())
         index += 1
         if match is None:
             continue
         key = (match["kind"], match["key"])
-        assert key not in blocks, f"{key} is marked twice in {DOC.name}"
+        assert key not in blocks, f"{key} is marked twice in {doc.name}"
         if lines[index].startswith("```"):
             end = index + 1
             while not lines[end].startswith("```"):
@@ -95,11 +101,11 @@ def _blocks() -> dict[tuple[str, str], str]:
             blocks[key] = "\n".join(lines[index:end])
             index = end
         else:
-            raise AssertionError(f"{key} in {DOC.name} is not followed by a fenced block or a table")
+            raise AssertionError(f"{key} in {doc.name} is not followed by a fenced block or a table")
     return blocks
 
 
-BLOCKS = _blocks()
+BLOCKS = marked_blocks(DOC, "walkthrough")
 
 
 def _argv(key: str) -> list[str]:
@@ -135,17 +141,20 @@ def _slashes(text: str) -> str:
 
 def _cli(directory: Path, argv: list[str]) -> _Result:
     out, err = io.StringIO(), io.StringIO()
-    with _offline(), contextlib.chdir(directory), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+    with offline(), contextlib.chdir(directory), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         code = main(argv)
     return _Result(code, _normalized(out.getvalue()), _normalized(err.getvalue()))
 
 
-def _assert_shown(key: str, actual: str) -> None:
-    """Every nonblank line of the marked output occurs in ``actual``, in the order shown; ``...`` is any text."""
+def assert_lines_shown(shown_block: str, actual: str, where: str) -> None:
+    """Every nonblank line of ``shown_block`` occurs in ``actual``, in the order shown; ``...`` is any text.
+
+    ``where`` names the block in the failure message (also used by ``tests/test_real_example_doc.py``).
+    """
 
     actual_lines = [line.rstrip() for line in _slashes(actual).splitlines()]
     position = 0
-    for line in _slashes(BLOCKS[("output", key)]).splitlines():
+    for line in _slashes(shown_block).splitlines():
         shown = line.rstrip()
         if not shown.strip() or shown.strip() == "...":
             continue
@@ -156,9 +165,13 @@ def _assert_shown(key: str, actual: str) -> None:
                 break
         else:
             raise AssertionError(
-                f"docs/walkthrough.md output {key!r} shows a line that the command does not print (or not in this "
-                f"order):\n  {shown}\nActual output:\n{actual}"
+                f"{where} shows a line that the command does not print (or not in this order):\n  {shown}\n"
+                f"Actual output:\n{actual}"
             )
+
+
+def _assert_shown(key: str, actual: str) -> None:
+    assert_lines_shown(BLOCKS[("output", key)], actual, f"docs/walkthrough.md output {key!r}")
 
 
 def _replace_line(path: Path, number: int, text: str) -> None:
