@@ -162,6 +162,21 @@ CONFIGS_6567464 = {
     "solid_case": "741dfce4d32789fe5c6301d7c8b4c670a6033861ae18945c14787ae1a544b1ba",
     "uniprot_case": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
 }
+# The registry environments of 6567464. Environments registered later (the held-out Gelain 5 and 40 g/L
+# loadings, HELDOUT-001) add cases of their own; the pin covers every case of the environments it was taken on.
+REGISTRY_ENVIRONMENTS_6567464 = (
+    "bio001_cellulose_surface_pilot_environment",
+    "gelain_2020_cellulose_batch_10gl",
+    "gelain_2020_cellulose_batch_20gl",
+    "gelain_2020_cellulose_batch_30gl",
+    "sabiork_reaction_618_selected_conditions",
+    "toy_lab_environment",
+    "tsukada_2008_bgl1a_assay_30c_ph4",
+    "tsukada_2008_bgl1a_assay_30c_ph5",
+    "tsukada_2008_bgl1a_assay_30c_ph6",
+    "tsukada_2008_bgl1a_assay_30c_ph7",
+    "tsukada_2008_bgl1a_assay_30c_ph8",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -697,7 +712,8 @@ def _config_digests(registry: Any, fungi: Sequence[str], substrates: Sequence[st
 def test_earlier_cases_assemble_the_configs_of_6567464(group: str) -> None:
     base = load_registry(REGISTRY_INDEX)
     if group == "registry":
-        digests = _config_digests(base, sorted(base.fungi), sorted(base.substrates), sorted(base.environments))
+        assert set(REGISTRY_ENVIRONMENTS_6567464) <= set(base.environments)
+        digests = _config_digests(base, sorted(base.fungi), sorted(base.substrates), REGISTRY_ENVIRONMENTS_6567464)
     else:
         dataset = load_user_dataset(FIXTURES / group, registry=REGISTRY_INDEX)
         substrates = [item["record_id"] for item in dataset.records["substrates"]] + [

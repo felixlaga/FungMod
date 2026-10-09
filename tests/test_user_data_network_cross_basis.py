@@ -262,6 +262,21 @@ EARLIER_CONFIG_DIGESTS: dict[str, dict[str, str]] = {
         ),
     },
 }
+# The registry environments of the base commit. Environments registered later (the held-out Gelain 5 and 40 g/L
+# loadings, HELDOUT-001) add cases of their own; the pin covers every case of the environments it was taken on.
+BASE_REGISTRY_ENVIRONMENTS = (
+    "bio001_cellulose_surface_pilot_environment",
+    "gelain_2020_cellulose_batch_10gl",
+    "gelain_2020_cellulose_batch_20gl",
+    "gelain_2020_cellulose_batch_30gl",
+    "sabiork_reaction_618_selected_conditions",
+    "toy_lab_environment",
+    "tsukada_2008_bgl1a_assay_30c_ph4",
+    "tsukada_2008_bgl1a_assay_30c_ph5",
+    "tsukada_2008_bgl1a_assay_30c_ph6",
+    "tsukada_2008_bgl1a_assay_30c_ph7",
+    "tsukada_2008_bgl1a_assay_30c_ph8",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -840,7 +855,8 @@ def test_every_existing_case_assembles_byte_identically(group: str) -> None:
 
     base = load_registry(REGISTRY_INDEX)
     if group == "registry":
-        digests = _config_digests(base, sorted(base.fungi), sorted(base.substrates), sorted(base.environments))
+        assert set(BASE_REGISTRY_ENVIRONMENTS) <= set(base.environments)
+        digests = _config_digests(base, sorted(base.fungi), sorted(base.substrates), BASE_REGISTRY_ENVIRONMENTS)
     else:
         dataset = load_user_dataset(FIXTURES / group, registry=REGISTRY_INDEX)
         registry = dataset.overlay(base)

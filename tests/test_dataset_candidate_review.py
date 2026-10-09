@@ -304,6 +304,7 @@ def test_literature_directory_contains_only_reviewed_sources() -> None:
         "cao_2015_bgl6_cellobiose",
         "de_ligne_2019_colony_growth",
         "gelain_2020_t_harzianum",
+        "gelain_2020_t_harzianum_heldout",
     ]
     ingested = " ".join(directories)
     assert "resa_buckin" not in ingested

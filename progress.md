@@ -109,14 +109,32 @@ result or solver. Scientific impact: two new exact registry conditions and a
 new literature-raw dataset; no existing simulation changes. Backward
 compatibility: additive.
 
-Found and not fixed here: `final_metrics.csv` reports one shared maximum
-process rate as both `maximum_substrate_depletion_rate` and
-`maximum_product_release_rate`; for the multi-process culture case that is
-the beta-glucosidase synthesis rate in assay units (separate task).
+Found and not fixed here: on `lit-correct`, which predates FIX-RATES-001,
+`final_metrics.csv` reported one shared maximum process rate as both
+`maximum_substrate_depletion_rate` and `maximum_product_release_rate`; for the
+multi-process culture case that was the beta-glucosidase synthesis rate in
+assay units. `main` already takes both metrics from the mapped state rates
+(FIX-RATES-001, `tests/test_state_rate_metrics.py`), so after the merge the
+culture case reports the cellulose depletion rate in gram / hour / liter and
+the product release rate as not applicable (no product state).
 `tests/test_literature_schema_contract.py::test_literature_directory_contains_only_reviewed_dataset_files`
-already failed before this change because `data/experiments/literature/lit/`
-(source PDFs added 2026-10-06) and four untracked folders holding only
-`.DS_Store` sit at the literature root; this entry does not move them.
+and
+`tests/test_dataset_candidate_review.py::test_literature_directory_contains_only_reviewed_sources`
+fail because `data/experiments/literature/lit/` (source PDFs added
+2026-10-06 on `lit-correct`, merged into `main` with this entry) sits at the
+literature root; this entry does not move them.
+
+Merged into `main` on 2026-10-09 (this entry was written on `lit-correct`).
+Follow-ups the two new environments required on `main`, with no simulation
+change: `tests/test_dataset_candidate_review.py` lists the held-out dataset
+directory; the registry groups of
+`test_every_existing_case_assembles_byte_identically` and
+`test_earlier_cases_assemble_the_configs_of_6567464` enumerate the eleven
+environments their pins were taken on (the held-out loadings add cases of
+their own, and the pinned digests are unchanged); `docs/real-example.md`
+shows the 13-environment `fungmod list` output. With the merge the 5 g/L
+culture case reports `maximum_substrate_depletion_rate` 0.202 gram / hour /
+liter and `maximum_product_release_rate` not applicable.
 
 Remaining ambiguities: digitized means of duplicates, not raw replicates; the
 article was public before every fit, so the test is retrospective, not blind;

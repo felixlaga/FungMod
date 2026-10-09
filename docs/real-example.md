@@ -57,16 +57,18 @@ Fungi and enzyme sources (--fungus): 5
   trichoderma_harzianum_p49p11     Trichoderma harzianum P49P11                           literature_metadata
   phanerochaete_chrysosporium_k3   Phanerochaete chrysosporium K-3 (BGL1A enzyme source)  literature_metadata
 ...
-Environments (--environment): 11
+Environments (--environment): 13
 ...
-  gelain_2020_cellulose_batch_10gl            Gelain 2020 T. harzianum batch culture on 10 g/L cellulose (29 C, pH 5)     literature_processed
-  gelain_2020_cellulose_batch_20gl            Gelain 2020 T. harzianum batch culture on 20 g/L cellulose (29 C, pH 5)     literature_processed
-  gelain_2020_cellulose_batch_30gl            Gelain 2020 T. harzianum batch culture on 30 g/L cellulose (29 C, pH 5)     literature_processed
-  tsukada_2008_bgl1a_assay_30c_ph4            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 4.0 (50 mM sodium acetate)  literature_processed
-  tsukada_2008_bgl1a_assay_30c_ph5            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 5.0 (50 mM sodium acetate)  literature_processed
-  tsukada_2008_bgl1a_assay_30c_ph6            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 6.0 (50 mM MES)             literature_processed
-  tsukada_2008_bgl1a_assay_30c_ph7            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 7.0 (50 mM HEPES)           literature_processed
-  tsukada_2008_bgl1a_assay_30c_ph8            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 8.0 (50 mM EPPS)            literature_processed
+  gelain_2020_cellulose_batch_10gl            Gelain 2020 T. harzianum batch culture on 10 g/L cellulose (29 C, pH 5)                      literature_processed
+  gelain_2020_cellulose_batch_20gl            Gelain 2020 T. harzianum batch culture on 20 g/L cellulose (29 C, pH 5)                      literature_processed
+  gelain_2020_cellulose_batch_30gl            Gelain 2020 T. harzianum batch culture on 30 g/L cellulose (29 C, pH 5)                      literature_processed
+  gelain_2020_cellulose_batch_5gl             Gelain 2020 T. harzianum batch culture on 5 g/L cellulose (29 C, pH 5), held-out condition   literature_processed
+  gelain_2020_cellulose_batch_40gl            Gelain 2020 T. harzianum batch culture on 40 g/L cellulose (29 C, pH 5), held-out condition  literature_processed
+  tsukada_2008_bgl1a_assay_30c_ph4            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 4.0 (50 mM sodium acetate)                   literature_processed
+  tsukada_2008_bgl1a_assay_30c_ph5            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 5.0 (50 mM sodium acetate)                   literature_processed
+  tsukada_2008_bgl1a_assay_30c_ph6            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 6.0 (50 mM MES)                              literature_processed
+  tsukada_2008_bgl1a_assay_30c_ph7            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 7.0 (50 mM HEPES)                            literature_processed
+  tsukada_2008_bgl1a_assay_30c_ph8            Tsukada 2008 BGL1A cellobiose assay at 30 C, pH 8.0 (50 mM EPPS)                             literature_processed
 ```
 
 The registry as a whole is labelled `toy_registry`, maturity `development`,
