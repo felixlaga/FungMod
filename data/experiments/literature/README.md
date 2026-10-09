@@ -4,9 +4,10 @@ This folder contains provenance-complete literature datasets plus the schema
 contract and review checklist used before ingestion.
 
 Current datasets: three enzyme-hydrolysis sources (seven series, four enzyme
-preparations) plus one whole-culture source (six conditions, twelve biomass and
-substrate series). Distinct publications do not establish matched independent
-validation of any one model.
+preparations) plus one whole-culture source (six deposited conditions, twelve
+biomass and substrate series, and two held-out cellulose conditions digitized
+from the same article). Distinct publications do not establish matched
+independent validation of any one model.
 
 - `gelain_2020_t_harzianum/`: six machine-readable batch conditions for
   *Trichoderma harzianum* P49P11 from Gelain et al. (2020),
@@ -21,6 +22,18 @@ validation of any one model.
   and are excluded. Regenerate with
   `python scripts/prepare_public_experimental_data.py`; verify with `--check`.
   These data add no validated fungus model or inferred physiological parameters.
+
+- `gelain_2020_t_harzianum_heldout/`: the 5 and 40 g/L cellulose cultures of
+  Gelain et al. (2020) digitized from article Figure 3 (62 observations of
+  biomass, cellulose, filter-paper and beta-glucosidase activity, 41 with the
+  plotted duplicate standard deviation, 8 left-censored at the zero line). The
+  article states that these conditions were not used for parameter estimation,
+  and every FungMod fit used 10 to 30 g/L only. `literature_raw`. The same
+  digitizer is checked against the deposited Figure 2 means before it writes
+  anything; that check and the Figure 2 standard deviations are kept beside
+  the data. Regenerate or verify with
+  `scripts/digitize_gelain_2020_figures_2_3.py` (`--check`). See
+  `docs/heldout-loading-study.md`.
 
 - `alvarez_gonzalez_2022_free_beta_glucosidase/`: four nine-point digitizations
   of Supplementary Figure S1 in Alvarez-Gonzalez et al. (2022), covering both

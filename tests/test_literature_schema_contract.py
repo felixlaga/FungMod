@@ -56,6 +56,13 @@ REVIEWED_SOURCES = {
         for concentration in concentrations
         for suffix in ("csv", "yml")
     ],
+    "gelain_2020_t_harzianum_heldout": [
+        "digitization_calibration.json",
+        "gelain_2020_figure_2_training_with_sd.csv",
+        "gelain_2020_figure_2_training_with_sd.yml",
+        "gelain_2020_figure_3_heldout.csv",
+        "gelain_2020_figure_3_heldout.yml",
+    ],
     "alvarez_gonzalez_2022_free_beta_glucosidase": [
         "alvarez_gonzalez_2022_figure_s1a_filled_squares.csv",
         "alvarez_gonzalez_2022_figure_s1a_open_squares.csv",
