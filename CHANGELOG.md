@@ -6,6 +6,15 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Held-out loading study (`docs/heldout-loading-study.md`): the Gelain 2020
+  5 and 40 g/L cellulose cultures digitized from article Figure 3 with their
+  duplicate SDs (`scripts/digitize_gelain_2020_figures_2_3.py`, checked
+  against the deposited Figure 2 means before writing), two held-out registry
+  conditions, `fungal_model.research.gelain_heldout` for frozen predictions
+  and scoring, and `scripts/run_showcase_study.py`, an end-to-end showcase
+  (public API, posterior bands, five frozen models, a virtual loading sweep,
+  Sobol sensitivity, a BGL1A pH screen and nine figures).
+
 - Six opt-in source-backed mechanisms from BIO-004: finite-enzyme adsorption,
   explicit soluble-sugar uptake and maintenance, dissolved-oxygen transfer and
   consumption, buffered pH and pH-stat, finite-chain endo/exo synergy, and

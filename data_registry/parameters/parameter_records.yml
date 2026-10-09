@@ -1422,6 +1422,60 @@ records:
     notes: >-
       Nominal initial Celufloc 200 cellulose loading of the 30 g/L batch condition; the first measured sample (8 h) differs from the nominal loading and is not an initial condition.
 
+  - record_id: gelain_2020_cellulose_initial_loading_5gl
+    name: Initial cellulose loading of the Gelain 2020 5 g/L held-out condition
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 Methods 2.2 and Section 3.4 (doi:10.1016/j.cesx.2020.100085).
+      confidence_level: literature_curated
+      measurement_method: Nominal loading stated in the article Methods; the Figure 3 t = 0 marker is drawn at the same value. No deposited workbook exists for this condition.
+      validity_range: Initial condition of the Gelain 2020 held-out cellulose batch culture only.
+    parameter_symbol: gelain_2020_cellulose_initial_loading
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: gelain_2020_cellulose_batch_5gl
+    value:
+      kind: exact
+      value: 5.0
+      units: gram / liter
+      source: Gelain 2020 Methods 2.2 (cellulose 5, 10, 20, 30 or 40 g per litre).
+      confidence_level: literature_curated
+      notes: Nominal loading of the held-out condition.
+    notes: >-
+      Nominal initial Celufloc 200 cellulose loading of the 5 g/L batch condition,
+      which the source used for extrapolation analysis and FungMod holds out from every
+      fit. The first measured sample (8 h) is not an initial condition.
+
+  - record_id: gelain_2020_cellulose_initial_loading_40gl
+    name: Initial cellulose loading of the Gelain 2020 40 g/L held-out condition
+    maturity: literature_processed
+    provenance:
+      source: Gelain 2020 Methods 2.2 and Section 3.4 (doi:10.1016/j.cesx.2020.100085).
+      confidence_level: literature_curated
+      measurement_method: Nominal loading stated in the article Methods; the Figure 3 t = 0 marker is drawn at the same value. No deposited workbook exists for this condition.
+      validity_range: Initial condition of the Gelain 2020 held-out cellulose batch culture only.
+    parameter_symbol: gelain_2020_cellulose_initial_loading
+    process_type: culture_physiology
+    enzyme_class: cellulase_total_filter_paper_activity
+    substrate_class: cellulose_particulate
+    fungus_id: trichoderma_harzianum_p49p11
+    substrate_id: cellulose_celufloc_200
+    environment_id: gelain_2020_cellulose_batch_40gl
+    value:
+      kind: exact
+      value: 40.0
+      units: gram / liter
+      source: Gelain 2020 Methods 2.2 (cellulose 5, 10, 20, 30 or 40 g per litre).
+      confidence_level: literature_curated
+      notes: Nominal loading of the held-out condition.
+    notes: >-
+      Nominal initial Celufloc 200 cellulose loading of the 40 g/L batch condition,
+      which the source used for extrapolation analysis and FungMod holds out from every
+      fit. The first measured sample (8 h) is not an initial condition.
+
   - record_id: gelain_2020_cellulose_initial_cellulase_activity
     name: Initial filter-paper activity of the Gelain 2020 cellulose cultures
     maturity: literature_processed

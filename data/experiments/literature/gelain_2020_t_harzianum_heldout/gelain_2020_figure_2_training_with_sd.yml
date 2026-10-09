@@ -1,0 +1,134 @@
+kind: experiment_dataset
+dataset_id: gelain_2020_figure_2_training_sd_v1
+name: Gelain 2020 T. harzianum P49P11 training cultures at 10, 20 and 30 g/L, Figure 2 means and standard deviations
+maturity: literature_raw
+
+source:
+  type: literature
+  citation: Gelain L, van der Wielen L, van Gulik WM, Pradella JGC, da Costa AC. Mathematical modelling
+    for the optimization of cellulase production using glycerol for cell growth and cellulose as the inducer
+    substrate. Chemical Engineering Science X 8 (2020), 100085.
+  doi: 10.1016/j.cesx.2020.100085
+  url: https://repository.tudelft.nl/file/File_7e2cf84c-4eab-4f61-9713-3facacea35bc
+  authors:
+    - Lucas Gelain
+    - Luuk van der Wielen
+    - Walter M. van Gulik
+    - Jose Geraldo da Cruz Pradella
+    - Aline Carvalho da Costa
+  year: 2020
+  figure_or_table: Figure 2, panels A (10 g/L), B (20 g/L), C (30 g/L) and D (beta-glucosidase)
+  extraction_method: Raster figure digitization of the raw DCT image stream embedded in the archived article PDF
+  extraction_tool: scripts/digitize_gelain_2020_figures_2_3.py; pypdf 6.14.2, Pillow 12.2.0, scipy 1.17.1, numpy 2.4.6
+  extracted_by: Claude (Anthropic) for FungMod
+  extraction_date: '2026-10-09'
+  raw_units:
+    time: hour
+    biomass: g/L
+    cellulose: g/L
+    cellulase: FPU/L
+    beta_glucosidase: U/L
+  notes: >-
+    CC BY 4.0. The means of these points are deposited exactly in the Mendeley
+    workbooks (gelain_2020_t_harzianum/ and data/benchmarks/gelain_2020_v2/observations.json);
+    this table exists for two reasons only. First, it is the calibration check of the
+    digitizer: the digitized means are compared with the deposited means before any
+    held-out value is written. Second, it records the standard deviations plotted as
+    error bars, which the deposit does not hold. Use the deposited means, not the
+    digitized ones, for any fit.
+
+system:
+  organism: Trichoderma harzianum P49P11
+  enzyme: null
+  substrate: cellulose (Celufloc 200)
+  product: null
+  environment: Controlled submerged batch culture, 29 C, pH 5.0, dissolved oxygen above 30 percent
+  geometry: stirred bioreactor, 1.9 L working volume
+  notes: Whole culture; enzyme pools are assay activities.
+
+conditions:
+  nominal_initial_substrate:
+    values: [10, 20, 30]
+    units: gram / liter
+  sampling_times:
+    values: [8, 12, 24, 32, 48, 54, 72, 96]
+    units: hour
+  notes: Same culture conditions as gelain_2020_t_harzianum/gelain_2020_cellulose_*gl.yml.
+
+measurement_definitions:
+  measured_quantity: Duplicate-culture means and sample standard deviations of biomass, cellulose and the two activities
+  units: gram / liter for biomass and cellulose; assay units per liter for the two activities
+  uncertainty_definition: >-
+    Column sd is the error-bar half-length (sample standard deviation, article
+    Section 3.2); empty where the bar is hidden inside its marker, with
+    sd_upper_bound holding the half marker height plus four pixels. Zero-line
+    markers carry censored_upper_limit. digitization_error is two calibrated pixels.
+  measurement_method: Article Methods 2.3.
+
+preprocessing:
+  status: raw_figure_digitization
+  raw_data_available: false
+  steps:
+    - same pipeline as gelain_2020_figure_3_heldout.yml, applied to article page 6 XObject /Im4
+    - compared every digitized mean with the deposited workbook mean (digitization_calibration.json)
+  unit_conversions:
+    - value = slope * marker_center_y_pixel + intercept, per panel and axis, from digitization_calibration.json
+    - sd = bar half-length in pixels * |slope|
+  excluded_points:
+    - t = 0 initial-condition markers
+    - beta_glucosidase_activity 10 g/L at 8 h and 12 h, 20 g/L at 8 h and 30 g/L at 8 h (near-zero symbols hidden behind other series)
+  notes: >-
+    92 of 96 deposited points recovered; 83 uncensored with median absolute error
+    0.06 percent of the axis span and worst 0.70 percent; nine zero-line markers all
+    consistent with the deposited values.
+
+digitization:
+  software: pypdf 6.14.2, Pillow 12.2.0, scipy 1.17.1, numpy 2.4.6
+  source_page: article page 6, XObject /Im4 (1772 x 1218 pixels, 300 dpi)
+  source_series: Figure 2A-C black squares (cells), orange circles (cellulose), blue triangles (cellulase); Figure 2D black squares, red circles and blue triangles (10, 20, 30 g/L beta-glucosidase)
+  axis_calibration:
+    x_axis: Time 0 to 100 h from the bottom-axis major ticks of each panel
+    y_axis: Left axes from their major ticks; the cellulase axis from the inward ticks of the right frame
+    rendered_page_size_pixels: 1772 x 1218
+    render_scale: 1
+  estimated_digitization_error:
+    value: 2
+    units: pixel
+    basis: Two pixels on each calibrated axis; checked against the deposited means.
+  included_points: 92
+  excluded_points:
+    - t = 0 initial-condition markers
+    - four near-zero beta-glucosidase symbols hidden behind other series
+  exclusion_reason: Initial conditions are not samples; four symbols are fully hidden.
+
+supplementary_data:
+  file_name: article.pdf
+  source_url_or_doi: https://repository.tudelft.nl/file/File_7e2cf84c-4eab-4f61-9713-3facacea35bc
+  checksum: sha256:38d90f4a90507bf1de76c316dd69a2532af8ffa944a7858ff8e72587a2b533aa
+  access_date: '2026-09-28'
+  notes: Figure 2 stream sha256 b0cc2f025e70ec6fb089e02ab7884d9550f01052c497101097a4061acb17a463.
+
+validation:
+  expected_columns:
+    - figure
+    - panel
+    - condition_g_l
+    - observable
+    - units
+    - time_h
+    - digitized_time_h
+    - mean
+    - censored_upper_limit
+    - sd
+    - sd_upper_bound
+    - sd_status
+    - digitization_error
+    - marker_center_x_pixel
+    - marker_center_y_pixel
+    - flags
+  allow_missing_uncertainty: true
+
+notes: >-
+  Digitizer calibration evidence and plotted standard deviations for the training
+  cultures. The standard deviations are of duplicate cultures and are an input for
+  a future measured error model; no FungMod fit uses them yet.

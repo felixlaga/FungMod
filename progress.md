@@ -26,6 +26,109 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## HELDOUT-001 Held-Out Gelain Loadings: Digitized Data, Registry Conditions, Frozen Predictions
+
+Date: 2026-10-09
+
+Status: complete for the stated scope. The 5 and 40 g/L *T. harzianum*
+P49P11 cellulose cultures of Gelain 2020, which the article kept out of its
+own parameter estimation and the deposit does not hold, are digitized from
+article Figure 3, registered as two held-out culture conditions, and predicted
+by five models frozen before the data entered the repository. A showcase
+study runs the whole chain end to end.
+
+Changed:
+
+- `scripts/digitize_gelain_2020_figures_2_3.py` (new): reads the raw DCT
+  streams of Figures 2 and 3 from the archived article PDF (article and stream
+  SHA-256 checked), calibrates every axis from its detected major ticks
+  (residual at most 0.51 px), segments markers by plotting colour, recovers
+  partly hidden markers from their visible edge (flagged), records markers on
+  the zero line as left-censored, and traces each error bar (duplicate SD) to
+  its cap. It digitizes Figure 2 first and refuses to write unless the
+  digitized means reproduce the deposited means (declared tolerances: median
+  0.4 percent, maximum 1.0 percent of the axis span, censored points
+  consistent, at most six reference points unfound). Recorded check: 92 of 96
+  points, 83 uncensored with median 0.06 percent and worst 0.70 percent, nine
+  censored all consistent. `--check` regenerates byte for byte.
+- `data/experiments/literature/gelain_2020_t_harzianum_heldout/` (new):
+  `gelain_2020_figure_3_heldout.csv`/`.yml` (62 observations, 41 with SD, 8
+  censored; two near-zero 5 g/L beta-glucosidase markers are fully hidden and
+  excluded), `gelain_2020_figure_2_training_with_sd.csv`/`.yml` (calibration
+  evidence and the training SDs the deposit lacks; fits must keep using the
+  deposited means) and `digitization_calibration.json`. Both YAML files pass
+  `validate_literature_dataset_metadata`. Literature README updated.
+- Registry: environments `gelain_2020_cellulose_batch_5gl` and
+  `gelain_2020_cellulose_batch_40gl` (`held_out_from` provenance) and the
+  matching `gelain_2020_cellulose_initial_loading_5gl`/`_40gl` records from
+  Methods 2.2. The nine calibrated constants are untouched and stay
+  environment-independent. Both conditions are modelable in `scientific`
+  mode; the template's stated scope (10 to 30 g/L) is unchanged and reported.
+- `fungal_model.research.gelain_heldout` (new): digitized-observation loader,
+  `FrozenPredictor` for the registry case, the three criticism variants
+  (recorded stage A primary fits) and the published model, at registry or
+  virtual loadings (the 10 g/L condition rebuilt with only its loading record
+  overridden); `score_model` (RMSE, bias, range-normalized RMSE, the stage A
+  normalized MSE, z-scores against measured SD plus digitization error,
+  censored-limit consistency); `threshold_time`; `apparent_yield`.
+- `scripts/run_showcase_study.py` (new): VirtualExperiment for all five
+  conditions, BAYES-001 posterior predictive bands, frozen held-out scores and
+  coverage, a 13-loading virtual sweep, three Sobol designs (independent
+  posterior-marginal approximations; the yield is uniform over its credible
+  interval because the template refuses Y above 1), the BGL1A pH grid and its
+  guardrails, nine figures in light and dark variants and `results.json`.
+- `docs/heldout-loading-study.md` (new, in the mkdocs nav) with three figures
+  under `docs/assets/heldout-study/`.
+- Tests: `tests/test_gelain_heldout_study.py` (digitizer `--check` and
+  calibration evidence; a shifted digitization fails the check; dataset
+  integrity and censoring; held-out registry records exact and modelable;
+  calibrated constants shared; virtual-condition parity with the registry
+  condition; draws only for the registry case; scoring and censoring logic;
+  `threshold_time` and `apparent_yield` definitions; recorded held-out scores
+  and ranking). `tests/test_literature_schema_contract.py` lists the new
+  directory.
+
+Results (retrospective, frozen, no refit): held-out mean normalized MSE
+published model 0.021, M2 0.128, registry M0 0.153, M1 0.158, M3 0.158
+(internal stage A: M2 0.070, others 0.092), so the stage A ranking of the
+FungMod variants carries over and M2 beats M0 in all eight
+observable-and-loading cells. The registry case predicts cellulose at 5 g/L
+(RMSE 0.47 g/L) and half-degradation times within about 7 h across 5 to
+40 g/L, but under-predicts biomass and both activities at 5 g/L and
+over-predicts them at 40 g/L, which then makes its cellulose consumption too
+fast. Model-free apparent yield falls from 0.98 (5 g/L) to 0.41 g/g (40 g/L)
+and peak biomass saturates near 9.5 g/L: a constant-yield, cellulose-only,
+mass-closed model cannot match either end. The 90 percent degradation time is
+under-predicted at every loading, training ones included. Sobol: `k_h` and
+`Kh` carry most of the variance of the 90 percent time; `Kh` is bounded below
+only. Posterior 90 percent prediction intervals cover 85 percent (5 g/L) and
+56 percent (40 g/L) of held-out points.
+
+Not changed: any calibrated constant, recorded fit, posterior, criticism
+result or solver. Scientific impact: two new exact registry conditions and a
+new literature-raw dataset; no existing simulation changes. Backward
+compatibility: additive.
+
+Found and not fixed here: `final_metrics.csv` reports one shared maximum
+process rate as both `maximum_substrate_depletion_rate` and
+`maximum_product_release_rate`; for the multi-process culture case that is
+the beta-glucosidase synthesis rate in assay units (separate task).
+`tests/test_literature_schema_contract.py::test_literature_directory_contains_only_reviewed_dataset_files`
+already failed before this change because `data/experiments/literature/lit/`
+(source PDFs added 2026-10-06) and four untracked folders holding only
+`.DS_Store` sit at the literature root; this entry does not move them.
+
+Remaining ambiguities: digitized means of duplicates, not raw replicates; the
+article was public before every fit, so the test is retrospective, not blind;
+SDs hidden inside markers are stored as upper bounds; the posterior error
+model is absolute and over-covers small values.
+
+Recommended next task: register a capacity or nutrient-limited growth
+mechanism (the generic resource-limited growth processes exist) as a
+criticism variant under a frozen plan, fit it to 10 to 30 g/L only, and score
+it on these held-out loadings; measure `Kh` directly if a laboratory becomes
+available.
+
 ## BIO-004 Six Mechanisms Implemented
 
 Date: 2026-10-09

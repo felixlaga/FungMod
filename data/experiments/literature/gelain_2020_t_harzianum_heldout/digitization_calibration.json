@@ -1,0 +1,1618 @@
+{
+ "article_sha256": "38d90f4a90507bf1de76c316dd69a2532af8ffa944a7858ff8e72587a2b533aa",
+ "figure_streams": {
+  "figure_2": {
+   "xobject": "/Im4",
+   "sha256": "b0cc2f025e70ec6fb089e02ab7884d9550f01052c497101097a4061acb17a463",
+   "size": [
+    1772,
+    1218
+   ]
+  },
+  "figure_3": {
+   "xobject": "/Im5",
+   "sha256": "b2359e2e9388844c855f29ac78d56413bd508961f6a6aa8cfc6d6f1b03a16a82",
+   "size": [
+    1772,
+    1272
+   ]
+  }
+ },
+ "axes": {
+  "figure_2A": {
+   "frame": [
+    81,
+    731,
+    13,
+    498
+   ],
+   "x": {
+    "major_tick_pixels": [
+     81.5,
+     211.5,
+     341.5,
+     471.5,
+     601.5,
+     731.5
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0,
+     100.0
+    ],
+    "max_residual_pixels": 0.0
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     497.5,
+     433.0,
+     368.0,
+     303.5,
+     239.0,
+     174.5,
+     110.0,
+     45.5
+    ],
+    "values": [
+     0.0,
+     2.0,
+     4.0,
+     6.0,
+     8.0,
+     10.0,
+     12.0,
+     14.0
+    ],
+    "max_residual_pixels": 0.232
+   },
+   "y_right": {
+    "major_tick_pixels": [
+     497.5,
+     400.5,
+     303.5,
+     207.0,
+     110.0,
+     13.5
+    ],
+    "values": [
+     0.0,
+     200.0,
+     400.0,
+     600.0,
+     800.0,
+     1000.0
+    ],
+    "max_residual_pixels": 0.233
+   }
+  },
+  "figure_2B": {
+   "frame": [
+    1019,
+    1671,
+    10,
+    496
+   ],
+   "x": {
+    "major_tick_pixels": [
+     1019.0,
+     1137.5,
+     1256.5,
+     1374.5,
+     1493.5,
+     1612.0
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0,
+     100.0
+    ],
+    "max_residual_pixels": 0.3
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     495.5,
+     407.0,
+     318.5,
+     230.5,
+     142.5,
+     54.5
+    ],
+    "values": [
+     0.0,
+     4.0,
+     8.0,
+     12.0,
+     16.0,
+     20.0
+    ],
+    "max_residual_pixels": 0.343
+   },
+   "y_right": {
+    "major_tick_pixels": [
+     495.5,
+     398.5,
+     301.5,
+     204.5,
+     107.0,
+     10.0
+    ],
+    "values": [
+     0.0,
+     200.0,
+     400.0,
+     600.0,
+     800.0,
+     1000.0
+    ],
+    "max_residual_pixels": 0.224
+   }
+  },
+  "figure_2C": {
+   "frame": [
+    79,
+    729,
+    647,
+    1130
+   ],
+   "x": {
+    "major_tick_pixels": [
+     79.5,
+     209.5,
+     339.5,
+     469.5,
+     599.5,
+     729.5
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0,
+     100.0
+    ],
+    "max_residual_pixels": 0.0
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     1129.5,
+     1073.0,
+     1016.5,
+     959.5,
+     902.5,
+     846.0,
+     788.5,
+     731.5,
+     674.5
+    ],
+    "values": [
+     0.0,
+     4.0,
+     8.0,
+     12.0,
+     16.0,
+     20.0,
+     24.0,
+     28.0,
+     32.0
+    ],
+    "max_residual_pixels": 0.511
+   },
+   "y_right": {
+    "major_tick_pixels": [
+     1129.5,
+     1033.5,
+     936.5,
+     840.0,
+     743.5,
+     646.5
+    ],
+    "values": [
+     0.0,
+     200.0,
+     400.0,
+     600.0,
+     800.0,
+     1000.0
+    ],
+    "max_residual_pixels": 0.328
+   }
+  },
+  "figure_2D": {
+   "frame": [
+    1021,
+    1692,
+    629,
+    1132
+   ],
+   "x": {
+    "major_tick_pixels": [
+     1021.5,
+     1144.5,
+     1267.5,
+     1390.5,
+     1513.5,
+     1636.5
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0,
+     100.0
+    ],
+    "max_residual_pixels": 0.0
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     1132.5,
+     1040.5,
+     949.5,
+     857.5,
+     765.5,
+     674.5
+    ],
+    "values": [
+     0.0,
+     500.0,
+     1000.0,
+     1500.0,
+     2000.0,
+     2500.0
+    ],
+    "max_residual_pixels": 0.39
+   },
+   "y_right": null
+  },
+  "figure_3A": {
+   "frame": [
+    110,
+    776,
+    13,
+    508
+   ],
+   "x": {
+    "major_tick_pixels": [
+     110.5,
+     243.5,
+     376.5,
+     509.5,
+     642.5,
+     776.0
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0,
+     100.0
+    ],
+    "max_residual_pixels": 0.238
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     508.0,
+     366.5,
+     225.0,
+     83.5
+    ],
+    "values": [
+     0.0,
+     2.0,
+     4.0,
+     6.0
+    ],
+    "max_residual_pixels": 0.0
+   },
+   "y_right": {
+    "major_tick_pixels": [
+     508.0,
+     384.5,
+     260.5,
+     136.5,
+     12.5
+    ],
+    "values": [
+     0.0,
+     200.0,
+     400.0,
+     600.0,
+     800.0
+    ],
+    "max_residual_pixels": 0.2
+   }
+  },
+  "figure_3B": {
+   "frame": [
+    1027,
+    1682,
+    10,
+    499
+   ],
+   "x": {
+    "major_tick_pixels": [
+     1027.5,
+     1158.5,
+     1289.5,
+     1420.5,
+     1551.5,
+     1682.5
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0,
+     100.0
+    ],
+    "max_residual_pixels": 0.0
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     498.5,
+     389.5,
+     281.0,
+     172.5,
+     64.5
+    ],
+    "values": [
+     0.0,
+     10.0,
+     20.0,
+     30.0,
+     40.0
+    ],
+    "max_residual_pixels": 0.301
+   },
+   "y_right": {
+    "major_tick_pixels": [
+     498.5,
+     376.0,
+     254.0,
+     132.5,
+     10.0
+    ],
+    "values": [
+     0.0,
+     200.0,
+     400.0,
+     600.0,
+     800.0
+    ],
+    "max_residual_pixels": 0.35
+   }
+  },
+  "figure_3C": {
+   "frame": [
+    112,
+    798,
+    669,
+    1185
+   ],
+   "x": {
+    "major_tick_pixels": [
+     112.5,
+     250.5,
+     388.5,
+     527.0,
+     665.5
+    ],
+    "values": [
+     0.0,
+     20.0,
+     40.0,
+     60.0,
+     80.0
+    ],
+    "max_residual_pixels": 0.3
+   },
+   "y_left": {
+    "major_tick_pixels": [
+     1184.0,
+     1081.5,
+     978.5,
+     875.0,
+     772.0,
+     669.5
+    ],
+    "values": [
+     0.0,
+     500.0,
+     1000.0,
+     1500.0,
+     2000.0,
+     2500.0
+    ],
+    "max_residual_pixels": 0.271
+   },
+   "y_right": null
+  }
+ },
+ "calibration_check": {
+  "points_compared": 92,
+  "uncensored_points": 83,
+  "censored_zero_line_points": 9,
+  "censored_points_consistent": 9,
+  "recovered_partial_markers": 3,
+  "recovered_max_error_fraction_of_span": 0.00226,
+  "deposited_points_not_found": [
+   [
+    "beta_glucosidase_activity",
+    10.0,
+    8.0
+   ],
+   [
+    "beta_glucosidase_activity",
+    10.0,
+    12.0
+   ],
+   [
+    "beta_glucosidase_activity",
+    20.0,
+    8.0
+   ],
+   [
+    "beta_glucosidase_activity",
+    30.0,
+    8.0
+   ]
+  ],
+  "median_error_fraction_of_span": 0.0006,
+  "max_error_fraction_of_span": 0.00699,
+  "tolerance_median_fraction": 0.004,
+  "tolerance_max_fraction": 0.01,
+  "passed": true,
+  "rows": [
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 24.0,
+    "digitized": 5.9121,
+    "deposited": 5.9135,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0014,
+    "error_fraction_of_axis_span": 0.0001,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 32.0,
+    "digitized": 4.7506,
+    "deposited": 4.7397,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0108,
+    "error_fraction_of_axis_span": 0.00077,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 48.0,
+    "digitized": 4.2395,
+    "deposited": 4.2435,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.004,
+    "error_fraction_of_axis_span": 0.00029,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 12.0,
+    "digitized": 3.6665,
+    "deposited": 3.665,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0014,
+    "error_fraction_of_axis_span": 0.0001,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 54.0,
+    "digitized": 3.5736,
+    "deposited": 3.5693,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0043,
+    "error_fraction_of_axis_span": 0.00031,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 8.0,
+    "digitized": 2.8612,
+    "deposited": 2.8617,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0006,
+    "error_fraction_of_axis_span": 4e-05,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 72.0,
+    "digitized": 2.6289,
+    "deposited": 2.6272,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0017,
+    "error_fraction_of_axis_span": 0.00012,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 10.0,
+    "time_h": 96.0,
+    "digitized": 2.1333,
+    "deposited": 2.125,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0083,
+    "error_fraction_of_axis_span": 0.00059,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 8.0,
+    "digitized": 9.8612,
+    "deposited": 9.8767,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0156,
+    "error_fraction_of_axis_span": 0.00111,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 12.0,
+    "digitized": 9.2107,
+    "deposited": 9.2191,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0084,
+    "error_fraction_of_axis_span": 0.0006,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 24.0,
+    "digitized": 2.7373,
+    "deposited": 2.7354,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0019,
+    "error_fraction_of_axis_span": 0.00014,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 32.0,
+    "digitized": 1.2506,
+    "deposited": 1.2601,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0096,
+    "error_fraction_of_axis_span": 0.00069,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 48.0,
+    "digitized": 0.5227,
+    "deposited": 0.5342,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0115,
+    "error_fraction_of_axis_span": 0.00082,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 96.0,
+    "digitized": 0.0,
+    "deposited": 0.2749,
+    "censored_upper_limit": 0.3097,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 54.0,
+    "digitized": 0.2749,
+    "deposited": 0.2686,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0063,
+    "error_fraction_of_axis_span": 0.00045,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 10.0,
+    "time_h": 72.0,
+    "digitized": 0.1975,
+    "deposited": 0.1974,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0,
+    "error_fraction_of_axis_span": 0.0,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 72.0,
+    "digitized": 888.0851,
+    "deposited": 887.6433,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.4418,
+    "error_fraction_of_axis_span": 0.00044,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 54.0,
+    "digitized": 845.7297,
+    "deposited": 845.5658,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.1639,
+    "error_fraction_of_axis_span": 0.00016,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 48.0,
+    "digitized": 817.8372,
+    "deposited": 818.9039,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -1.0667,
+    "error_fraction_of_axis_span": 0.00107,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 96.0,
+    "digitized": 790.9777,
+    "deposited": 791.2037,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.226,
+    "error_fraction_of_axis_span": 0.00023,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 32.0,
+    "digitized": 766.1844,
+    "deposited": 766.7136,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.5293,
+    "error_fraction_of_axis_span": 0.00053,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 24.0,
+    "digitized": 422.1764,
+    "deposited": 422.0973,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.079,
+    "error_fraction_of_axis_span": 8e-05,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 12.0,
+    "digitized": 20.3172,
+    "deposited": 21.412,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -1.0948,
+    "error_fraction_of_axis_span": 0.00109,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 8.0,
+    "digitized": 0.0,
+    "deposited": 0.0,
+    "censored_upper_limit": 18.595,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "recovered_partial_marker",
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 32.0,
+    "digitized": 7.9475,
+    "deposited": 7.9517,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0042,
+    "error_fraction_of_axis_span": 0.00021,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 12.0,
+    "digitized": 4.7951,
+    "deposited": 4.8147,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0196,
+    "error_fraction_of_axis_span": 0.00098,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 48.0,
+    "digitized": 4.1374,
+    "deposited": 4.1318,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0055,
+    "error_fraction_of_axis_span": 0.00028,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 54.0,
+    "digitized": 3.9786,
+    "deposited": 3.9027,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0759,
+    "error_fraction_of_axis_span": 0.0038,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 8.0,
+    "digitized": 3.9786,
+    "deposited": 4.0002,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0216,
+    "error_fraction_of_axis_span": 0.00108,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 72.0,
+    "digitized": 3.0034,
+    "deposited": 3.0241,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0207,
+    "error_fraction_of_axis_span": 0.00104,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 96.0,
+    "digitized": 2.255,
+    "deposited": 2.2692,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0142,
+    "error_fraction_of_axis_span": 0.00071,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 20.0,
+    "time_h": 24.0,
+    "digitized": 8.2197,
+    "deposited": 8.2199,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0002,
+    "error_fraction_of_axis_span": 1e-05,
+    "flags": [
+     "recovered_partial_marker",
+     "occluded_below"
+    ]
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 8.0,
+    "digitized": 19.9903,
+    "deposited": 19.9731,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0171,
+    "error_fraction_of_axis_span": 0.00086,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 12.0,
+    "digitized": 18.9697,
+    "deposited": 18.9475,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0222,
+    "error_fraction_of_axis_span": 0.00111,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 24.0,
+    "digitized": 8.0156,
+    "deposited": 8.0234,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0078,
+    "error_fraction_of_axis_span": 0.00039,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 32.0,
+    "digitized": 4.4095,
+    "deposited": 4.4234,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0139,
+    "error_fraction_of_axis_span": 0.00069,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 48.0,
+    "digitized": 1.4159,
+    "deposited": 1.4393,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0235,
+    "error_fraction_of_axis_span": 0.00117,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 54.0,
+    "digitized": 0.8942,
+    "deposited": 0.9119,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0176,
+    "error_fraction_of_axis_span": 0.00088,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 72.0,
+    "digitized": 0.4406,
+    "deposited": 0.4596,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.019,
+    "error_fraction_of_axis_span": 0.00095,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 20.0,
+    "time_h": 96.0,
+    "digitized": 0.0,
+    "deposited": 0.2285,
+    "censored_upper_limit": 0.4536,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 54.0,
+    "digitized": 839.4624,
+    "deposited": 842.7412,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -3.2789,
+    "error_fraction_of_axis_span": 0.00328,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 72.0,
+    "digitized": 814.7492,
+    "deposited": 813.5884,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 1.1609,
+    "error_fraction_of_axis_span": 0.00116,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 48.0,
+    "digitized": 791.0658,
+    "deposited": 790.3711,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.6947,
+    "error_fraction_of_axis_span": 0.00069,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 96.0,
+    "digitized": 770.4715,
+    "deposited": 769.9579,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.5136,
+    "error_fraction_of_axis_span": 0.00051,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 32.0,
+    "digitized": 430.6659,
+    "deposited": 429.8292,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.8367,
+    "error_fraction_of_axis_span": 0.00084,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 24.0,
+    "digitized": 233.9906,
+    "deposited": 234.194,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.2034,
+    "error_fraction_of_axis_span": 0.0002,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 8.0,
+    "digitized": 0.0,
+    "deposited": 0.0,
+    "censored_upper_limit": 18.5349,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "recovered_partial_marker",
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 12.0,
+    "digitized": 0.0,
+    "deposited": 0.0,
+    "censored_upper_limit": 18.5349,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "recovered_partial_marker",
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 24.0,
+    "digitized": 9.3841,
+    "deposited": 9.4063,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0221,
+    "error_fraction_of_axis_span": 0.00069,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 32.0,
+    "digitized": 9.349,
+    "deposited": 9.3594,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0104,
+    "error_fraction_of_axis_span": 0.00033,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 48.0,
+    "digitized": 5.5177,
+    "deposited": 5.4859,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0318,
+    "error_fraction_of_axis_span": 0.00099,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 12.0,
+    "digitized": 4.5687,
+    "deposited": 4.5695,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0008,
+    "error_fraction_of_axis_span": 3e-05,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 54.0,
+    "digitized": 4.4281,
+    "deposited": 4.3916,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0365,
+    "error_fraction_of_axis_span": 0.00114,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 72.0,
+    "digitized": 3.7251,
+    "deposited": 3.6948,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0303,
+    "error_fraction_of_axis_span": 0.00095,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 8.0,
+    "digitized": 3.3385,
+    "deposited": 3.3863,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0478,
+    "error_fraction_of_axis_span": 0.00149,
+    "flags": []
+   },
+   {
+    "observable": "biomass",
+    "condition_g_l": 30.0,
+    "time_h": 96.0,
+    "digitized": 3.0924,
+    "deposited": 3.0836,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0088,
+    "error_fraction_of_axis_span": 0.00028,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 8.0,
+    "digitized": 31.1767,
+    "deposited": 31.1884,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0118,
+    "error_fraction_of_axis_span": 0.00037,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 12.0,
+    "digitized": 28.9974,
+    "deposited": 28.9889,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0085,
+    "error_fraction_of_axis_span": 0.00026,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 24.0,
+    "digitized": 15.7461,
+    "deposited": 15.734,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0122,
+    "error_fraction_of_axis_span": 0.00038,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 32.0,
+    "digitized": 7.8376,
+    "deposited": 7.8721,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0345,
+    "error_fraction_of_axis_span": 0.00108,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 48.0,
+    "digitized": 2.6706,
+    "deposited": 2.6668,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0039,
+    "error_fraction_of_axis_span": 0.00012,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 54.0,
+    "digitized": 1.6513,
+    "deposited": 1.647,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0043,
+    "error_fraction_of_axis_span": 0.00014,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 72.0,
+    "digitized": 0.8077,
+    "deposited": 0.8127,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.0049,
+    "error_fraction_of_axis_span": 0.00015,
+    "flags": []
+   },
+   {
+    "observable": "substrate",
+    "condition_g_l": 30.0,
+    "time_h": 96.0,
+    "digitized": 0.0,
+    "deposited": 0.4135,
+    "censored_upper_limit": 0.703,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 72.0,
+    "digitized": 796.5395,
+    "deposited": 796.3738,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.1657,
+    "error_fraction_of_axis_span": 0.00017,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 96.0,
+    "digitized": 755.1378,
+    "deposited": 754.6128,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.525,
+    "error_fraction_of_axis_span": 0.00053,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 54.0,
+    "digitized": 744.7874,
+    "deposited": 745.107,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.3196,
+    "error_fraction_of_axis_span": 0.00032,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 48.0,
+    "digitized": 665.0892,
+    "deposited": 665.0016,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0876,
+    "error_fraction_of_axis_span": 9e-05,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 32.0,
+    "digitized": 343.1912,
+    "deposited": 343.4898,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.2986,
+    "error_fraction_of_axis_span": 0.0003,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 24.0,
+    "digitized": 151.7084,
+    "deposited": 152.5786,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.8702,
+    "error_fraction_of_axis_span": 0.00087,
+    "flags": []
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 8.0,
+    "digitized": 0.0,
+    "deposited": 0.0,
+    "censored_upper_limit": 18.6308,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "recovered_partial_marker",
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "cellulase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 12.0,
+    "digitized": 0.0,
+    "deposited": 0.0,
+    "censored_upper_limit": 18.6308,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "recovered_partial_marker",
+     "on_zero_line"
+    ]
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 72.0,
+    "digitized": 1884.8075,
+    "deposited": 1893.2358,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -8.4283,
+    "error_fraction_of_axis_span": 0.00337,
+    "flags": [
+     "partial_marker_ambiguous"
+    ]
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 54.0,
+    "digitized": 1819.3259,
+    "deposited": 1818.8543,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.4716,
+    "error_fraction_of_axis_span": 0.00019,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 48.0,
+    "digitized": 1707.4615,
+    "deposited": 1706.7683,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.6932,
+    "error_fraction_of_axis_span": 0.00028,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 96.0,
+    "digitized": 1639.2516,
+    "deposited": 1636.0853,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 3.1663,
+    "error_fraction_of_axis_span": 0.00127,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 32.0,
+    "digitized": 1497.3748,
+    "deposited": 1494.4111,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 2.9637,
+    "error_fraction_of_axis_span": 0.00119,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 10.0,
+    "time_h": 24.0,
+    "digitized": 897.1271,
+    "deposited": 895.1467,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 1.9804,
+    "error_fraction_of_axis_span": 0.00079,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 72.0,
+    "digitized": 2152.1905,
+    "deposited": 2150.7972,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 1.3933,
+    "error_fraction_of_axis_span": 0.00056,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 54.0,
+    "digitized": 2032.141,
+    "deposited": 2014.6708,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 17.4702,
+    "error_fraction_of_axis_span": 0.00699,
+    "flags": [
+     "partial_marker_ambiguous",
+     "narrow_marker"
+    ]
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 48.0,
+    "digitized": 1944.8322,
+    "deposited": 1942.6523,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 2.18,
+    "error_fraction_of_axis_span": 0.00087,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 32.0,
+    "digitized": 1109.9422,
+    "deposited": 1107.6066,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 2.3356,
+    "error_fraction_of_axis_span": 0.00093,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 24.0,
+    "digitized": 482.4105,
+    "deposited": 482.3498,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 0.0607,
+    "error_fraction_of_axis_span": 2e-05,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 12.0,
+    "digitized": 40.4099,
+    "deposited": 42.4971,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -2.0873,
+    "error_fraction_of_axis_span": 0.00083,
+    "flags": [
+     "recovered_partial_marker",
+     "occluded_below"
+    ]
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 20.0,
+    "time_h": 96.0,
+    "digitized": 2007.5854,
+    "deposited": 2001.9315,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 5.654,
+    "error_fraction_of_axis_span": 0.00226,
+    "flags": [
+     "recovered_partial_marker"
+    ]
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 54.0,
+    "digitized": 1977.573,
+    "deposited": 1976.4527,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 1.1203,
+    "error_fraction_of_axis_span": 0.00045,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 96.0,
+    "digitized": 1969.3878,
+    "deposited": 1966.6927,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 2.6951,
+    "error_fraction_of_axis_span": 0.00108,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 72.0,
+    "digitized": 1931.1902,
+    "deposited": 1929.3992,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 1.791,
+    "error_fraction_of_axis_span": 0.00072,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 48.0,
+    "digitized": 1541.0292,
+    "deposited": 1538.8448,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 2.1844,
+    "error_fraction_of_axis_span": 0.00087,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 32.0,
+    "digitized": 717.0528,
+    "deposited": 713.5078,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": 3.5449,
+    "error_fraction_of_axis_span": 0.00142,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 24.0,
+    "digitized": 395.1017,
+    "deposited": 395.9481,
+    "censored_upper_limit": null,
+    "censored_consistent": null,
+    "error": -0.8464,
+    "error_fraction_of_axis_span": 0.00034,
+    "flags": []
+   },
+   {
+    "observable": "beta_glucosidase_activity",
+    "condition_g_l": 30.0,
+    "time_h": 12.0,
+    "digitized": 0.0,
+    "deposited": 12.0408,
+    "censored_upper_limit": 54.568,
+    "censored_consistent": true,
+    "error": null,
+    "error_fraction_of_axis_span": null,
+    "flags": [
+     "on_zero_line",
+     "narrow_marker"
+    ]
+   }
+  ]
+ }
+}
