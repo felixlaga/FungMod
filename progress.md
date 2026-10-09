@@ -26,6 +26,59 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-004 Plan For Six New Mechanisms (planning only)
+
+Date: 2026-10-09
+
+Status: `not started` (plan written; nothing implemented). The owner asked for
+a detailed plan to build the biology that FungMod documents as absent: LPMOs,
+synergy between cellulases, adsorption onto solids from user data, sugar uptake
+in cultures, and pH or oxygen dynamics.
+
+`foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md` plans six mechanisms:
+- M1 adsorption with a binding capacity;
+- M2 released-sugar uptake;
+- M3 dissolved oxygen;
+- M4 pH through a buffer value;
+- M5 chain-end synergy;
+- M6 H2O2-driven LPMO cleavage.
+
+It builds on what the code already holds (Langmuir coverage, the Pirt/Monod
+closure, gas transfer, the state-reading modifier pattern) and on what it lacks.
+For each mechanism it gives:
+- a sourcing gate that must pass before any code is written;
+- candidate equations, to be confirmed against the chosen source;
+- states and parameters;
+- design decisions;
+- PR-sized steps;
+- tests, including limits that reduce to today's laws and byte identity;
+- what "done" means and the data needed to go further.
+
+It also plans six shared foundations: mechanism-source records, environment
+read from a state, signed states, closure stoichiometry through the composer,
+new state roles with ledgers, and leave-one-out degree of synergy.
+
+The plan totals about 24 to 28 PRs and gives an order with dependencies. It
+lists 22 candidate sources, each marked checked, re-check or unverified; none
+may be used before the sourcing gate.
+
+Changed:
+- `foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md` (new).
+- Six proposals, `foundation_progress/proposals/BIO_004_*.yml` (new). Each
+  passes BIO-READINESS-LITE with `validation_status: proposed`.
+- `tests/test_bio004_plan.py` (new). It checks:
+  - the proposals pass and claim no more than `proposed`;
+  - each points at its plan section;
+  - every candidate source states its verification;
+  - no proposal defines an imposed synergy, boost or efficiency factor.
+
+Not changed: any code, registry record, dataset or numerical behaviour.
+Scientific impact: none.
+
+Decisions for the owner: the order (adsorption first, or LPMO right after
+adsorption); who signs off each sourcing gate; whether calibration targets are
+wanted now.
+
 ## PAPER-004 The JOSS Paper Brought Up To The Current Software
 
 Date: 2026-10-08

@@ -1,0 +1,92 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-004
+mechanism_id: proton_balance_ph
+general_process_family: pH as a state moved by stated proton release of processes through the buffer value of declared
+  buffers, with an optional pH-stat mode
+mathematical_law: d(pH)/dt = -(1/beta(pH))*sum_j nu_H_j*r_j with beta(pH) = 2.303*([H+] + Kw/[H+] + sum_i C_i*Ka_i*[H+]/(Ka_i+[H+])^2);
+  in pH-stat mode pH is held and the titrant rate equals sum_j nu_H_j*r_j. pH-dependent laws read the state.
+state_variables:
+- name: ph
+  role: environment_state
+  units: dimensionless pH, bounded 0 to 14
+- name: proton_ledger
+  role: ledger
+  units: amount per volume, signed
+parameters:
+- symbol: C_i
+  meaning: total concentration of declared buffer i
+  units: amount per volume
+- symbol: pKa_i
+  meaning: acid dissociation constant of buffer i at the stated temperature
+  units: dimensionless
+- symbol: nu_H_j
+  meaning: protons released per unit extent of process j
+  units: amount of protons per unit extent
+units:
+  state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
+    silently
+  parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
+    units is refused
+valid_substrate_classes:
+- any case whose processes state their proton release
+valid_enzyme_or_source_classes:
+- any process with a stated proton stoichiometry record
+environment_variables:
+- name: pH
+  required: true
+  units: dimensionless
+  notes: initial value; afterwards a state
+output_curves:
+- pH
+- titrant consumed in pH-stat mode
+- pH-dependent process rates
+summary_metrics:
+- final pH
+- time to a stated pH threshold
+- total titrant
+- proton ledger residual
+assumptions:
+- Dilute solution of declared weak-acid buffers; constant activity coefficients.
+- Buffer pKa values apply at the stated temperature; no temperature correction.
+- Proton release per process is a stated record, never inferred from a nitrogen source.
+not_in_scope:
+- Full electrolyte speciation with ionic strength.
+- Intracellular pH.
+- Nitrogen uptake or organic-acid secretion laws.
+unknowns:
+- Proton stoichiometry of any particular culture.
+- Buffer composition of the user's medium.
+suggested_experiments:
+- Log titrant addition in a pH-controlled run.
+- Measure pH and buffer composition over time in an uncontrolled run.
+blocking_failure_modes:
+- pH leaving the domain of a pH response law.
+- A buffer without pKa.
+- Proton stoichiometry without evidence.
+- A pH law driven by both a static value and the state.
+tests_required:
+- Large buffer limit keeps pH constant to 1e-12; zero proton release keeps pH constant.
+- One buffer reproduces the analytic weak-acid titration curve.
+- pH-stat titrant equals integrated proton release.
+- A pH-ionization rate equals its law at the state's pH at every time.
+limitations:
+- Proposed only.
+- Buffer-value balance for declared buffers; no full speciation.
+demo_case:
+  case_id: CASE-PH-SYNTH
+  purpose: Exercise acidifying and alkalising synthetic systems.
+  distinction: Synthetic benchmark; not scientific data.
+validation_status: proposed
+plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 8 (M4)
+candidate_sources:
+- key: vanslyke1922
+  citation: Van Slyke (1922), Journal of Biological Chemistry 52:525-570
+  supports: 'law form: buffer value'
+  verification: checked 2026-10-09
+  doi: 10.1016/S0021-9258(18)85845-8
+- key: ammonium1984
+  citation: A 1984 study in Microbiology 130(4) on proton excretion coupled to ammonium uptake in a citric-acid-producing
+    fungus
+  supports: qualitative coupling only
+  verification: unverified title and authors; confirm before use
+  doi: 10.1099/00221287-130-4-1007

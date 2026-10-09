@@ -1,0 +1,130 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-004
+mechanism_id: peroxide_driven_oxidative_cleavage
+general_process_family: oxidative cleavage of a polysaccharide solid by a copper monooxygenase using hydrogen peroxide
+  as co-substrate, with peroxide-dependent inactivation
+mathematical_law: r_ox = kcat*E_eng*H/(K_mH+H); dH/dt = F_H - r_ox - k_dH*H (one peroxide per oxidative cut); dE/dt
+  = -k_in*E_free*H; oxidized soluble products through a stated yield; optionally nu_ends*r_ox into the chain-end
+  state.
+state_variables:
+- name: solid_substrate
+  role: substrate
+  units: dry mass or monomer equivalents per volume
+- name: hydrogen_peroxide
+  role: peroxide
+  units: amount per volume
+- name: active_monooxygenase
+  role: enzyme
+  units: amount per volume
+- name: oxidized_products
+  role: product
+  units: amount per volume
+parameters:
+- symbol: kcat
+  meaning: turnover number with peroxide
+  units: per time
+- symbol: K_mH
+  meaning: half-saturation in peroxide
+  units: amount per volume
+- symbol: k_in
+  meaning: second-order inactivation constant by peroxide
+  units: per concentration per time
+- symbol: F_H
+  meaning: peroxide feed rate
+  units: concentration per time
+- symbol: k_dH
+  meaning: non-productive peroxide decay
+  units: per time
+units:
+  state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
+    silently
+  parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
+    units is refused
+valid_substrate_classes:
+- polysaccharide solids with a confirmed oxidative-cleavage compatibility (cellulose-like and chitin-like first)
+valid_enzyme_or_source_classes:
+- lytic polysaccharide monooxygenase class, families mapped only where the sourcing gate confirms the substrate
+  class
+environment_variables:
+- name: temperature
+  required: false
+  units: kelvin
+  notes: constants at the condition of their rows
+output_curves:
+- solid remaining
+- peroxide
+- active enzyme
+- oxidized products
+summary_metrics:
+- total turnover before inactivation
+- peroxide consumed
+- degree of synergy with hydrolases when combined
+assumptions:
+- The enzyme is primed; the reductant is not a state.
+- Peroxide is fed or present at a stated level; in situ generation from reductant and oxygen is a separate later
+  law.
+- Engaged enzyme is bound enzyme from the adsorption law, or substrate saturation stated as an assumption.
+not_in_scope:
+- In situ peroxide generation from reductant and oxygen.
+- Reductant consumption.
+- Activity on hemicellulose or starch beyond mapped families.
+unknowns:
+- Constants for a given enzyme and solid.
+- Confirmed EC numbers and family-to-substrate mapping.
+suggested_experiments:
+- Measure oxidized product formation at controlled peroxide feeds.
+- Measure residual activity after peroxide exposure with and without substrate.
+blocking_failure_modes:
+- A monooxygenase member without a peroxide state or feed.
+- kcat without K_mH.
+- A feed without units of concentration per time.
+tests_required:
+- Rate linear in peroxide at low peroxide and saturating above; zero peroxide gives zero rate.
+- One peroxide per oxidative cut in the ledger; analytic total turnover at constant peroxide.
+- Two materially different synthetic solids (cellulose-like and chitin-like).
+- With chain-end synergy, the combination exceeds the sum only through chain ends.
+limitations:
+- Proposed only.
+- Primed-enzyme, fed-peroxide form; no redox chemistry of reductants.
+demo_case:
+  case_id: CASE-LPMO-SYNTH
+  purpose: Exercise peroxide-driven cleavage on synthetic solids.
+  distinction: Synthetic benchmark; not scientific data.
+validation_status: proposed
+plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 10 (M6)
+candidate_sources:
+- key: bissaro2017
+  citation: Bissaro et al. (2017), Nature Chemical Biology 13(10):1123-1128
+  supports: peroxide as co-substrate; reductant consumed in priming
+  verification: checked 2026-10-09
+  doi: 10.1038/nchembio.2470
+- key: kuusk2018
+  citation: Kuusk et al. (2018), Journal of Biological Chemistry 293(2):523-531
+  supports: 'law form: Michaelis-Menten in peroxide; second-order inactivation'
+  verification: checked 2026-10-09
+  doi: 10.1074/jbc.M117.817593
+- key: kont2020
+  citation: Kont, Bissaro, Eijsink and Valjamae (2020), Nature Communications 11:5786
+  supports: law form across families
+  verification: checked 2026-10-09
+  doi: 10.1038/s41467-020-19561-8
+- key: muller2018
+  citation: Muller, Chylenski, Bissaro, Eijsink and Horn (2018), Biotechnology for Biofuels 11:209
+  supports: peroxide feed process; candidate data
+  verification: checked 2026-10-09
+  doi: 10.1186/s13068-018-1199-4
+- key: vaajekolstad2010
+  citation: Vaaje-Kolstad et al. (2010), Science 330:219-222
+  supports: existence and boosting
+  verification: re-check
+  doi: 10.1126/science.1192231
+- key: quinlan2011
+  citation: Quinlan et al. (2011), PNAS 108:15079-15084
+  supports: cellulose-active family
+  verification: re-check
+  doi: 10.1073/pnas.1105776108
+- key: levasseur2013
+  citation: Levasseur et al. (2013), Biotechnology for Biofuels 6:41
+  supports: auxiliary-activity families
+  verification: re-check
+  doi: 10.1186/1754-6834-6-41
