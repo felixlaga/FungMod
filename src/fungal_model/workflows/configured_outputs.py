@@ -143,6 +143,11 @@ class ConfiguredOutputWriter:
             solver_diagnostics["rows"],
             _SOLVER_DIAGNOSTIC_COLUMNS,
         )
+        from fungal_model.workflows.mechanism_metrics import summarize_mechanisms
+        mechanism_metrics = summarize_mechanisms(config, result)
+        if mechanism_metrics:
+            _write_json(destination / "mechanism_metrics.json", mechanism_metrics)
+            _write_csv(destination / "mechanism_metrics.csv", mechanism_metrics)
         _write_json(destination / "merged_parameters.json", inputs.parameters.to_dict())
         _write_json(destination / "run_environment.json", _run_environment())
         _write_json(destination / "package_versions.json", _package_versions(result))
@@ -156,6 +161,8 @@ def _clear_stale_entropy_artifacts(destination: Path) -> None:
     for filename in (
         "entropy_production_rate_timeseries.json",
         "entropy_production_rate_timeseries.csv",
+        "mechanism_metrics.json",
+        "mechanism_metrics.csv",
         "output_manifest.json",
     ):
         (destination / filename).unlink(missing_ok=True)
@@ -256,6 +263,20 @@ def _configured_process_modifiers(config: ModelConfig) -> list[dict[str, Any]]:
 def _configured_process_laws(config: ModelConfig) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for process in config.processes:
+        if process.process_type == "adsorbed_enzyme_hydrolysis":
+            from fungal_model.processes.adsorption import ADSORPTION_LIMITATIONS, ADSORPTION_SOURCE
+            rows.append({"process_id": process.id, "type": process.process_type,
+                         "substrate_state": process.states.get("substrate", ""),
+                         "enzyme_state": process.states.get("enzyme", ""),
+                         "binding_capacity": process.parameters.get("binding_capacity", ""),
+                         "adsorption_constant": process.parameters.get("adsorption_constant", ""),
+                         "adsorption_dissociation_constant": process.parameters.get("adsorption_dissociation_constant", ""),
+                         "bound_rate_constant": process.parameters.get("bound_rate_constant", ""),
+                         "primary_source": ADSORPTION_SOURCE,
+                         "maturity": "software_tested",
+                         "equation": "E_b = Gamma*S*E_f/(Kd+E_f); E_T = E_f+E_b; r = k_b*E_b",
+                         "limitation": " ".join(ADSORPTION_LIMITATIONS)})
+            continue
         if process.process_type == "ph_ionization_michaelis_menten":
             rows.append(_ph_ionization_law_row(process))
             continue
@@ -1096,13 +1117,18 @@ def _conservation_diagnostics(config: ModelConfig, result: SimulationResult) -> 
         if validator.validator_type == "mass_balance"
         and isinstance(validator.settings.get("conserved_weights"), Mapping)
     ]
+    adsorption_rows = _adsorption_conservation_rows(config, result)
+    rows.extend(adsorption_rows)
     evaluated_count = sum(1 for row in rows if row["status"] == "evaluated")
     return {
         "kind": "configured_conservation_diagnostics",
         "validator_count": len(rows),
         "evaluated_count": evaluated_count,
         "status_counts": _count_by_key(rows, "status"),
-        "allowed_use": _CONSERVATION_DIAGNOSTIC_ALLOWED_USE,
+        "allowed_use": _CONSERVATION_DIAGNOSTIC_ALLOWED_USE + (
+            " Includes explicit adsorption free-plus-bound-minus-total enzyme balance diagnostics."
+            if adsorption_rows else ""
+        ),
         "unsupported_scope": (
             "No new validation rule, solver equation, calibration target, threshold "
             "change, thermodynamic enforcement, or biological claim is created by "
@@ -1110,6 +1136,40 @@ def _conservation_diagnostics(config: ModelConfig, result: SimulationResult) -> 
         ),
         "rows": rows,
     }
+
+
+def _adsorption_conservation_rows(config: ModelConfig, result: SimulationResult) -> list[dict[str, Any]]:
+    """Report the declared algebraic enzyme-pool balance at every output time."""
+    rows = []
+    for process in config.processes:
+        if process.process_type != "adsorbed_enzyme_hydrolysis":
+            continue
+        prefix = process.id + "."
+        names = {role: prefix + role for role in ("free_enzyme", "bound_enzyme", "total_enzyme")}
+        if any(name not in result.derived_quantities for name in names.values()):
+            continue
+        total = result.derived_quantities[names["total_enzyme"]]
+        free = result.derived_quantities[names["free_enzyme"]].to(total.units)
+        bound = result.derived_quantities[names["bound_enzyme"]].to(total.units)
+        values = np.asarray(total.magnitude, dtype=float)
+        residual = np.asarray(free.magnitude, dtype=float) + np.asarray(bound.magnitude, dtype=float) - values
+        maximum = float(np.max(np.abs(residual)))
+        scale = float(np.max(np.abs(values)))
+        rows.append({
+            "validator_id": prefix + "enzyme_pool_balance",
+            "status": "evaluated",
+            "reason": "Algebraic free + bound = declared total enzyme; total may change through explicit other processes.",
+            "closed_system": None,
+            "weighted_states": {names["free_enzyme"]: 1, names["bound_enzyme"]: 1, names["total_enzyme"]: -1},
+            "initial_conserved_total": float(values.flat[0]),
+            "final_conserved_total": float(values.flat[-1]),
+            "final_drift": float(residual.flat[-1]),
+            "max_absolute_drift": maximum,
+            "relative_max_absolute_drift": maximum / scale if scale else None,
+            "units": str(total.units),
+            "allowed_use": "Algebraic enzyme partition diagnostic only; not empirical validation or a kinetic conservation claim.",
+        })
+    return rows
 
 
 def _conservation_diagnostic_row(

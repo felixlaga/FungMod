@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fungal_model.screening.adsorption import adsorption_registry_assembler
+
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -133,6 +135,8 @@ EXTRACELLULAR_ENZYME_CHAIN_PARAMETER_ROLES = (
     "km",
     "kcat",
 )
+
+
 class RegistryCaseBuildError(ValueError):
     """Raised when a registry case cannot be converted into a model config."""
 
@@ -472,6 +476,10 @@ def build_registry_process_config_data(
         parameter_records=parameter_records,
         output_directory=output_directory,
     )
+    medium_rows = case_template.process_state_metadata.get("medium_rows")
+    if medium_rows is not None:
+        from fungal_model.api.user_data_medium import augment_config_with_medium
+        data = augment_config_with_medium(data, medium_rows)
     provenance = data.get("provenance")
     if not isinstance(provenance, dict):
         raise RegistryCaseBuildError(
@@ -2572,6 +2580,9 @@ _REGISTRY_PROCESS_ASSEMBLERS = {
         config_data_builder=_extracellular_enzyme_chain_config_data,
     ),
 }
+
+
+_REGISTRY_PROCESS_ASSEMBLERS["adsorbed_enzyme_hydrolysis"] = adsorption_registry_assembler()
 
 
 __all__ = [

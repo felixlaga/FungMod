@@ -1,0 +1,2 @@
+class_id,name,target_bond_classes,compatible_substrate_classes,source
+cutter,Synthetic cutter,film_link,film_like,Illustrative synthetic inputs invented for software verification; no empirical data.

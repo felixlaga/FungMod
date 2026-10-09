@@ -1,0 +1,17 @@
+name: Synthetic explicit chain_scission table example
+mechanism: chain_scission
+mode: toy
+maturity: framework_benchmark
+source: Synthetic BIO-004 software benchmark only; not biological measurements.
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 60
+    units: second
+  points: 61
+solid_min_length: 4
+exo_fragment_length: 2
+structure_source: Niu et al. 2016 Eqs 12-20; synthetic initial chain population and
+  constants.

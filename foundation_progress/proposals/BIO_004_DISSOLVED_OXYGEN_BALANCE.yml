@@ -2,9 +2,9 @@ proposal_kind: bio_mechanism_proposal
 milestone_id: BIO-004
 mechanism_id: dissolved_oxygen_balance
 general_process_family: dissolved oxygen as a state supplied by gas-liquid transfer and consumed by growth and maintenance
-mathematical_law: dO/dt = kLa*(O_sat - O) - (nu_O_growth*growth extent + nu_O_maint*maintenance extent)*X; growth
-  limited by O/(K_O+O) inside the existing closure; O_sat stated or computed from temperature by the solubility
-  source within its validity range.
+mathematical_law: dO/dt = kLa*(O_sat-O) - nu_O_growth*r_growth - nu_O_maint*r_maint, where r_growth and r_maint
+  are volumetric extents that already include biomass X. Uptake capacity is multiplied by O/(K_O+O). O_sat is explicitly
+  supplied; no solubility function is implemented.
 state_variables:
 - name: dissolved_oxygen
   role: oxidant
@@ -12,8 +12,11 @@ state_variables:
 - name: biomass
   role: biomass
   units: dry mass per volume
-- name: oxygen_ledger
-  role: ledger
+- name: oxygen_transferred
+  role: signed ledger
+  units: amount per volume
+- name: oxygen_consumed
+  role: nonnegative ledger
   units: amount per volume
 parameters:
 - symbol: kLa
@@ -26,10 +29,11 @@ parameters:
   meaning: oxygen consumed per unit growth extent
   units: oxygen per biomass
 - symbol: nu_O_maint
-  meaning: oxygen consumed per unit maintenance extent
-  units: oxygen per biomass per time
+  meaning: oxygen consumed per maintenance sugar consumed; the volumetric maintenance extent already includes time
+    and biomass
+  units: oxygen amount per sugar mass or sugar amount
 - symbol: K_O
-  meaning: oxygen half-saturation of growth
+  meaning: oxygen half-saturation of sugar uptake
   units: amount per volume
 units:
   state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
@@ -44,7 +48,8 @@ environment_variables:
 - name: temperature
   required: false
   units: kelvin
-  notes: only for the solubility function, inside its stated range
+  notes: constants and explicitly supplied saturation belong to the stated culture condition; temperature-derived
+    solubility is not implemented
 output_curves:
 - dissolved oxygen
 - biomass
@@ -60,28 +65,32 @@ not_in_scope:
 - kLa correlations from vessel geometry.
 - Gas-phase composition dynamics.
 - Spatial oxygen gradients in pellets or mycelium.
+- Temperature-, pressure- or salinity-derived oxygen solubility; the supplied saturation value is required.
 unknowns:
 - Oxygen stoichiometry and half-saturation for any particular culture.
 suggested_experiments:
 - Record dissolved oxygen and the off-gas oxygen uptake rate alongside biomass.
 - Measure kLa in the vessel used.
 blocking_failure_modes:
-- Temperature outside the solubility range.
 - kLa without units of inverse time.
 - An oxygen response law with neither a state nor a static value.
+- Missing explicitly supplied oxygen saturation, initial oxygen or demand coefficients.
 tests_required:
-- Analytic approach to saturation without a culture and the analytic steady state under constant uptake.
+- Analytic approach to saturation without uptake, including signed outgassing from supersaturation.
 - Large kLa limit reproduces the oxygen-unlimited closure.
 - 'Oxygen ledger: transferred equals consumed plus accumulated.'
-- Solubility function against the source's tabulated values.
+- State-driven responses use simulated oxygen and require declared oxygen-unlimited hydrolysis capacity.
 limitations:
-- Proposed only.
+- Implemented and software-tested with checked law-form evidence; synthetic examples are not calibration or independent
+  empirical validation.
 - Single well-mixed liquid phase; no gradients.
+- Oxygen saturation is explicitly supplied at the medium and condition; no guessed temperature-solubility or salinity
+  correction.
 demo_case:
   case_id: CASE-OXYGEN-SYNTH
   purpose: Exercise oxygen supply and demand on synthetic cultures.
   distinction: Synthetic benchmark; not scientific data.
-validation_status: proposed
+validation_status: software_tested
 plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 7 (M3)
 candidate_sources:
 - key: garciaochoa2009
@@ -91,11 +100,17 @@ candidate_sources:
   doi: 10.1016/j.biotechadv.2008.10.006
 - key: benson1984
   citation: Benson and Krause (1984), Limnology and Oceanography 29(3):620-632
-  supports: oxygen solubility from temperature and salinity, 0-40 C
+  supports: candidate solubility extension only; no implemented function uses it
   verification: checked 2026-10-09
   doi: 10.4319/lo.1984.29.3.0620
 - key: pirt1965
   citation: Pirt (1965), Proceedings of the Royal Society B 163:224-231
   supports: maintenance demand
-  verification: re-check
+  verification: checked 2026-10-09 primary publisher abstract; full text inaccessible; capped extension explicitly
+    assumed
   doi: 10.1098/rspb.1965.0069
+mechanism_sources:
+- data/mechanism_sources/garcia_ochoa_gomez2009/source.yml
+- data/mechanism_sources/monod1949/source.yml
+- data/mechanism_sources/pirt1965/source.yml
+implementation_document: docs/bio004-uptake-oxygen.md

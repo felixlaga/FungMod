@@ -495,8 +495,8 @@ def to_sbml(
 
     Raises:
         SbmlExportError: If the model contains an unsupported process, a
-            rate-modifier wrapper, a dynamic thermodynamic constraint, or an
-            initial value is missing for a state variable.
+            rate-modifier wrapper, a dynamic thermodynamic constraint, a signed
+            or explicitly bounded state domain, or an initial value is missing.
     """
 
     libsbml = _require_libsbml()
@@ -506,6 +506,17 @@ def to_sbml(
             "Model carries dynamic thermodynamic constraints, which gate the rate law "
             "at solver time and are not standard SBML kinetics. Export is refused to "
             "avoid producing an SBML model that does not match FungMod's behaviour."
+        )
+
+    unsupported_domains = [
+        spec.name for spec in model.state_variables
+        if spec.domain != "non_negative" or spec.lower_bound is not None or spec.upper_bound is not None
+    ]
+    if unsupported_domains:
+        raise SbmlExportError(
+            "Model carries signed or explicitly bounded state domains for "
+            f"{', '.join(unsupported_domains)}, which the SBML exporter does not represent. "
+            "Export is refused to preserve the native solver's state-domain semantics."
         )
 
     annotations = annotations or {}

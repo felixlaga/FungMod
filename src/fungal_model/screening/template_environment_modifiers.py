@@ -228,6 +228,8 @@ def required_environment_conditions(
     for process_type in process_types:
         conditions.extend(PROCESS_ENVIRONMENT_CONDITIONS.get(process_type, ()))
     for modifier in modifiers:
+        if modifier.get("state_source") is not None:
+            continue
         condition = ENVIRONMENT_MODIFIER_CONDITIONS.get(str(modifier.get("type", "")).strip())
         if condition is not None:
             conditions.append(condition)
@@ -256,6 +258,8 @@ def environment_response_summary(processes: Sequence[Mapping[str, Any]]) -> dict
         for modifier in process.get("modifiers", ()) or ():
             if not isinstance(modifier, Mapping):
                 continue
+            if modifier.get("state_source") is not None:
+                continue  # Dynamic states do not make EnvironmentGrid labels control rates.
             modifier_type = str(modifier.get("type", "")).strip()
             condition = ENVIRONMENT_MODIFIER_CONDITIONS.get(modifier_type)
             if condition is None:

@@ -1,0 +1,15 @@
+state,role,value,units,source,chain_length
+C1,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,1
+C2,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,2
+C3,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,3
+C4,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,4
+C5,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,5
+C6,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,6
+C7,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,7
+C8,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,8
+C9,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,9
+C10,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,10
+C11,chain,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,11
+C12,chain,1,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,12
+E_endo,endo_enzyme,0.1,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,
+E_exo,exo_enzyme,0.1,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,

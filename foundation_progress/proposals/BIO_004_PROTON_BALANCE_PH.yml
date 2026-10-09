@@ -3,7 +3,7 @@ milestone_id: BIO-004
 mechanism_id: proton_balance_ph
 general_process_family: pH as a state moved by stated proton release of processes through the buffer value of declared
   buffers, with an optional pH-stat mode
-mathematical_law: d(pH)/dt = -(1/beta(pH))*sum_j nu_H_j*r_j with beta(pH) = 2.303*([H+] + Kw/[H+] + sum_i C_i*Ka_i*[H+]/(Ka_i+[H+])^2);
+mathematical_law: d(pH)/dt = -(1/beta(pH))*sum_j nu_H_j*r_j with beta(pH) = ln(10)*([H+] + Kw/[H+] + sum_i C_i*Ka_i*[H+]/(Ka_i+[H+])^2);
   in pH-stat mode pH is held and the titrant rate equals sum_j nu_H_j*r_j. pH-dependent laws read the state.
 state_variables:
 - name: ph
@@ -70,13 +70,16 @@ tests_required:
 - pH-stat titrant equals integrated proton release.
 - A pH-ionization rate equals its law at the state's pH at every time.
 limitations:
-- Proposed only.
+- Implemented and software-tested with checked law-form evidence; synthetic examples are not calibration or independent
+  empirical validation.
 - Buffer-value balance for declared buffers; no full speciation.
+- Implemented buffer equation is independently sourced to Chiriac and Balea (1997), Eqs 1 and 11; literature pKa
+  values are not inferred.
 demo_case:
   case_id: CASE-PH-SYNTH
   purpose: Exercise acidifying and alkalising synthetic systems.
   distinction: Synthetic benchmark; not scientific data.
-validation_status: proposed
+validation_status: software_tested
 plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 8 (M4)
 candidate_sources:
 - key: vanslyke1922
@@ -90,3 +93,6 @@ candidate_sources:
   supports: qualitative coupling only
   verification: unverified title and authors; confirm before use
   doi: 10.1099/00221287-130-4-1007
+mechanism_sources:
+- data/mechanism_sources/chiriac1997/source.yml
+implementation_document: docs/bio004-mechanisms.md

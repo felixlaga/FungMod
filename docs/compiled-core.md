@@ -192,3 +192,14 @@ culture classes' analytic-Jacobian trajectories with it.
 ```bash
 python -m pytest tests/test_compiled_process_models.py
 ```
+
+## Declared signed and bounded states
+
+A `StateVariableSpec` defaults to `domain="non_negative"`, retaining the existing
+rate-evaluation projection and unchanged default serialization. An explicit
+`domain="signed"` preserves negative values in rates, Jacobians and recorded
+trajectories. Optional finite `lower_bound`/`upper_bound` values are enforced;
+violations fail rather than clamping a bounded intensive variable. Signed proton
+and transfer ledgers and bounded pH use this contract. Composition retains the
+intersection of declared bounds and refuses incompatible units or empty ranges.
+No material-specific branch is added to the compiler.

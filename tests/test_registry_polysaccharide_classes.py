@@ -173,7 +173,7 @@ def test_each_class_acts_on_its_own_polymer_only(base_registry: FungModRegistry)
             bond_classes=substrate.bond_classes,
         )
     }
-    assert acting == {(enzyme, substrate) for substrate, enzyme in ENZYME_FOR_SUBSTRATE.items()}
+    assert acting == {(enzyme, substrate) for substrate, enzyme in ENZYME_FOR_SUBSTRATE.items()} | {("lytic_polysaccharide_monooxygenase", "chitin")}
     starch = base_registry.substrates["starch"]
     glucoamylase = base_registry.enzyme_classes["glucoamylase"]
     assert enzyme_class_acts_on(
@@ -184,8 +184,10 @@ def test_each_class_acts_on_its_own_polymer_only(base_registry: FungModRegistry)
     ) == ("alpha_1_4_glycosidic", "alpha_1_6_glycosidic")
 
 
-def test_no_lpmo_or_endoglucanase_record_is_added(base_registry: FungModRegistry) -> None:
-    for absent in ("lytic_polysaccharide_monooxygenase", "endoglucanase", "laccase", "alpha_amylase"):
+def test_source_backed_mechanism_records_exist_but_other_classes_remain_absent(base_registry: FungModRegistry) -> None:
+    assert base_registry.enzyme_classes["endoglucanase"].compatible_processes == ("chain_endo_scission",)
+    assert base_registry.enzyme_classes["lytic_polysaccharide_monooxygenase"].compatible_processes == ("peroxide_oxidative_cleavage",)
+    for absent in ("laccase", "alpha_amylase"):
         assert absent not in base_registry.enzyme_classes
 
 

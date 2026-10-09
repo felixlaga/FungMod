@@ -51,6 +51,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from dataclasses import replace
 from typing import Any
 
 from fungal_model.core.units import Q_
@@ -108,6 +109,8 @@ _PROCESS_TEMPLATE_FIELDS = frozenset(
         "assumptions",
         "rate_units_from_state_role",
         "enzyme_class",
+        "stoichiometry",
+        "extent_state",
     }
 )
 
@@ -181,7 +184,18 @@ def build_composed_process_config_data(
     state_units = _state_units(case_template, parameter_records=parameter_records)
     product_maps = _product_map_specs(case_template, parameter_records=parameter_records)
     process_specs = _process_template_specs(case_template, product_map_ids=frozenset(product_maps))
+    # Resolve record-backed closure weights before the existing unit-aware check.
+    raw_conservation = deepcopy(dict(case_template.process_state_metadata.get("conservation", {})))
+    raw_weights = raw_conservation.get("state_weights", {})
+    resolved_weights = {role: _record_coefficient(value, parameter_records=parameter_records) for role, value in raw_weights.items()}
+    if resolved_weights != raw_weights:
+        case_template = replace(case_template, process_state_metadata={**case_template.process_state_metadata,
+            "conservation": {**raw_conservation, "state_weights": resolved_weights}})
     conservation = _conservation_spec(case_template, state_units=state_units, product_maps=product_maps)
+    extra_conservation = []
+    for extra in metadata.get("additional_conservation", ()):
+        extra_template = replace(case_template, process_state_metadata={**metadata, "conservation": extra})
+        extra_conservation.append(_conservation_spec(extra_template, state_units=state_units, product_maps={}))
     _require_every_role_used(
         case_template,
         parameter_records=parameter_records,
@@ -238,6 +252,10 @@ def build_composed_process_config_data(
             "process_ids": [process["id"] for process in processes],
         }
     )
+    if metadata.get("mechanism_sources"):
+        case_template_config["mechanism_sources"] = list(metadata["mechanism_sources"])
+        provenance["mechanism_sources"] = list(metadata["mechanism_sources"])
+        provenance["mechanism_maturity"] = "software_tested"
     enzyme_classes = {
         str(spec["id"]): str(spec["enzyme_class"]) for spec in process_specs if spec.get("enzyme_class") is not None
     }
@@ -267,6 +285,8 @@ def build_composed_process_config_data(
             }
         ],
         "processes": processes,
+        **({"metric_definitions": deepcopy(metadata["metric_definitions"])} if metadata.get("metric_definitions") else {}),
+        **({"state_domains": {_template_state(case_template, str(role)): domain for role, domain in metadata["state_domains"].items()}} if metadata.get("state_domains") else {}),
         "initial_state": _initial_state_from_template(
             case_template=case_template,
             parameter_records=parameter_records,
@@ -276,7 +296,7 @@ def build_composed_process_config_data(
             {
                 "id": non_negative_validator_id,
                 "validator_type": "non_negative",
-                "species": list(dict.fromkeys(state_roles.values())),
+                "species": [name for role, name in state_roles.items() if metadata.get("state_domains", {}).get(role) != "signed"],
             },
             {
                 "id": conservation["id"],
@@ -284,6 +304,7 @@ def build_composed_process_config_data(
                 "closed_system": conservation["closed_system"],
                 "conserved_weights": conservation["state_weights"],
             },
+            *[{"id": extra["id"], "validator_type": "mass_balance", "closed_system": extra["closed_system"], "conserved_weights": extra["state_weights"]} for extra in extra_conservation],
         ],
         "outputs": {
             "directory": output_directory
@@ -609,9 +630,9 @@ def _conservation_spec(
             raise RegistryCaseBuildError(
                 f"Conservation {validator_id!r} weight for role {role!r} must be numeric."
             ) from exc
-        if not math.isfinite(numeric) or numeric <= 0.0:
+        if not math.isfinite(numeric) or numeric == 0.0 or (numeric < 0 and template.process_state_metadata.get("state_domains", {}).get(role) != "signed"):
             raise RegistryCaseBuildError(
-                f"Conservation {validator_id!r} weight for role {role!r} must be positive and finite."
+                f"Conservation {validator_id!r} weight for role {role!r} must be positive and finite unless explicitly signed."
             )
         state_weights[state_name] = numeric
         weight_units.add(state_units[state_name])
@@ -679,9 +700,9 @@ def _unit_bearing_conservation_spec(
                 f"Conservation {validator_id!r} weight for role {role!r} must be a number or a mapping of value and "
                 f"units ({exc})."
             ) from exc
-        if not math.isfinite(numeric) or numeric <= 0.0:
+        if not math.isfinite(numeric) or numeric == 0.0 or (numeric < 0 and template.process_state_metadata.get("state_domains", {}).get(role) != "signed"):
             raise RegistryCaseBuildError(
-                f"Conservation {validator_id!r} weight for role {role!r} must be positive and finite."
+                f"Conservation {validator_id!r} weight for role {role!r} must be positive and finite unless explicitly signed."
             )
         term = Q_(1.0, state_units[state_name]) * quantity
         if ledger is None:
@@ -751,6 +772,7 @@ def _require_every_role_used(
     for spec in process_specs:
         referenced.update(str(role) for role in spec["parameter_roles"].values())
         referenced.update(_modifier_roles(spec.get("modifiers")))
+        referenced.update(_coefficient_roles(spec.get("stoichiometry", {})))
     for product_map in product_maps.values():
         referenced.update(product_map["parameter_roles"])
     for initial in template.initial_state_mapping.values():
@@ -785,6 +807,7 @@ def _modifier_roles(value: Any) -> set[str]:
                 isinstance(key, str)
                 and key.endswith("_role")
                 and not key.endswith("_state_role")
+                and key != "state_source_role"
                 and isinstance(nested, str)
                 and nested
             ):
@@ -881,7 +904,56 @@ def _process_config(
     }
     if spec.get("product_map") is not None:
         config["product_map"] = str(spec["product_map"])
+    if spec.get("stoichiometry") is not None:
+        raw = spec["stoichiometry"]
+        if not isinstance(raw, Mapping) or not raw:
+            raise RegistryCaseBuildError(f"Process {process_id!r} stoichiometry must be a non-empty mapping.")
+        config["stoichiometry"] = {_template_state(case_template, str(role)): _record_coefficient(value, parameter_records=parameter_records)
+                                   for role, value in raw.items()}
+        # Explicitly zero demand is an absent contribution, never a guessed coefficient.
+        config["stoichiometry"] = {name: coefficient for name, coefficient in config["stoichiometry"].items()
+                                   if float(coefficient["value"] if isinstance(coefficient, Mapping) else coefficient) != 0.0}
+    if spec.get("extent_state") is not None:
+        states["extent"] = _template_state(case_template, str(spec["extent_state"]))
     return config
+
+
+def _coefficient_roles(value: Any) -> set[str]:
+    roles: set[str] = set()
+    if isinstance(value, Mapping):
+        if "parameter_role" in value:
+            roles.add(str(value["parameter_role"]))
+        if "inverse_parameter_roles" in value:
+            roles.update(str(role) for role in value["inverse_parameter_roles"])
+        for nested in value.values():
+            if isinstance(nested, Mapping):
+                roles.update(_coefficient_roles(nested))
+    return roles
+
+
+def _record_coefficient(value: Any, *, parameter_records: Mapping[str, ParameterRecord]) -> Any:
+    """A signed coefficient or reciprocal product of explicit, unit-bearing records."""
+    if not isinstance(value, Mapping) or not ({"parameter_role", "inverse_parameter_roles"} & set(value)):
+        return value
+    allowed = {"factor", "parameter_role", "inverse_parameter_roles"}
+    if set(value) - allowed or ("parameter_role" in value and "inverse_parameter_roles" in value):
+        raise RegistryCaseBuildError("A record coefficient needs parameter_role or inverse_parameter_roles, with optional factor.")
+    coefficient = Q_(float(value.get("factor", 1.0)), "dimensionless")
+    roles = [str(value["parameter_role"])] if "parameter_role" in value else value["inverse_parameter_roles"]
+    if not isinstance(roles, Sequence) or isinstance(roles, (str, bytes)) or not roles:
+        raise RegistryCaseBuildError("inverse_parameter_roles must be a non-empty list.")
+    for role in roles:
+        record = _template_parameter_record(parameter_records, str(role))
+        magnitude = _record_exact_value(record, role=str(role))
+        if magnitude < 0 or (magnitude == 0 and "inverse_parameter_roles" in value):
+            raise RegistryCaseBuildError(f"Coefficient record {role!r} must be nonnegative (positive when inverted).")
+        quantity = Q_(magnitude, _record_units(record, role=str(role)))
+        coefficient = coefficient * quantity if "parameter_role" in value else coefficient / quantity
+    if not math.isfinite(float(coefficient.magnitude)):
+        raise RegistryCaseBuildError("Record coefficient must be finite.")
+    if coefficient.dimensionless:
+        return float(coefficient.to("dimensionless").magnitude)
+    return {"value": float(coefficient.magnitude), "units": str(coefficient.units)}
 
 
 def _process_modifiers(
@@ -901,6 +973,12 @@ def _process_modifiers(
             raise RegistryCaseBuildError(f"Process template {spec['id']!r} modifiers[{index}] must be a mapping.")
         modifier_type = str(modifier.get("type", "")).strip()
         label = f"Case template {case_template.case_template_id!r} process {spec['id']!r} modifiers[{index}]"
+        if modifier_type == "oxygen_monod" and modifier.get("state_source_role"):
+            role = str(modifier["half_saturation_role"])
+            record = _template_parameter_record(parameter_records, role)
+            modifiers.append({"type": "oxygen_monod", "state_source": _template_state(case_template, str(modifier["state_source_role"])),
+                "half_saturation_symbol": record.parameter_symbol, "oxygen_units": _record_units(record, role=role)})
+            continue
         if modifier_type in ENVIRONMENT_MODIFIER_TYPES:
             modifiers.append(
                 build_template_environment_modifier(

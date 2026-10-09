@@ -322,7 +322,7 @@ class ResourceLimitedCulture:
             raise ValueError("Species names collide with reserved ledger names.")
         return names
 
-    def _closure_kwargs(self) -> dict[str, str]:
+    def _closure_kwargs(self) -> dict[str, Any]:
         """Pool names, units and parameter symbols shared by the closure processes."""
         return {"substrate_state": self.metabolism.substrate, "biomass_state": self.metabolism.biomass,
                 "nutrient_state": self.nitrogen, "oxidant_state": self.oxidant,

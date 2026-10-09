@@ -1,0 +1,13 @@
+name: Synthetic explicit peroxide_oxidation table example
+mechanism: peroxide_oxidation
+mode: toy
+maturity: framework_benchmark
+source: Synthetic BIO-004 software benchmark only; not biological measurements.
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 60
+    units: second
+  points: 61

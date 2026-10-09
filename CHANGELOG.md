@@ -6,6 +6,17 @@ All notable public releases of FungMod are documented here.
 
 ### Added
 
+- Six opt-in source-backed mechanisms from BIO-004: finite-enzyme adsorption,
+  explicit soluble-sugar uptake and maintenance, dissolved-oxygen transfer and
+  consumption, buffered pH and pH-stat, finite-chain endo/exo synergy, and
+  peroxide-driven oxidative cleavage with enzyme inactivation. Includes checked
+  law-source records, CSV/configured input routes, analytic gradients, declared
+  signed/bounded states, mass/enzyme/oxygen/proton diagnostics and synthetic
+  examples. `assemble-mechanisms`, `add-medium` and `run-config` expose the
+  explicit configured routes. Existing user-dataset digests and the default CAZy
+  map remain unchanged. These mechanisms are software-tested, not calibrated or
+  empirically validated; see `docs/bio004-mechanisms.md` for supported scope.
+
 - Analytic sparse Jacobian for the spatial mycelium core (SPATIAL-003):
   every shipped field process offers `compile_jacobian`, the blocks of the
   nearest-neighbour stencil it couples (`StencilBlock`) and a kernel for

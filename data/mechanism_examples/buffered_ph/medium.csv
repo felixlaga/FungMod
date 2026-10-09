@@ -1,0 +1,10 @@
+quantity,value,units,buffer,process,evidence_type,source,measurement_method,notes
+buffer_concentration,0.1,mol/L,buffer_a,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+buffer_pka,7.0,dimensionless,buffer_a,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+initial_ph,7.0,dimensionless,,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+minimum_ph,2.0,dimensionless,,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+maximum_ph,12.0,dimensionless,,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+water_ion_product,1e-14,(mol/L)**2,,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+standard_concentration,1.0,mol/L,,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+temperature,303.15,kelvin,,,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.
+proton_coefficient,1.0,dimensionless,,a_to_b,estimate,Synthetic numerical benchmark; no empirical measurements.,defined software test,Artificial inputs for verifying equations.

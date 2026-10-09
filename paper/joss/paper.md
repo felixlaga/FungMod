@@ -99,13 +99,9 @@ estimation problem in COPASI and compares it with FungMod.
 **Records and assembly.** Each parameter record holds a value of one of five
 kinds (exact, range, distribution, unknown, not applicable), a unit, a source
 and a maturity label, and declares which uses it allows. A preflight matches
-the requested source, substrate and environment, selects a case template and
-assembles the process laws through one of six assemblers (surface
-catalysis, homogeneous Michaelis-Menten, pH-ionised Michaelis-Menten, culture
-physiology, an extracellular enzyme chain, and an enzyme network that
-composes one Michaelis-Menten process per enzyme class). A name is used only
-to look up records or a proteome; no property is inferred from it. The trade-off is coverage: a fungus without records yields a
-list of missing parameters and suggested measurements, not a guess.
+the requested source, substrate and environment, selects a template and composes
+its declared process laws. Names only retrieve records or proteomes; they never
+supply biological properties. Missing records yield measurement requests.
 
 **Modes.** An exploratory mode accepts labelled exploratory priors; a
 scientific mode refuses to run unless every input is sourced and valid, and
@@ -173,6 +169,11 @@ grids (one to three Cartesian dimensions, or axisymmetric), with analytic
 sparse Jacobians. It is verified against analytic front speeds,
 conservation, symmetry and solver agreement, carries no organism parameters
 and is not yet connected to the registry.
+
+Optional source-backed mechanisms add finite-enzyme adsorption, sugar uptake,
+oxygen balances, buffered pH, finite-chain endo/exo scission and peroxide cleavage
+with inactivation. Synthetic tests verify their software behavior; explicit
+parameter evidence is required, and empirical validation remains outstanding.
 
 # Research impact statement
 

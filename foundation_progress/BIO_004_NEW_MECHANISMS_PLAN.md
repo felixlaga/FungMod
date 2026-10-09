@@ -1,10 +1,14 @@
 # BIO-004: Plan For Six New Mechanisms
 
-Status: `plan only`, written 2026-10-09 against `main` at 4d08938. Nothing in
-this plan is implemented. Every mechanism below has a machine-checkable
-proposal under `foundation_progress/proposals/BIO_004_*.yml` with
-`validation_status: proposed`. `tests/test_bio004_plan.py` checks that each
-proposal passes BIO-READINESS-LITE and claims no more than `proposed`.
+Status update (2026-10-09): all six mechanisms now have explicit implementations,
+checked law-form records, synthetic software tests and input routes. Proposals are
+`software_tested`, not calibrated or empirically validated. The implementation
+and its supported scope are documented in [the mechanism guide](../docs/bio004-mechanisms.md).
+This plan was originally written against `main` at 4d08938; the stage descriptions
+below retain the design intent, while code, tests and the implementation guide
+record the delivered scope. M5 uses a sourced finite-chain population law instead
+of inventing the proposed aggregate end-exhaustion term. M6 uses the complete
+sourced ternary law and refuses unsourced oxidative fragment allocation.
 
 The six mechanisms are the ones FungMod's documentation lists as absent:
 
@@ -21,7 +25,7 @@ The owner's request was LPMOs, synergy, adsorption from user data, sugar
 uptake, and pH or oxygen dynamics. pH and oxygen are planned separately (M3,
 M4) because they share infrastructure but not mechanisms.
 
-Proposals, one per mechanism, all `validation_status: proposed`:
+Proposals, one per mechanism, all `validation_status: software_tested`:
 
 | Mechanism | Proposal |
 | --- | --- |
@@ -439,6 +443,13 @@ starting point.
   sugar comes first, stated as such.
 
 ## 7. M3 — Dissolved-oxygen balance
+
+Implementation note: the current proposal and `docs/bio004-uptake-oxygen.md`
+supersede the candidate notation below. Maintenance is already a sugar/time
+flux, so its oxygen coefficient is oxygen per sugar amount (no second biomass
+or time multiplier). Saturation is explicitly supplied; no solubility formula
+is inferred. The original candidate equations below are historical design
+notes, not executable specifications.
 
 **Goal.** Dissolved oxygen as a state that falls when the culture respires
 and is resupplied through gas transfer. Growth slows when oxygen limits it.

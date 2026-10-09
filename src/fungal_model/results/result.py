@@ -19,11 +19,16 @@ from fungal_model.core.validators import ValidationResult
 from fungal_model.processes.assembly import AssemblyReport
 
 
-def _quantity_to_dict(quantity: Quantity) -> dict[str, Any]:
-    return {
-        "value": np.asarray(quantity.magnitude, dtype=float).tolist(),
-        "units": str(quantity.units),
-    }
+def _quantity_to_dict(quantity: Quantity, *, undefined_as_none: bool = False) -> dict[str, Any]:
+    values = np.asarray(quantity.magnitude, dtype=float)
+    # Undefined derived diagnostics are portable JSON nulls. States and rates
+    # retain their existing representation so invalid trajectories are not hidden.
+    serialized = values.tolist()
+    if undefined_as_none:
+        nullable = values.astype(object)
+        nullable[np.isnan(values)] = None
+        serialized = nullable.tolist()
+    return {"value": serialized, "units": str(quantity.units)}
 
 
 def _validation_to_dict(validation: ValidationResult | Mapping[str, Any]) -> dict[str, Any]:
@@ -193,7 +198,7 @@ class SimulationResult:
                 for name, quantity in self.state_rates.items()
             },
             "derived_quantities": {
-                name: _quantity_to_dict(quantity)
+                name: _quantity_to_dict(quantity, undefined_as_none=True)
                 for name, quantity in self.derived_quantities.items()
             },
             "parameters": self.parameters.to_dict(),
@@ -414,7 +419,7 @@ def _write_quantity_table(path: Path, time: Quantity, quantities: Mapping[str, Q
                         "index": index,
                         "time": time_value,
                         "time_units": str(time.units),
-                        "value": float(value),
+                        "value": "" if kind == "derived" and np.isnan(value) else float(value),
                         "units": str(quantity.units),
                     }
                 )

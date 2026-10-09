@@ -1,0 +1,24 @@
+source_id: garcia_ochoa_gomez2009
+citation: 'Garcia-Ochoa F, Gomez E (2009). Bioreactor scale-up and oxygen transfer
+  rate in microbial processes: An overview. Biotechnology Advances 27:153-176.'
+doi: 10.1016/j.biotechadv.2008.10.006
+url: https://www.sciencedirect.com/science/article/pii/S0734975008001079
+license: Publisher copyright; no article redistributed.
+retrieved_on: '2026-10-09'
+supports:
+- law_form
+equations:
+- id: gas_liquid_transfer
+  location: Introduction, discussion of equation (4); publisher full-text preview.
+  expression: OTR = kLa (C_sat - C); dC/dt = OTR - OUR
+  interpretation: Linear gas-liquid driving-force law and well-mixed oxygen balance;
+    uptake coefficients are independently supplied.
+study_system: Aerobic microbial bioreactors.
+assumptions:
+- One well-mixed liquid and a stated saturation concentration.
+- Measured transfer coefficient fixed during each run.
+validity:
+- kLa >= 0; oxygen concentration and saturation nonnegative.
+limitations:
+- No solubility calculation, vessel kLa correlation, off-gas composition, spatial
+  gradients, or organism-specific respiration constants supplied.

@@ -1028,5 +1028,6 @@ def test_importable_laws_are_existing_template_modifiers_with_their_roles() -> N
     for name, law in rate_laws.items():
         fields = _MODIFIER_COMPATIBILITY_ROLE_BY_FIELD[name]
         for parameter in law.parameters:
-            assert fields[f"{parameter.name}_role"] == parameter.name
+            expected_role = "oxygen_half_saturation" if name == "oxygen_monod" and parameter.name == "half_saturation" else parameter.name
+            assert fields[f"{parameter.name}_role"] == expected_role
         assert law.reference_parameter in law.parameter_names

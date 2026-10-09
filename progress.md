@@ -26,6 +26,61 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## BIO-004 Six Mechanisms Implemented
+
+Date: 2026-10-09
+
+Status: `complete` for the explicit implementation scope in
+`docs/bio004-mechanisms.md`; calibration and independent validation remain out
+of scope. Implements the latest plan PR #134 from its head 5ad535a in an isolated
+worktree, leaving the original `lit-correct` checkout unchanged.
+
+- M1: finite-depletion Langmuir adsorption and activity of bound enzyme, CSV and
+  registry assembly, mass/amount/assay enzyme bases, free/bound enzyme curves
+  and a pool-conservation diagnostic.
+- M2: explicit release-yield sugar pool, Monod uptake/capped maintenance,
+  biomass and carbon closure, culture table intake and timecourse comparison.
+- M3: stated oxygen saturation and transfer, growth/maintenance costs, dynamic
+  oxygen response, signed transfer and consumption ledgers.
+- M4: ideal buffer capacity with explicit proton coefficients, signed ledgers,
+  bounded dynamic pH and pH-stat, medium table intake, acidity residual and
+  threshold/titrant metrics.
+- M5: Niu et al. finite-chain endo/exo equations, fragment/chain-end accounting,
+  singleton-denominator synergy and separate leave-one-out counterfactuals.
+- M6: Kuusk et al. ternary peroxide/substrate law, protected enzyme inactivation,
+  explicit peroxide feed/decay and product yield.
+
+Eight checked primary law-form records contain equation locations, assumptions,
+validity limits and copyright terms. No parameter is inferred from these
+citations. Promoted proposal files require valid mechanism-source links. M5's
+finite-chain source closes exhaustion without inventing the aggregate proposal's
+missing term. M6 does not allocate oxidative fragments to M5 chains without a
+source. The full original plan is retained with implementation notes.
+
+Generic foundations: signed/bounded states with unchanged legacy defaults,
+state-driven environment authorities, composer's unit-bearing coefficients and
+additional conservation checks, generic derived outputs and provenance. Default
+CAZy classifications and old user-generated records are preserved; new classes
+use an explicit map and explicit-state input route. No empirical datasets or
+legacy fit constants are changed. Scientific behavior changes only when opting
+into the new mechanisms/state metadata.
+
+Tests added/updated: source readiness/integrity, all six rate laws and analytic
+Jacobians, two materially different synthetic systems, zero/infinite-limit
+reductions, at-every-time conservation, pH titration and pH-stat, signed boundary
+behavior, malformed/unknown input refusal, full CSV/CLI runs, annotations and
+legacy byte regressions. Final quality-gate results are recorded below after the
+source-stable run. The existing De Ligne digitizer exact-reproduction test also
+fails on pristine plan HEAD in this environment; its unchanged numeric data and
+floating-point metadata boundary are tracked in the verification report.
+
+Risk: medium for numerical integration and scientific misuse. Scope remains
+explicit and unvalidated; no silent defaults, hard-coded biological branching,
+calibration claims or broad biological parameter transfers. Recommended next
+work: freeze one condition-matched experimental calibration/holdout study before
+claiming predictive adequacy. Culture fitting, dynamic adsorption, repression,
+stalling and unsourced oxidative chain allocation are not bundled.
+
 ## BIO-004 Plan For Six New Mechanisms (planning only)
 
 Date: 2026-10-09

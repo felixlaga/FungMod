@@ -14,3 +14,8 @@ tests/fixtures/uniprot_proteome_search/** -text
 tests/fixtures/sabiork_kinetics_queries/** -text
 # DOCS-WALK-001 frozen snapshots of those synthetic responses: FungMod verifies their SHA-256 on every read.
 tests/fixtures/walkthrough/** -text
+
+# BIO-004 input provenance hashes refer to exact supplied bytes.
+data/mechanism_examples/** -text
+data/user_mechanisms/** -text
+data/mechanism_sources/** -text

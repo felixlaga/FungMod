@@ -1,0 +1,25 @@
+source_id: chiriac1997
+citation: Chiriac and Balea (1997), Buffer Index and Buffer Capacity for a Simple Buffer Solution, Journal of Chemical Education 74, 937-939
+doi: 10.1021/ed074p937
+url: https://lateqs.iqsc.usp.br/files/2012/10/Buffer-Capacity.pdf
+license: Copyright 1997 ACS; bibliographic facts and equation transcription only, no paper redistributed
+retrieved_on: "2026-10-09"
+supports: [law_form]
+equations:
+  - id: eq1
+    location: page 937, equation (1)
+    expression: beta = dB/dpH = -dA/dpH
+    interpretation: Differential buffer index, not finite one-pH-unit titrant capacity.
+  - id: eq11
+    location: page 938, equation (11)
+    expression: dB/dpH = 2.303 * (C*Ka*H/(Ka+H)^2 + H + OH)
+    interpretation: Implement ln(10) without the printed rounding, OH=Kw/H; additive independent monoprotic buffers at fixed volume.
+study_system: Analytical derivation for dilute simple weak-acid buffers.
+assumptions:
+  - Ideal dilute solution, fixed volume and temperature, instantaneous acid-base equilibration.
+  - Explicit standard concentration, water ion product and buffer pKa are user inputs.
+validity:
+  - Independent monoprotic buffers; pH within the caller-declared domain inside 0 to 14.
+limitations:
+  - No physiological proton-production constants, organism validation, activity corrections or electrolyte speciation.
+  - Van Slyke 1922 publisher and archival PDF fetches returned HTTP 403; this verified primary analytical derivation supplies the law.

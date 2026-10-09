@@ -947,11 +947,11 @@ REFUSALS: dict[str, tuple[dict[str, Any], tuple[str, int | None, str | None, str
     ),
     "surface-law quantity": (
         {"add": (_case_row("adsorption_constant", "0.1", "L/mg", evidence_type="estimate"),)},
-        ("kinetics.csv", 12, "quantity", "an adsorption (Langmuir) constant"),
+        ("kinetics.csv", 12, "units", "incompatible with the case's enzyme basis"),
     ),
     "binding-capacity quantity": (
         {"add": (_case_row("binding_capacity", "10", "mg/g", evidence_type="estimate"),)},
-        ("kinetics.csv", 12, "quantity", "no rate law of the user-data route reads it"),
+        ("kinetics.csv", 12, "units", "exactly one of adsorption_constant"),
     ),
 }
 
@@ -990,7 +990,7 @@ SUBSTRATE_REFUSALS: dict[str, tuple[str, tuple[str, int | None, str | None, str]
     ),
     "surface-area column": (
         f"{SOLID_SUBSTRATE_HEADER},specific_surface_area\n{_solid_row().splitlines()[1]},12\n",
-        ("substrates.csv", 1, "specific_surface_area", "is refused: no rate law of the user-data route reads it"),
+        ("substrates.csv", 1, "specific_surface_area", "is refused: no rate law consumes this morphology input"),
     ),
     "binding-capacity column": (
         f"{SOLID_SUBSTRATE_HEADER},binding_capacity\n{_solid_row().splitlines()[1]},30\n",
@@ -1091,14 +1091,17 @@ def test_cellobiohydrolase_record_is_categorical_metadata_without_kinetics(base_
     assert "doi:10.1093/nar/gkab1045" in source and "GH6" in source and "GH7" in source
     assert not any(parameter.enzyme_class == "cellobiohydrolase" for parameter in base_registry.parameters.values())
     assert not any(item.enzyme_class == "cellobiohydrolase" for item in base_registry.process_compatibility.values())
-    for absent in ("endoglucanase", "lytic_polysaccharide_monooxygenase"):
-        assert absent not in base_registry.enzyme_classes
+    # These records now exist, but require the explicit mechanism-table route.
+    assert base_registry.enzyme_classes["endoglucanase"].compatible_processes == ("chain_endo_scission",)
+    assert base_registry.enzyme_classes["lytic_polysaccharide_monooxygenase"].compatible_processes == ("peroxide_oxidative_cleavage",)
 
 
 def test_both_cellobiohydrolase_ec_numbers_resolve_and_a_gh7_endoglucanase_disagrees(
     base_registry: FungModRegistry,
 ) -> None:
     """EC 3.2.1.91 and its reducing-end alias 3.2.1.176 name the record; GH7 with EC 3.2.1.4 is a disagreement."""
+
+    from fungal_model.capability.mechanism_scope import mechanism_family_map_path
 
     tsv = (
         "Entry\tEC number\tCAZy\n"
@@ -1110,7 +1113,7 @@ def test_both_cellobiohydrolase_ec_numbers_resolve_and_a_gh7_endoglucanase_disag
     resolution = resolve_uniprot_proteome(
         parse_uniprot_tsv(tsv, source="hand-written routing export"),
         capability_resolver=CapabilityResolver(
-            family_map=CazymeFamilyMap.load(), registry_enzyme_classes=tuple(sorted(base_registry.enzyme_classes))
+            family_map=CazymeFamilyMap.load(mechanism_family_map_path()), registry_enzyme_classes=tuple(sorted(base_registry.enzyme_classes))
         ),
         registry=base_registry,
         organism="Synthetic format-fixture organism",
@@ -1121,8 +1124,8 @@ def test_both_cellobiohydrolase_ec_numbers_resolve_and_a_gh7_endoglucanase_disag
     )
     supports = {item.enzyme_class: dict(item.accessions_by_basis) for item in resolution.capabilities}
     assert supports["cellobiohydrolase"]["cazy_and_ec"] == ("X0SOLID1", "X0SOLID2")
-    # GH5 and EC 3.2.1.4 name no class that carries an EC number, so they cannot disagree.
-    assert supports["cellulase_generic"]["cazy"] == ("X0SOLID4",)
+    # Explicit mechanism map: GH5 and EC 3.2.1.4 agree on endoglucanase.
+    assert supports["endoglucanase"]["cazy_and_ec"] == ("X0SOLID4",)
     (disagreement,) = resolution.disagreements
-    assert (disagreement.accession, disagreement.contested_classes) == ("X0SOLID3", ("cellobiohydrolase",))
+    assert (disagreement.accession, disagreement.contested_classes) == ("X0SOLID3", ("cellobiohydrolase", "endoglucanase"))
 

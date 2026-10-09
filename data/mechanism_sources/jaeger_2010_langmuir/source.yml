@@ -1,0 +1,22 @@
+source_id: jaeger_2010_langmuir
+citation: 'Jaeger et al. (2010), Practical screening of purified cellobiohydrolases and endoglucanases with alpha-cellulose and specification of hydrodynamics, Biotechnology for Biofuels 3:18.'
+doi: 10.1186/1754-6834-3-18
+url: https://pmc.ncbi.nlm.nih.gov/articles/PMC2936879/
+license: CC-BY-2.0
+retrieved_on: '2026-10-09'
+supports: [law_form]
+equations:
+  - id: '1'
+    location: 'Page 4 of 12, Methods, Adsorption experiments, equation (1).'
+    expression: 'A = A_max * E / (K_D + E)'
+    interpretation: 'A is enzyme bound per solid mass; E is free enzyme concentration. FungMod multiplies A by solid concentration and solves total = free + bound exactly. This quadratic is algebra derived from the published isotherm, not a new fitted law.'
+study_system: 'Purified Trichoderma reesei CBH I and EG I on alpha-cellulose; 45 C, pH 4.8, adsorption measured after 40 minutes.'
+assumptions:
+  - Single reversible site class at equilibrium.
+  - Uniform sites without interactions between adsorbed enzyme molecules.
+validity:
+  - Law-form support only; no parameter values are imported.
+  - Applying equilibrium during hydrolysis requires adsorption to be faster than depletion.
+limitations:
+  - No competition, irreversible binding, pore transport, or nonproductive site class.
+  - No evidence for other enzyme-substrate constants or universal biological validity.

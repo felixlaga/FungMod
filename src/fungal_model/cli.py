@@ -345,6 +345,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "assemble": _assemble,
         "draft-kinetics": _draft_kinetics,
         "fit": _fit,
+        "assemble-mechanisms": _assemble_mechanisms,
+        "run-config": _run_config,
+        "add-medium": _add_medium,
     }
     target = cast("str | None", getattr(args, "json", None))
     # The --json summary's result object; the handlers record into it what they computed.
@@ -538,6 +541,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_registry_argument(listing)
     listing.add_argument("--aliases", action="store_true", help="also list the aliases that can be used as names")
+    explicit = commands.add_parser("assemble-mechanisms", help="assemble explicitly parameterized chain/peroxide tables")
+    explicit.add_argument("--user-data", type=Path, required=True)
+    explicit.add_argument("--output", type=Path, required=True, help="new configured model YAML file")
+    configured = commands.add_parser("run-config", help="run an explicit, unit-checked configured model")
+    configured.add_argument("config", type=Path)
+    configured.add_argument("--output", type=Path, required=True, help="new or empty output directory")
+    medium = commands.add_parser("add-medium", help="bind explicit medium.csv buffers and proton coefficients to a model")
+    medium.add_argument("config", type=Path)
+    medium.add_argument("--medium", type=Path, required=True)
+    medium.add_argument("--output", type=Path, required=True, help="new configured model YAML file")
+
     _add_assemble_parser(commands)
     _add_draft_kinetics_parser(commands)
     _add_fit_parser(commands)
@@ -1252,6 +1266,46 @@ def _list(args: argparse.Namespace) -> int:
         print(f"{title}: {len(rows)}")
         for line in _table(headers, rows):
             print(f"  {line}")
+    return EXIT_OK
+
+
+def _assemble_mechanisms(args: argparse.Namespace) -> int:
+    from fungal_model.api.user_data_oxidative import write_mechanism_config
+    try:
+        path = write_mechanism_config(args.user_data, args.output)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"Wrote explicit mechanism configuration: {path}")
+    print(f"Run: fungmod run-config {shell_quote(str(path))} --output PATH")
+    return EXIT_OK
+
+
+def _run_config(args: argparse.Namespace) -> int:
+    from fungal_model.workflows import run_configured_model
+    _require_new_output(args.output)
+    try:
+        result = run_configured_model(args.config, output_dir=args.output)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"Wrote configured simulation: {args.output}")
+    print(f"States: {', '.join(result.states)}")
+    print("Maturity and parameter evidence are recorded with the result; execution is not empirical validation.")
+    return EXIT_OK
+
+
+def _add_medium(args: argparse.Namespace) -> int:
+    from fungal_model.api.user_data_medium import augment_config_with_medium, read_medium_csv
+    from fungal_model.io.model_config import load_model_config, ModelConfig
+    import yaml
+    try:
+        original = load_model_config(args.config)
+        config = augment_config_with_medium(original.raw, read_medium_csv(args.medium))
+        ModelConfig.from_mapping(config)
+        with args.output.open("x", encoding="utf-8") as stream:
+            yaml.safe_dump(config, stream, sort_keys=False)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"Wrote buffered-pH configuration: {args.output}")
     return EXIT_OK
 
 

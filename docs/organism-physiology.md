@@ -1,5 +1,10 @@
 # Organism physiology in the registry
 
+The opt-in [six-mechanism extension](bio004-mechanisms.md) adds adsorption,
+released-sugar uptake, oxygen and buffered-pH dynamics, finite-chain synergy and
+peroxide-driven cleavage. The older routes described below retain their existing
+contracts unless these explicit inputs are supplied.
+
 FungMod's first whole-organism registry case is *Trichoderma harzianum* P49P11
 growing in submerged batch culture on particulate cellulose, the system studied
 by [Gelain et al. (2020)](https://doi.org/10.1016/j.cesx.2020.100085). The case
@@ -157,7 +162,7 @@ name, each pool in its own protein-mass or assay units. Several pools acting on
 the substrate consume it in parallel (CULTURE-002): one consumption process per
 pool, each with its own capacity and half-saturation constant, their rates
 adding and all of them feeding growth through the one yield; no released
-soluble pool is resolved, because no uptake law for one exists. The generated
+soluble pool is resolved, without the optional explicit uptake inputs. The generated
 template uses `rate_units_from_state_role` and a `null` geometry; the shipped
 *T. harzianum* case assembles byte-identically, and re-entering its records in
 `culture.csv` reproduces its trajectories. See

@@ -75,13 +75,14 @@ tests_required:
 - Two materially different synthetic solids, labelled synthetic.
 - Byte identity of every earlier dataset, case and draft.
 limitations:
-- Proposed only; no law-form source has been taken in yet.
+- Implemented and software-tested with checked law-form evidence; synthetic examples are not calibration or independent
+  empirical validation.
 - Quasi-steady single-site Langmuir partition; no surface renewal, morphology or non-productive binding.
 demo_case:
   case_id: CASE-ADSORB-SYNTH
   purpose: Exercise the law on synthetic solids.
   distinction: Synthetic benchmark; not scientific data.
-validation_status: proposed
+validation_status: software_tested
 plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 5 (M1)
 candidate_sources:
 - key: kadam2004
@@ -98,3 +99,7 @@ candidate_sources:
   citation: Bansal et al. (2009), Biotechnology Advances, review of cellulase kinetic models
   supports: choice between forms (review)
   verification: unverified; confirm before use
+mechanism_sources:
+- data/mechanism_sources/jaeger_2010_langmuir/source.yml
+- data/mechanism_sources/medve_1998_bound_activity/source.yml
+implementation_document: docs/bio004-mechanisms.md

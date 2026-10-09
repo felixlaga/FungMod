@@ -1,0 +1,6 @@
+quantity,value,units,source
+endo_kcat,0.15,1/second,Synthetic BIO-004 software benchmark only; no measured biological constants.
+exo_kcat,1,1/second,Synthetic BIO-004 software benchmark only; no measured biological constants.
+endo_km,1,millimolar,Synthetic BIO-004 software benchmark only; no measured biological constants.
+exo_km,2,millimolar,Synthetic BIO-004 software benchmark only; no measured biological constants.
+accessible_fraction,1,dimensionless,Synthetic BIO-004 software benchmark only; no measured biological constants.

@@ -107,9 +107,18 @@ TIMECOURSE_INTERPOLATION = (
 )
 # The simulated trajectory each observable is compared with, as (trajectory_quantiles column, value):
 # the substrate state of the case template, and the product formed since time zero.
-_OBSERVABLE_TRAJECTORY = {"substrate": ("state_role", "substrate"), "product": ("state", "product_formed")}
+_OBSERVABLE_TRAJECTORY = {
+    "substrate": ("state_role", "substrate"),
+    "product": ("state", "product_formed"),
+    "soluble_sugar": ("state_role", "soluble_product"),
+    "biomass": ("state_role", "biomass"),
+    "dissolved_oxygen": ("state_role", "dissolved_oxygen"),
+}
 # The case-template state each observable measures in a fit.
-_OBSERVABLE_STATE_ROLE = {"substrate": "substrate", "product": "product"}
+_OBSERVABLE_STATE_ROLE = {
+    "substrate": "substrate", "product": "product", "soluble_sugar": "soluble_product",
+    "biomass": "biomass", "dissolved_oxygen": "dissolved_oxygen",
+}
 
 FIT_REPORT_FILE = "fit_report.json"
 FIT_REPORT_KIND = "fungmod_user_dataset_fit_report"
@@ -223,8 +232,9 @@ def compare_with_timecourses(
     For every simulated case with time courses, the median (p50) and the 5-95
     percent band (p05, p95) of ``trajectory_quantiles.csv`` are interpolated
     linearly on the simulated output grid to each observed time and converted
-    to the observation's units: the substrate state for ``substrate``, and
-    ``product_formed`` for ``product``. An observation outside the simulated
+    to the observation's units: the substrate state for ``substrate``,
+    ``product_formed`` for assay ``product``, or the corresponding uptake-culture
+    pool for ``soluble_sugar``, ``biomass`` and ``dissolved_oxygen``. An observation outside the simulated
     time range refuses the comparison; nothing is extrapolated. Residuals are
     simulated median minus observed (``residuals_between``).
 
@@ -277,7 +287,10 @@ def compare_with_timecourses(
             report=case.modelability_report,
         )
         for series in candidates:
-            if series.enzyme_class_id != compatibility.enzyme_class:
+            culture_class = dataset._parsed.cultured.get((series.strain_id, series.substrate_id))
+            culture = dataset._parsed.culture_pairs.get((culture_class, series.substrate_id))
+            shared_culture_pool = culture is not None and culture.uptake and series.class_key in culture.consuming_pools
+            if series.enzyme_class_id != compatibility.enzyme_class and not shared_culture_pool:
                 not_compared.append(
                     _not_compared(series, f"the simulated case uses enzyme class {compatibility.enzyme_class!r}")
                 )
@@ -902,6 +915,13 @@ def _fit_case(
             issues=[_issue(TIMECOURSE_TABLE, None, None, f"parameters name the cases {cases}; fit them separately.")],
         )
     strain_id, class_text, substrate_id = cases[0]
+    if (strain_id, substrate_id) in dataset._parsed.cultured:
+        raise UserDataFitError(
+            "Culture time courses support comparison, not parameter fitting in this version.",
+            issues=[_issue(TIMECOURSE_TABLE, None, None,
+                "fit_user_dataset fits km, kcat and vmax in kinetics.csv only. It does not fit uptake, "
+                "maintenance, yield, secretion or oxygen constants in culture.csv or aeration.csv.")],
+        )
     quantities = tuple(key[3] for key in keys)
     bad = [quantity for quantity in quantities if quantity not in FITTABLE_QUANTITIES]
     if bad or len(set(quantities)) != len(quantities):

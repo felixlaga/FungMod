@@ -1,0 +1,2 @@
+substrate_id,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+solid,Synthetic chitin,chitin_like,solid_polymer,acetylated_link,dry_mass,soluble,1,g/g,Illustrative synthetic inputs invented for software verification; no empirical data.

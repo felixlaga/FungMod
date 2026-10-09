@@ -3,22 +3,34 @@ milestone_id: BIO-004
 mechanism_id: peroxide_driven_oxidative_cleavage
 general_process_family: oxidative cleavage of a polysaccharide solid by a copper monooxygenase using hydrogen peroxide
   as co-substrate, with peroxide-dependent inactivation
-mathematical_law: r_ox = kcat*E_eng*H/(K_mH+H); dH/dt = F_H - r_ox - k_dH*H (one peroxide per oxidative cut); dE/dt
-  = -k_in*E_free*H; oxidized soluble products through a stated yield; optionally nu_ends*r_ox into the chain-end
-  state.
+mathematical_law: 'Kuusk et al. Eq 5: r_cut=kcat*E*S*H/(KiS*KmH+KmH*S+KmS*H+S*H). Eq 4 protection fraction: r_inactive=ki*E*H*KmS/(KmS+S).
+  dH/dt=feed-r_cut-k_decay*H; dP/dt=Y*r_cut; dS/dt=-Y*r_cut; dE/dt=-r_inactive; dE_inactive/dt=r_inactive. The primed
+  active-enzyme pool and explicit product-per-cut yield are required.'
 state_variables:
 - name: solid_substrate
   role: substrate
-  units: dry mass or monomer equivalents per volume
+  units: molar monomer-equivalent concentration
 - name: hydrogen_peroxide
   role: peroxide
-  units: amount per volume
+  units: molar concentration
 - name: active_monooxygenase
   role: enzyme
-  units: amount per volume
+  units: molar enzyme concentration
+- name: inactive_monooxygenase
+  role: inactive_enzyme
+  units: molar enzyme concentration
 - name: oxidized_products
   role: product
-  units: amount per volume
+  units: molar monomer-equivalent concentration on the substrate basis
+- name: cumulative_cuts
+  role: ledger
+  units: molar concentration of productive peroxide consumption
+- name: cumulative_peroxide_decay
+  role: ledger
+  units: molar concentration
+- name: cumulative_peroxide_feed
+  role: ledger
+  units: molar concentration
 parameters:
 - symbol: kcat
   meaning: turnover number with peroxide
@@ -35,6 +47,15 @@ parameters:
 - symbol: k_dH
   meaning: non-productive peroxide decay
   units: per time
+- symbol: KmS
+  meaning: substrate half-saturation in ternary law and protection fraction
+  units: monomer-equivalent amount per volume
+- symbol: KiS
+  meaning: substrate binding constant in compulsory-order ternary law
+  units: monomer-equivalent amount per volume
+- symbol: Y
+  meaning: sourced monomer-equivalent release per oxidative cut
+  units: dimensionless
 units:
   state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
     silently
@@ -56,41 +77,52 @@ output_curves:
 - active enzyme
 - oxidized products
 summary_metrics:
-- total turnover before inactivation
-- peroxide consumed
-- degree of synergy with hydrolases when combined
+- Accumulated oxidative cuts and oxidized-product equivalents.
+- Remaining active enzyme and cumulative inactivation.
+- Peroxide feed, decay and productive-consumption ledgers.
 assumptions:
-- The enzyme is primed; the reductant is not a state.
-- Peroxide is fed or present at a stated level; in situ generation from reductant and oxygen is a separate later
-  law.
-- Engaged enzyme is bound enzyme from the adsorption law, or substrate saturation stated as an assumption.
+- The explicit enzyme pool is already primed; reductant is not a state.
+- The ternary-complex rate uses finite substrate concentration; no hidden substrate-saturation or bound-enzyme assumption.
+- Peroxide is initially present or has a stated constant feed; no in situ generation is inferred.
+- Each cut consumes one peroxide; released monomer-equivalents per cut is an explicit sourced coefficient.
+- The source does not provide peroxide-damage stoichiometry for the effective inactivation law; no such consumption
+  is silently added.
 not_in_scope:
-- In situ peroxide generation from reductant and oxygen.
-- Reductant consumption.
-- Activity on hemicellulose or starch beyond mapped families.
+- In situ peroxide generation, reductant consumption and enzyme priming kinetics.
+- Explicit adsorption occupancy, surface transport and product oxidation-position prediction.
+- Oxidative-cut allocation to chain-length populations; no implied M5 chain-end coupling.
+- Activity transfer between CAZy families or substrates solely from annotation.
 unknowns:
-- Constants for a given enzyme and solid.
-- Confirmed EC numbers and family-to-substrate mapping.
+- Preparation-specific kinetic constants, substrate basis and product yield.
+- Enzyme-specific activity and substrate specificity beyond conservative class/family annotations.
+- A sourced fragment-allocation law for oxidative coupling to finite-chain endo/exo populations.
 suggested_experiments:
 - Measure oxidized product formation at controlled peroxide feeds.
 - Measure residual activity after peroxide exposure with and without substrate.
 blocking_failure_modes:
-- A monooxygenase member without a peroxide state or feed.
-- kcat without K_mH.
-- A feed without units of concentration per time.
+- Missing peroxide state or missing explicit initial concentration.
+- Missing peroxide/substrate Michaelis or substrate-binding constants.
+- Feed without concentration/time units or source.
+- Missing product-yield coefficient or source.
+- Unstated inactive-enzyme or cumulative ledger states in the explicit composition.
 tests_required:
-- Rate linear in peroxide at low peroxide and saturating above; zero peroxide gives zero rate.
-- One peroxide per oxidative cut in the ledger; analytic total turnover at constant peroxide.
-- Two materially different synthetic solids (cellulose-like and chitin-like).
-- With chain-end synergy, the combination exceeds the sum only through chain ends.
+- Low-peroxide linear and high-peroxide saturating limits; zero peroxide or substrate gives zero cleavage.
+- One peroxide per oxidative cut and material, active/inactive enzyme, and feed/decay/peroxide balances.
+- Source-derived enzyme decay and integrated total turnover at constant substrate and peroxide.
+- Analytic rate gradients versus finite differences with distinct substrate, peroxide and enzyme concentration scales.
+- Cellulose-like and chitin-like synthetic cases, without asserting transferred biological constants.
+- Complete explicit table-to-configuration assembly, conservation checks, and refusal of missing constants/sources.
 limitations:
-- Proposed only.
+- Implemented and software-tested with checked law-form evidence; synthetic examples are not calibration or independent
+  empirical validation.
 - Primed-enzyme, fed-peroxide form; no redox chemistry of reductants.
+- No coupling of oxidative cuts to individual finite-chain populations without sourced fragment allocation. No in
+  situ peroxide-generation or reductant-priming kinetics.
 demo_case:
   case_id: CASE-LPMO-SYNTH
   purpose: Exercise peroxide-driven cleavage on synthetic solids.
   distinction: Synthetic benchmark; not scientific data.
-validation_status: proposed
+validation_status: software_tested
 plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 10 (M6)
 candidate_sources:
 - key: bissaro2017
@@ -128,3 +160,6 @@ candidate_sources:
   supports: auxiliary-activity families
   verification: re-check
   doi: 10.1186/1754-6834-6-41
+mechanism_sources:
+- data/mechanism_sources/kuusk2018_peroxide/source.yml
+implementation_document: docs/bio004-chain-peroxide.md

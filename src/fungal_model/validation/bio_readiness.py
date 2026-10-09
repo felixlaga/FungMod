@@ -127,6 +127,16 @@ def validate_bio_mechanism_proposal(
         issues.extend(_bio_case_data_distinction_issues(proposal))
         issues.extend(_mechanism_generality_issues(proposal))
         issues.extend(_structured_field_issues(proposal))
+    if proposal.get("milestone_id") == "BIO-004" and proposal.get("validation_status") != "proposed":
+        from fungal_model.mechanism_sources import validate_mechanism_source_links
+        from fungal_model.resources import package_data_path
+
+        resolved = Path(proposal_path).resolve()
+        try:
+            root = next((parent for parent in resolved.parents if (parent / "data/mechanism_sources").is_dir()), None)
+            validate_mechanism_source_links(proposal, root=package_data_path() if root is None else root)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            issues.append(BioReadinessIssue("mechanism_sources", str(exc)))
     error_issues = tuple(issue for issue in issues if issue.severity == "error")
     return BioReadinessReport(
         proposal_path=str(proposal_path),
@@ -143,9 +153,7 @@ def validate_bio_mechanism_proposal_file(
     """Load and validate one BIO mechanism proposal file."""
 
     return validate_bio_mechanism_proposal(
-        load_bio_mechanism_proposal(path),
-        proposal_path=path,
-        allow_template=allow_template,
+        load_bio_mechanism_proposal(path), proposal_path=path, allow_template=allow_template
     )
 
 

@@ -78,6 +78,10 @@ nav:
       - Compiled model core: compiled-core.md
       - Organism physiology in the registry: organism-physiology.md
       - Environment response laws: environment-response.md
+      - Six new mechanisms: bio004-mechanisms.md
+      - Finite-enzyme adsorption: bio004-adsorption.md
+      - Sugar uptake and oxygen: bio004-uptake-oxygen.md
+      - Chain scission and peroxide: bio004-chain-peroxide.md
       - Spatial mycelium: spatial-mycelium.md
   - Tutorials:
       - Full example notebooks: notebooks.md

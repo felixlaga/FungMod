@@ -1,0 +1,2 @@
+condition_id,temperature,temperature_units,ph,notes
+assay,25,degC,6,Illustrative synthetic inputs invented for software verification; no empirical data.

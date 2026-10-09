@@ -1,0 +1,115 @@
+kind: model_config
+name: Synthetic dry-solid finite-enzyme adsorption benchmark
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: Synthetic software benchmark only; not experimental data.
+  measurement_method: defined benchmark
+  confidence_level: testing
+  notes: Synthetic software benchmark only; not experimental data.
+  validity_range: software tests only
+  units: not_applicable
+entities:
+  product_maps:
+  - id: release
+    loader: one_to_one
+    data:
+      kind: product_map
+      name: synthetic mass-equivalent release
+      reactants:
+        S: 1.0
+      products:
+        P: 1.0
+      maturity: toy
+      source: Synthetic software benchmark only; not experimental data.
+      notes: Synthetic software benchmark only; not experimental data.
+      substrate_state: S
+      product_state: P
+parameters:
+- id: adsorption_parameters
+  parameters:
+  - name: synthetic Gamma
+    symbol: Gamma
+    value: 0.2
+    units: mg/g
+    uncertainty: 0.0
+    source: Synthetic software benchmark only; not experimental data.
+    confidence_level: testing
+    notes: Synthetic software benchmark only; not experimental data.
+    measurement_method: defined benchmark
+    validity_range: software tests only
+  - name: synthetic Kd
+    symbol: Kd
+    value: 0.5
+    units: mg/L
+    uncertainty: 0.0
+    source: Synthetic software benchmark only; not experimental data.
+    confidence_level: testing
+    notes: Synthetic software benchmark only; not experimental data.
+    measurement_method: defined benchmark
+    validity_range: software tests only
+  - name: synthetic kb
+    symbol: kb
+    value: 0.1
+    units: g/mg/hour
+    uncertainty: 0.0
+    source: Synthetic software benchmark only; not experimental data.
+    confidence_level: testing
+    notes: Synthetic software benchmark only; not experimental data.
+    measurement_method: defined benchmark
+    validity_range: software tests only
+processes:
+- id: adsorbed_hydrolysis
+  process_type: adsorbed_enzyme_hydrolysis
+  states:
+    substrate: S
+    enzyme: ET
+    product: P
+  parameters:
+    binding_capacity: Gamma
+    adsorption_dissociation_constant: Kd
+    bound_rate_constant: kb
+    rate_units: g/L/hour
+  product_map: release
+  assumptions:
+  - Synthetic low-capacity polysaccharide-film benchmark; not a prediction.
+  substrate_physical_state: solid_polymer
+  amount_basis: dry_mass
+initial_state:
+  states:
+    S:
+      value: 10
+      units: g/L
+    ET:
+      value: 1
+      units: mg/L
+    P:
+      value: 0
+      units: g/L
+time:
+  start:
+    value: 0
+    units: hour
+  stop:
+    value: 48
+    units: hour
+  points: 49
+validators:
+- id: non_negative
+  validator_type: non_negative
+  species:
+  - S
+  - ET
+  - P
+- id: substrate_balance
+  validator_type: mass_balance
+  conserved_weights:
+    S: 1.0
+    P: 1.0
+outputs:
+  directory: outputs/toy_adsorbed_enzyme_hydrolysis
+  save:
+  - record
+  - validation_report
+  plots:
+  - state_trajectories

@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
@@ -94,6 +94,11 @@ class RateModifierProcess(Process):
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         return self.base_process.contributions(rate)
 
+    def derived_quantities(self, states: Mapping[str, Quantity], parameters: ParameterSet) -> dict[str, Quantity]:
+        """Delegate diagnostics without changing the underlying partition or serialization."""
+        method = getattr(self.base_process, "derived_quantities", None)
+        return {} if method is None else method(states, parameters)
+
     @property
     def rate_units(self) -> str:
         """Rate units are those of the wrapped base process; modifiers are dimensionless."""
@@ -125,6 +130,31 @@ class RateModifierProcess(Process):
             return rate
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        # Preserve the historical derivative policy for static modifiers.
+        if not any(getattr(modifier, "state_source", None) is not None for modifier in self.rate_modifiers):
+            return None
+        base = self.base_process.compile_rate(context)
+        base_gradient = self.base_process.compile_jacobian(context)
+        if base is None or base_gradient is None:
+            return None
+        pairs = []
+        for modifier in self.rate_modifiers:
+            activity = modifier.compile_activity(context)
+            derivative_method = getattr(modifier, "compile_activity_jacobian", None)
+            if derivative_method is None:
+                return None
+            pairs.append((activity, derivative_method(context)))
+        def gradient(t: float, y: np.ndarray) -> np.ndarray:
+            value = base(t, y)
+            result = base_gradient(t, y)
+            for activity, derivative in pairs:
+                a = activity(t, y)
+                result = result*a + value*derivative(t, y)
+                value *= a
+            return result
+        return gradient
 
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
@@ -480,6 +510,7 @@ def cardinal_ph_modifier_from_config(modifier_config: Mapping[str, Any]) -> Card
             modifier_type=modifier_type,
         ),
         source=_modifier_source(modifier_config, "Explicit configured Rosso cardinal pH modifier."),
+        state_source=_optional_symbol(modifier_config, "state_source"),
     )
 
 
@@ -508,6 +539,7 @@ def ph_modifier_from_config(modifier_config: Mapping[str, Any]) -> PHModifier:
         minimum_ph_symbol=_optional_symbol(modifier_config, "minimum_ph_symbol", "minimum_ph"),
         maximum_ph_symbol=_optional_symbol(modifier_config, "maximum_ph_symbol", "maximum_ph"),
         source=_modifier_source(modifier_config, "Explicit configured Gaussian pH modifier."),
+        state_source=_optional_symbol(modifier_config, "state_source"),
     )
 
 
@@ -532,6 +564,7 @@ def oxygen_modifier_from_config(modifier_config: Mapping[str, Any]) -> OxygenMod
     return OxygenModifier(
         half_saturation_symbol=half_saturation,
         oxygen_units=oxygen_units,
+        state_source=_optional_symbol(modifier_config, "state_source"),
     )
 
 
@@ -582,6 +615,16 @@ def _required_state_variables(
     specs = list(base_process.required_state_variables)
     existing = {(spec.name, spec.units) for spec in base_process.state_variables}
     for modifier in modifiers:
+        state_source = getattr(modifier, "state_source", None)
+        if state_source is not None:
+            is_ph = isinstance(modifier, (PHModifier, CardinalPHModifier))
+            units = "dimensionless" if is_ph else modifier.oxygen_units
+            key = (state_source, units)
+            if key not in existing:
+                specs.append(StateVariableSpec(state_source, units, role="ph" if is_ph else "dissolved_oxygen",
+                    domain="signed" if is_ph else "non_negative",
+                    lower_bound=0 if is_ph else None, upper_bound=14 if is_ph else None))
+                existing.add(key)
         if isinstance(modifier, ProductInhibitionModifier):
             key = (modifier.product_state, modifier.product_units)
             if key not in existing:
@@ -770,7 +813,7 @@ def _requires_environment(modifiers: tuple[Any, ...]) -> bool:
                 CardinalPHModifier,
             ),
         )
-        for modifier in modifiers
+        for modifier in modifiers if getattr(modifier, "state_source", None) is None
     )
 
 

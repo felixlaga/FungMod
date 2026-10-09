@@ -77,6 +77,8 @@ CASE_TEMPLATE_ALLOWED_STATE_ROLES = frozenset(
         "homogeneous_catalyst",
         "accessibility_proxy",
         "biomass",
+        "bound_enzyme", "chain_end", "dissolved_oxygen", "peroxide",
+        "proton_excess", "ph", "soluble_product",
     }
 )
 # Indexed roles name additional pools of one semantic kind. ``ledger_*`` roles

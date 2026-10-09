@@ -56,6 +56,7 @@ SHIPPED_PROCESS_TYPES = {
     "ph_ionization_michaelis_menten",
     "proportional_synthesis",
     "surface_catalysis",
+    "adsorbed_enzyme_hydrolysis",
     "substrate_transglycosylation",
     "thermal_inactivation",
     "resource_limited_growth",
@@ -63,6 +64,7 @@ SHIPPED_PROCESS_TYPES = {
     "costed_secretion",
     "dilution_exchange",
     "gas_transfer",
+    "proton_balance_ph",
 }
 
 
@@ -129,11 +131,19 @@ def _numeric_request(model, request: RunRequest):
     return state_units, time_units, span, t_eval, y0
 
 
-def _trial_states(y0: np.ndarray, count: int = 6) -> list[np.ndarray]:
+def _trial_states(y0: np.ndarray, count: int = 6, *, bounds=()) -> list[np.ndarray]:
     generator = np.random.default_rng(20261004)
     states = [y0.copy()]
     for _ in range(count - 1):
-        states.append(y0 * generator.uniform(0.05, 1.5, size=y0.shape))
+        state = y0 * generator.uniform(0.05, 1.5, size=y0.shape)
+        # Bounded state coordinates (e.g. pH) are sampled within their declared
+        # validity interval, while unbounded historical cases keep identical draws.
+        for index, (lower, upper) in enumerate(bounds):
+            if lower is not None:
+                state[index] = max(state[index], lower)
+            if upper is not None:
+                state[index] = min(state[index], upper)
+        states.append(state)
     return states
 
 
@@ -144,7 +154,7 @@ def test_compiled_rhs_and_trajectory_match_unit_aware_reference(config_path: Pat
     state_units, time_units, span, t_eval, y0 = _numeric_request(model, request)
     reference = _reference_rhs(model, compiled)
 
-    for state in _trial_states(y0):
+    for state in _trial_states(y0, bounds=compiled.state_bounds):
         np.testing.assert_allclose(compiled.rhs(span[0], state), reference(span[0], state), rtol=1e-12, atol=0.0)
 
     options = model.solver_settings.scipy_options(state_units, time_units)
@@ -175,7 +185,7 @@ def test_every_kernel_matches_its_process_rate_pointwise(config_path: Path) -> N
     _, time_units, span, _, y0 = _numeric_request(model, request)
     constraints = {constraint.process_id: constraint for constraint in model.thermodynamic_constraints}
 
-    for state in _trial_states(y0):
+    for state in _trial_states(y0, bounds=compiled.state_bounds):
         quantity_state = compiled.quantity_state(state)
         for process in compiled.processes:
             expected = process.process.rate(
@@ -432,7 +442,7 @@ def test_environment_modifiers_fold_into_constant_kernels_that_match_reference()
     assert compiled.summary()["process_kernels"] == {"modified MM": KERNEL_NUMERIC}
     reference = _reference_rhs(model, compiled)
     state_units, time_units, span, t_eval, y0 = _numeric_request(model, request)
-    for state in _trial_states(y0):
+    for state in _trial_states(y0, bounds=compiled.state_bounds):
         np.testing.assert_allclose(compiled.rhs(0.0, state), reference(0.0, state), rtol=1e-12, atol=0.0)
     result = ProcessODESolver(model).run(request)
     options = model.solver_settings.scipy_options(state_units, time_units)

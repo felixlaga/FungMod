@@ -1066,7 +1066,10 @@ def test_every_culture_quantity_has_a_role_label_and_request(reentry: UserDatase
         for item in dataset.records["parameter_records"]
         if item["maturity"] == USER_DATASET_MATURITY_GAP and item["environment_id"] == f"{DATASET}__load_40"
     }
-    assert set(requests) == set(CULTURE_QUANTITIES)
+    # BIO-004 quantities are required only by explicitly selected uptake/aeration closures.
+    from fungal_model.api.user_data_uptake import UPTAKE_QUANTITIES, OXYGEN_CULTURE_QUANTITIES, AERATION_QUANTITIES
+    optional = {*UPTAKE_QUANTITIES, *OXYGEN_CULTURE_QUANTITIES, *AERATION_QUANTITIES, "release_yield"}
+    assert set(requests) == set(CULTURE_QUANTITIES) - optional
     for fragment in (
         "initial Particulate cellulose lot H1",
         "initial biomass dry mass concentration (the inoculum)",

@@ -1,0 +1,32 @@
+source_id: niu2016_chain_scission
+citation: Niu, Shah and Kontoravdi (2016), Modelling of amorphous cellulose depolymerisation by cellulases, parametric studies and optimisation, Biochemical Engineering Journal 105, 455-472.
+doi: 10.1016/j.bej.2015.10.017
+url: https://pmc.ncbi.nlm.nih.gov/articles/PMC4705870/
+license: CC-BY-4.0
+retrieved_on: '2026-10-09'
+supports: [law_form]
+equations:
+  - id: endo_channel
+    location: Equations 12-14 and Figure 1
+    expression: 'r_(i,j) = k_en * E_en * F_a * G_i / (K_en + F_a * sum_(n>=4)((n-1)*G_n)); G_i -> G_j + G_(i-j), j=1..i-1'
+    interpretation: 'Decomposes the published random-scission population balance into one equally weighted channel per bond. Both symmetric cut positions are included. This exactly yields Eqs 13-14, including two identical fragments for a central cut.'
+  - id: exo_channel
+    location: Equations 17-20
+    expression: 'r_i = k_ex * E_ex * F_a * G_i / (K_ex + F_a * sum_(n>=4)(G_n)); G_i -> G_2 + G_(i-2)'
+    interpretation: 'Exo removes two monomers per event. A chain end persists while the residual chain has DP>=4 and disappears on exhaustion below DP4. DP4 releases two dimers, not one.'
+  - id: ends_and_material
+    location: Stoichiometric consequence of Figure 1 and Equations 13-20
+    expression: 'N = sum_(i>=4)(G_i); M = sum_(i>=1)(i*G_i)'
+    interpretation: 'One attackable end per solid chain is an observable derived from the chain populations. No independent chain-end creation or exhaustion constant is invented.'
+study_system: 'Amorphous finely ground cellulose, endoglucanase and exoglucanase; soluble DP1-3, solid DP>=4.'
+assumptions:
+  - 'Binding sites in excess; quasi-steady enzyme complexes; one accessible fraction F_a shared within each enzyme channel family.'
+  - 'The effective enzyme concentration in the sourced scission law is explicit; no adsorption-occupancy reinterpretation is supplied by this record.'
+  - 'Implementation chooses the sourced finite-chain option instead of the plan candidate aggregated chain-end law, whose exhaustion term was not sourced.'
+validity:
+  - 'Published solid threshold is DP4 and exo product is a dimer. Other explicitly selected thresholds or product lengths are exploratory mathematical generalisations, not experimentally established biology.'
+  - 'All parameter values and initial chain populations require separate provenance; this record supplies no constants.'
+limitations:
+  - 'No stalling, recruitment, crystallinity, inaccessible-layer exposure or spatial transport.'
+  - 'Synthetic non-cellulose software checks establish software generality only.'
+  - 'Only the scission submodel is implemented here; the complete published model includes other mechanisms.'

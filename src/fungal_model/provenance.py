@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Literal
 
+from fungal_model.mechanism_sources import load_mechanism_source, validate_mechanism_source_links
+
 
 CURATION_AUDIT_PROVENANCE_KEY = "fungmod_curation"
 PARAMETER_BRIDGE_PROVENANCE_KEY = "fungmod_parameter_bridge"
@@ -89,4 +91,6 @@ __all__ = [
     "USER_DATASET_PROVENANCE_KEY",
     "ParameterProvenanceClass",
     "classify_parameter_provenance",
+    "load_mechanism_source",
+    "validate_mechanism_source_links",
 ]

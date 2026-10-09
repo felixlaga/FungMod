@@ -12,6 +12,7 @@ from fungal_model.modifiers import (
     ProductInhibitionModifier,
     SubstrateInhibitionModifier,
 )
+from fungal_model.processes.adsorption import AdsorbedEnzymeHydrolysisFactory
 from fungal_model.processes.base import Process
 from fungal_model.processes.homogeneous import (
     FirstOrderDecayProcess,
@@ -358,6 +359,7 @@ class PHIonizationMichaelisMentenFactory:
             minimum_ph_symbol=None if parameters.get("minimum_ph") is None else str(parameters["minimum_ph"]),
             maximum_ph_symbol=None if parameters.get("maximum_ph") is None else str(parameters["maximum_ph"]),
             source=context.source,
+            state_source=None if states.get("ph") is None else str(states["ph"]),
             notes="Built from generic pH-ionization Michaelis-Menten process config.",
         )
         return _apply_rate_modifiers(context, process_config, process)
@@ -658,8 +660,10 @@ def _closure_missing(context: ProcessBuildContext, process_config: Any, *, extra
     missing = _missing_config_fields(process_config, ("id", "states", "parameters", "stoichiometry"))
     states = _mapping(getattr(process_config, "states", {}))
     parameters = _mapping(getattr(process_config, "parameters", {}))
-    missing += _missing_mapping_fields(states, _CLOSURE_STATE_FIELDS, prefix="states")
-    missing += _missing_mapping_fields(parameters, (*_CLOSURE_PARAMETER_FIELDS, "time_units", *extra_parameters), prefix="parameters")
+    missing += _missing_mapping_fields(states, ("substrate", "biomass"), prefix="states")
+    required = ("true_yield", "maintenance_demand", "uptake_capacity", "substrate_half_saturation")
+    required += tuple(f"{pool}_half_saturation" for pool in ("nutrient", "oxidant") if states.get(pool) is not None)
+    missing += _missing_mapping_fields(parameters, (*required, "time_units", *extra_parameters), prefix="parameters")
     stoichiometry = _mapping(getattr(process_config, "stoichiometry", {}))
     if _has_field(process_config, "stoichiometry") and not stoichiometry:
         missing += ("stoichiometry",)
@@ -673,24 +677,27 @@ def _closure_kwargs(context: ProcessBuildContext, process_config: Any) -> dict[s
     parameters = _mapping(process_config.parameters)
     substrate = str(states["substrate"])
     units = context.state_units[substrate]
-    for pool in _CLOSURE_STATE_FIELDS:
-        if context.state_units[str(states[pool])] != units:
-            raise ValueError(f"Closure pools must share the units of the substrate state ({units!r}); {states[pool]!r} differs.")
+    separate = bool(parameters.get("separate_state_units", False))
+    if not separate:
+        for pool in _CLOSURE_STATE_FIELDS:
+            if states.get(pool) is not None and context.state_units[str(states[pool])] != units:
+                raise ValueError(f"Closure pools must share the units of the substrate state ({units!r}); {states[pool]!r} differs. Set separate_state_units explicitly for record-backed basis conversions.")
     return {
         "name": process_config.id,
         "substrate_state": substrate,
         "biomass_state": str(states["biomass"]),
-        "nutrient_state": str(states["nutrient"]),
-        "oxidant_state": str(states["oxidant"]),
+        "nutrient_state": None if states.get("nutrient") is None else str(states["nutrient"]),
+        "oxidant_state": None if states.get("oxidant") is None else str(states["oxidant"]),
         "concentration_units": units,
+        "state_units": context.state_units if separate else None,
         "time_units": str(parameters["time_units"]),
         "true_yield_symbol": str(parameters["true_yield"]),
         "maintenance_demand_symbol": str(parameters["maintenance_demand"]),
         "uptake_capacity_symbol": str(parameters["uptake_capacity"]),
         "substrate_half_saturation_symbol": str(parameters["substrate_half_saturation"]),
-        "nutrient_half_saturation_symbol": str(parameters["nutrient_half_saturation"]),
-        "oxidant_half_saturation_symbol": str(parameters["oxidant_half_saturation"]),
-        "stoichiometry": {str(state): float(value) for state, value in _mapping(process_config.stoichiometry).items()},
+        "nutrient_half_saturation_symbol": None if parameters.get("nutrient_half_saturation") is None else str(parameters["nutrient_half_saturation"]),
+        "oxidant_half_saturation_symbol": None if parameters.get("oxidant_half_saturation") is None else str(parameters["oxidant_half_saturation"]),
+        "stoichiometry": dict(_mapping(process_config.stoichiometry)),
         "extent_state": None if states.get("extent") is None else str(states["extent"]),
         "source": context.source,
     }
@@ -825,8 +832,49 @@ class GasTransferFactory:
         return _apply_rate_modifiers(context, process_config, process)
 
 
+@dataclass(frozen=True)
+class ProtonBalanceFactory:
+    """Build a sourced balance around a fully specified existing driver law."""
+    process_type: str = "proton_balance_ph"
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        required = ("buffers", "proton_coefficient", "water_ion_product", "standard_concentration", "temperature")
+        missing = _missing_mapping_fields(_mapping(process_config.parameters), required, prefix="parameters")
+        missing += _missing_mapping_fields(_mapping((process_config.raw or {}).get("balance", {})),
+            ("concentration_units", "time_units", "ph_bounds", "mode", "source"), prefix="balance")
+        missing += _missing_mapping_fields(_mapping(process_config.states), ("ph", "output"), prefix="states")
+        if not isinstance((process_config.raw or {}).get("driver"), Mapping):
+            missing += ("driver",)
+        return _decision(self, missing_fields=missing)
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        from fungal_model.io.model_config import ProcessConfig
+        from fungal_model.processes.buffer import ProtonBalanceProcess
+        from fungal_model.processes.registry import ProcessLibrary
+        _require_buildable(self.can_build(context, process_config))
+        params = process_config.parameters
+        options = process_config.raw["balance"]
+        driver_config = ProcessConfig.from_mapping(process_config.raw["driver"])
+        if driver_config.process_type == self.process_type:
+            raise ValueError("A pH balance cannot recursively drive another pH balance.")
+        library = ProcessLibrary.default_foundation()
+        driver = library.build_processes(context, (driver_config,))[0]
+        return ProtonBalanceProcess(name=process_config.id, driver=driver,
+            ph_state=str(process_config.states["ph"]), output_state=str(process_config.states["output"]),
+            buffer_symbols=tuple((str(item["concentration"]), str(item["pka"])) for item in params["buffers"]),
+            proton_coefficient_symbol=str(params["proton_coefficient"]),
+            water_ion_product_symbol=str(params["water_ion_product"]),
+            standard_concentration_symbol=str(params["standard_concentration"]),
+            temperature_symbol=str(params["temperature"]), concentration_units=str(options["concentration_units"]),
+            time_units=str(options["time_units"]), ph_bounds=tuple(options["ph_bounds"]),
+            mode=str(options["mode"]), source=str(options["source"]))
+
+
 def default_foundation_factories() -> tuple[ProcessFactory, ...]:
+    from fungal_model.processes.oxidative_factories import oxidative_mechanism_factories
+
     return (
+        *oxidative_mechanism_factories(),
         FirstOrderFactory(),
         MassActionFactory(),
         HomogeneousMichaelisMentenFactory(),
@@ -834,12 +882,14 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         ProportionalSynthesisFactory(),
         SubstrateTransglycosylationFactory(),
         SurfaceCatalysisFactory(),
+        AdsorbedEnzymeHydrolysisFactory(),
         ThermalInactivationFactory(),
         ResourceLimitedGrowthFactory(),
         ResourceLimitedMaintenanceFactory(),
         CostedSecretionFactory(),
         DilutionExchangeFactory(),
         GasTransferFactory(),
+        ProtonBalanceFactory(),
     )
 
 

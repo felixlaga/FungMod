@@ -451,3 +451,24 @@ def test_names_as_ids_option_repeats_identifiers_as_parameter_names():
     assert default.getParameter("k").getName() == "first-order loss constant (descriptive)"
     renamed = libsbml.readSBMLFromString(to_sbml(model, initial_state=initial, names_as_ids=True)).getModel()
     assert renamed.getParameter("k").getName() == "k"
+
+
+@pytest.mark.parametrize("domain,lower,upper,value", [
+    ("signed", None, None, 1.0),
+    ("signed", -2.0, 2.0, -1.0),
+    ("non_negative", 0.1, None, 1.0),
+    ("non_negative", None, 2.0, 1.0),
+])
+def test_export_refuses_state_domains_it_cannot_represent(tmp_path, domain, lower, upper, value):
+    from dataclasses import replace
+
+    model, initial = _first_order()
+    model = replace(model, state_variables=tuple(
+        replace(spec, domain=domain, lower_bound=lower, upper_bound=upper) if spec.name == "A" else spec
+        for spec in model.state_variables
+    ))
+    initial["A"] = Q_(value, "millimolar")
+    destination = tmp_path / "unsupported.xml"
+    with pytest.raises(SbmlExportError, match="signed or explicitly bounded state domains for A"):
+        write_sbml(model, destination, initial_state=initial)
+    assert not destination.exists()

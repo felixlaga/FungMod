@@ -3,9 +3,10 @@ milestone_id: BIO-004
 mechanism_id: released_sugar_uptake_growth
 general_process_family: release of a soluble sugar pool from a hydrolysed solid and its Monod uptake with Pirt maintenance
   by a growing culture
-mathematical_law: dG/dt = y_GP*r_h - q_G*X with q_G = q_max*G/(K_G+G); dX/dt = Y*max(q_G - m, 0)*X; maintenance
-  min(q_G, m)*X goes to a respired-carbon ledger. y_GP is a stated, unit-bearing yield and is never derived from
-  a molar mass. Bound through the existing resource-limited closure with nitrogen and oxidant optional.
+mathematical_law: r_growth = Y*max(q_G-m,0)*X; r_maint = min(q_G,m)*X; dG/dt = y_GP*r_h-r_growth/Y-r_maint; dX/dt
+  = r_growth-k_loss*X; q_G = q_max*G/(K_G+G), optionally multiplied by O/(K_O+O). Maintenance sugar accumulates
+  in a substrate-equivalent ledger. Unit-bearing release and biomass yields are explicitly supplied; no molar mass
+  is inferred.
 state_variables:
 - name: solid_substrate
   role: substrate
@@ -82,24 +83,30 @@ tests_required:
 - Two materially different synthetic cultures.
 - Byte identity of every earlier culture, including the shipped culture case.
 limitations:
-- Proposed only.
+- Implemented and software-tested with checked law-form evidence; synthetic examples are not calibration or independent
+  empirical validation.
 - Monod uptake of one pooled sugar with Pirt maintenance; no regulation or morphology.
+- The respired-carbon output role is a maintenance substrate-equivalent ledger, not measured CO2 or elemental carbon
+  closure. Enzyme synthesis is uncosted.
+- 'Pirt full text was inaccessible: the primary publisher abstract supports constant maintenance, while the finite-uptake
+  cap is an explicit exploratory closure assumption.'
 demo_case:
   case_id: CASE-UPTAKE-SYNTH
   purpose: Exercise release and uptake on synthetic cultures.
   distinction: Synthetic benchmark; not scientific data.
-validation_status: proposed
+validation_status: software_tested
 plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 6 (M2)
 candidate_sources:
 - key: monod1949
   citation: Monod (1949), Annual Review of Microbiology 3:371-394
   supports: 'law form: saturable uptake and growth'
-  verification: re-check
+  verification: checked 2026-10-09 against original paper equation (2); numerical organism parameters not supplied
   doi: 10.1146/annurev.mi.03.100149.002103
 - key: pirt1965
   citation: Pirt (1965), Proceedings of the Royal Society B 163:224-231
   supports: 'law form: maintenance demand'
-  verification: re-check
+  verification: checked 2026-10-09 primary publisher abstract; full text inaccessible; capped extension explicitly
+    assumed
   doi: 10.1098/rspb.1965.0069
 - key: ilmen1997
   citation: Ilmen, Saloheimo, Onnela and Penttila (1997), Applied and Environmental Microbiology 63(4):1298-1306
@@ -109,3 +116,7 @@ candidate_sources:
   citation: Velkovska, Marten and Ollis (1997), Journal of Biotechnology, batch cellulase production model
   supports: candidate repression term
   verification: unverified; confirm before use
+mechanism_sources:
+- data/mechanism_sources/monod1949/source.yml
+- data/mechanism_sources/pirt1965/source.yml
+implementation_document: docs/bio004-uptake-oxygen.md

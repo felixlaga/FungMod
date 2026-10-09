@@ -1523,3 +1523,13 @@ with `--aliases`, the aliases that `--fungus`, `--substrate` and
 with its meaning (`exit_meaning`). A refused `--json PATH` (an existing file,
 a missing directory, a path inside `--output`) exits with 2 before the command
 runs.
+
+## Explicit mechanism configurations
+
+`fungmod assemble-mechanisms --user-data DIRECTORY --output CONFIG.yml` validates
+explicit finite-chain or peroxide tables and writes one new configuration.
+`fungmod add-medium CONFIG.yml --medium medium.csv --output BUFFERED.yml` attaches
+a sourced proton/buffer balance. `fungmod run-config CONFIG.yml --output DIRECTORY`
+runs the existing configured-model workflow with its provenance and validators.
+Outputs must be new files or an empty run directory. See the
+[six-mechanism guide](bio004-mechanisms.md) for complete examples and limitations.

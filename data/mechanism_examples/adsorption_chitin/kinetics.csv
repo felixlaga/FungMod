@@ -1,0 +1,6 @@
+strain_id,enzyme_class,substrate_id,condition_id,quantity,value,units,evidence_type,method,source
+strain,cutter,solid,assay,binding_capacity,20,umol/g,estimate,synthetic test inputs,Illustrative synthetic inputs invented for software verification; no empirical data.
+strain,cutter,solid,assay,adsorption_dissociation_constant,0.5,umol/L,estimate,synthetic test inputs,Illustrative synthetic inputs invented for software verification; no empirical data.
+strain,cutter,solid,assay,bound_rate_constant,0.1,g/umol/hour,estimate,synthetic test inputs,Illustrative synthetic inputs invented for software verification; no empirical data.
+strain,cutter,solid,assay,substrate_initial_concentration,10,g/L,estimate,synthetic test inputs,Illustrative synthetic inputs invented for software verification; no empirical data.
+strain,cutter,solid,assay,enzyme_concentration,1,umol/L,estimate,synthetic test inputs,Illustrative synthetic inputs invented for software verification; no empirical data.

@@ -245,10 +245,13 @@ def test_culture_route_names_are_exported_and_not_placeholders() -> None:
         assert name in user_data.__all__, name
     assert user_data.CULTURE_TABLE == "culture.csv"
     assert set(user_data.CULTURE_QUANTITIES) == {
-        *user_data.CULTURE_LEVEL_QUANTITIES,
+        *(quantity for quantity in user_data.CULTURE_LEVEL_QUANTITIES if quantity != "release_yield"),
         *user_data.CULTURE_CONSUMPTION_QUANTITIES,
         *user_data.CULTURE_POOL_QUANTITIES,
     }
+    # release_yield is generated from substrates.csv evidence, never accepted in culture.csv.
+    assert "release_yield" in user_data.CULTURE_LEVEL_QUANTITIES
+    assert "release_yield" not in user_data.CULTURE_QUANTITIES
     for function in (
         user_data.load_user_dataset,
         user_data._parse_culture,
@@ -275,8 +278,12 @@ def test_command_line_entry_point_is_complete_and_uses_the_public_api() -> None:
     assert "virtual_experiment(" in source
     assert ".simulate(" in source
     assert ".preflight(" in source
-    for low_level in ("simulate_screen", "assess_modelability", "run_configured_model", "ProcessODESolver"):
+    for low_level in ("simulate_screen", "assess_modelability", "ProcessODESolver"):
         assert low_level not in source
+    # The explicit run-config command delegates to the existing public configured API.
+    configured_source = inspect.getsource(cli._run_config)
+    assert "run_configured_model(" in configured_source
+    assert "run_configured_model" not in inspect.getsource(cli._run)
 
 
 def test_public_api_names_are_not_unfinished_placeholders() -> None:

@@ -1,0 +1,23 @@
+source_id: monod1949
+citation: Monod J (1949). The growth of bacterial cultures. Annual Review of Microbiology
+  3:371-394.
+doi: 10.1146/annurev.mi.03.100149.002103
+url: https://garcialab.berkeley.edu/courses/papers/Monod1949.pdf
+license: Publisher copyright; linked primary article, not redistributed.
+retrieved_on: '2026-10-09'
+supports:
+- law_form
+equations:
+- id: saturation
+  location: pp. 383-384, equation (2)
+  expression: r = r_max C / (K + C)
+  interpretation: Single-resource saturation; using the saturation form for uptake
+    capacity is an explicit effective-model assumption.
+study_system: Bacterial cultures; no fungus-specific constants transferred.
+assumptions:
+- Well-mixed population under fixed conditions.
+- One limiting resource; optional independent oxidant saturation is a model composition.
+validity:
+- Concentrations nonnegative, K positive.
+limitations:
+- Supports a law form only, not fungal uptake constants, yield, or validation.

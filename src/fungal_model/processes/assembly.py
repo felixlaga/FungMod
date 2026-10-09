@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Sequence
 
@@ -16,7 +16,7 @@ from fungal_model.core.errors import (
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import ProvenanceError, UnknownParameterError
 from fungal_model.core.simulation import SolverSettings
-from fungal_model.core.units import Quantity, UnitError, assert_compatible
+from fungal_model.core.units import Q_, Quantity, UnitError, assert_compatible
 from fungal_model.processes.base import Process, StateVariableSpec
 from fungal_model.processes.registry import MissingProcessIssue, ProcessRegistry
 
@@ -502,6 +502,20 @@ def _collect_state_variables(
         if spec.name not in seen:
             variables.append(spec)
             seen.add(spec.name)
+        else:
+            index = next(i for i, item in enumerate(variables) if item.name == spec.name)
+            previous = variables[index]
+            assert_compatible(Q_(1, spec.units), previous.units, name=spec.name)
+            converted_lower = None if spec.lower_bound is None else float(
+                assert_compatible(Q_(spec.lower_bound, spec.units), previous.units, name=spec.name).magnitude)
+            converted_upper = None if spec.upper_bound is None else float(
+                assert_compatible(Q_(spec.upper_bound, spec.units), previous.units, name=spec.name).magnitude)
+            lower_bounds = [value for value in (previous.lower_bound, converted_lower) if value is not None]
+            upper_bounds = [value for value in (previous.upper_bound, converted_upper) if value is not None]
+            lower = max(lower_bounds) if lower_bounds else None
+            upper = min(upper_bounds) if upper_bounds else None
+            variables[index] = replace(previous, domain="signed" if "signed" in (previous.domain, spec.domain)
+                else "non_negative", lower_bound=lower, upper_bound=upper)
     return tuple(variables)
 
 

@@ -21,7 +21,6 @@ from fungal_model.solvers.compiled import (
     JACOBIAN_COMPILED_LABEL,
     CompiledModel,
     compile_assembled_model,
-    evaluation_state_for_rates,
     resolve_state_units,
 )
 
@@ -120,9 +119,10 @@ class ProcessODESolver:
             assumptions=tuple(self.model.assumptions),
             solver_settings=settings,
             process_rates=process_rates,
-            derived_quantities=_thermodynamic_derived_quantities(
-                thermodynamic_evaluations
-            ),
+            derived_quantities={
+                **_thermodynamic_derived_quantities(thermodynamic_evaluations),
+                **_process_derived_quantities(self.model, states),
+            },
             validation_results=(),
             warnings=(),
             solver_metadata={
@@ -176,6 +176,19 @@ class ProcessODESolver:
 
 
 _state_units = resolve_state_units
+
+
+def _process_derived_quantities(model: AssembledModel, states: Mapping[str, Quantity]) -> dict[str, Quantity]:
+    values: dict[str, Quantity] = {}
+    for process in model.processes:
+        method = getattr(process, "derived_quantities", None)
+        if method is not None:
+            for name, quantity in method(states, model.parameters).items():
+                key = f"{process.name}.{name}"
+                if key in values:
+                    raise ValueError(f"Duplicate derived quantity {key!r}.")
+                values[key] = require_quantity(quantity, name=key)
+    return values
 
 
 def _time_units(t_span: tuple[Quantity, Quantity]) -> str:
@@ -250,9 +263,8 @@ def _record_process_rates(
     times = np.asarray(time.magnitude, dtype=float)
     # Accepted states are recorded unclipped; rates at the returned points use
     # the same non-negative projection as the compiled right-hand side.
-    matrix = evaluation_state_for_rates(
-        np.vstack([np.asarray(states[name].magnitude, dtype=float) for name in compiled.state_names])
-    )
+    raw_matrix = np.vstack([np.asarray(states[name].magnitude, dtype=float) for name in compiled.state_names])
+    matrix = np.column_stack([compiled.evaluation_state(raw_matrix[:, i]) for i in range(times.size)]) if times.size else raw_matrix
     rates: dict[str, Quantity] = {}
     evaluations: dict[str, list[DynamicThermodynamicEvaluation]] = {
         constraint.constraint_id: []

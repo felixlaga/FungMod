@@ -150,6 +150,7 @@ from fungal_model.api.user_data_sources import (
     user_tables_from_sabiork,
 )
 from fungal_model.capability import CapabilityResolver, CazymeAnnotation, CazymeFamilyMap
+from fungal_model.capability.mechanism_scope import legacy_annotation_registry
 from fungal_model.capability.resolution import CapabilityResolutionError
 from fungal_model.capability.uniprot import decode_uniprot_tsv, parse_uniprot_tsv, resolve_uniprot_proteome
 from fungal_model.core.provenance import ProvenanceError
@@ -1972,7 +1973,7 @@ class _Assembler:
         try:
             resolution = CapabilityResolver(
                 family_map=CazymeFamilyMap.load(),
-                registry_enzyme_classes=tuple(sorted(self.base.enzyme_classes)),
+                registry_enzyme_classes=tuple(sorted(legacy_annotation_registry(self.base).enzyme_classes)),
             ).resolve(
                 CazymeAnnotation(
                     organism=self.strain_name,
@@ -2118,9 +2119,9 @@ class _Assembler:
                 proteome,
                 capability_resolver=CapabilityResolver(
                     family_map=CazymeFamilyMap.load(),
-                    registry_enzyme_classes=tuple(sorted(self.base.enzyme_classes)),
+                    registry_enzyme_classes=tuple(sorted(legacy_annotation_registry(self.base).enzyme_classes)),
                 ),
-                registry=self.base,
+                registry=legacy_annotation_registry(self.base),
                 organism=self.strain_name,
                 proteome_source=source,
                 annotation_tool=tool[0],

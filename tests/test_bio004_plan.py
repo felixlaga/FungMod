@@ -1,4 +1,4 @@
-"""The BIO-004 plan for six new mechanisms: proposals are machine-checkable and claim no more than `proposed`."""
+"""The BIO-004 plan for six new mechanisms: implementation status and law-form evidence remain machine-checkable."""
 
 from __future__ import annotations
 
@@ -42,14 +42,14 @@ def test_each_proposal_passes_bio_readiness(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))
-def test_each_proposal_claims_no_more_than_proposed(name: str) -> None:
+def test_each_proposal_limits_promotion_to_software_tests(name: str) -> None:
     proposal = _proposal(name)
-    # Nothing in BIO-004 is implemented or sourced yet; promotion happens one gate at a time.
-    assert proposal["validation_status"] == "proposed"
+    assert proposal["validation_status"] == "software_tested"
+    assert proposal["mechanism_sources"]
     assert proposal["milestone_id"] == "BIO-004"
     assert proposal["plan_section"].startswith("foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md")
     assert f"({EXPECTED[name]})" in proposal["plan_section"]
-    assert any("Proposed only" in item for item in proposal["limitations"])
+    assert any("not calibration or independent empirical validation" in item for item in proposal["limitations"])
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))

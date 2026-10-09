@@ -1,0 +1,21 @@
+source_id: medve_1998_bound_activity
+citation: 'Medve, Karlsson, Lee and Tjerneld (1998), Hydrolysis of microcrystalline cellulose by cellobiohydrolase I and endoglucanase II from Trichoderma reesei: Adsorption, sugar production pattern, and synergism of the enzymes. Biotechnology and Bioengineering 59(5):621-634.'
+doi: '10.1002/(SICI)1097-0290(19980905)59:5<621::AID-BIT13>3.0.CO;2-C'
+url: https://portal.research.lu.se/en/publications/hydrolysis-of-microcrystalline-cellulose-by-cellobiohydrolase-i-a/
+license: Copyright Wiley; metadata and short factual extraction only
+retrieved_on: '2026-10-09'
+supports: [law_form]
+equations:
+  - id: bound_activity_relation
+    location: 'Abstract, p. 621; primary institutional publication record. An empirical relation in prose, not a numbered equation.'
+    expression: 'r = k_b * E_b'
+    interpretation: 'Model notation for the reported linear soluble-sugar-production versus adsorbed-CBH-I relation. The source does not establish this relation for EG II; no numeric constants transferred.'
+study_system: 'Trichoderma reesei CBH I and EG II on 10 g/L Avicel; isotherm studies at 4 C and 90 min, time courses at 40 C.'
+assumptions:
+  - Constant average productive activity per bound enzyme is an explicit case assumption.
+validity:
+  - Source supports the proportional bound-activity closure for its CBH I observations only.
+limitations:
+  - EG II showed a leveling response; proportional bound activity is not universal.
+  - Adsorption equilibration and mixed-enzyme competition are not represented dynamically.
+  - Full text was not accessible; abstract-level evidence only for the empirical closure.

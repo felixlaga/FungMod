@@ -1,0 +1,28 @@
+source_id: pirt1965
+citation: Pirt SJ (1965). The maintenance energy of bacteria in growing cultures.
+  Proceedings of the Royal Society B 163:224-231.
+doi: 10.1098/rspb.1965.0069
+url: https://royalsocietypublishing.org/doi/10.1098/rspb.1965.0069
+license: Publisher copyright; no article redistributed.
+retrieved_on: '2026-10-09'
+supports:
+- law_form
+equations:
+- id: maintenance_partition
+  location: Publisher abstract reproduced as JATS by CiNii, https://cir.nii.ac.jp/crid/1360011144615794048;
+    full text not accessible in this intake.
+  expression: q = mu / Y_true + m
+  interpretation: Algebraic expression of the abstract-described constant maintenance
+    requirement and true growth yield; mu=Y_true max(q-m,0) with maintenance capped
+    at q is the explicitly declared nonnegative model extension.
+study_system: Growing bacterial cultures; maintenance/yield law form only.
+assumptions:
+- Maintenance demand is constant per biomass at a stated condition.
+- Below demand, uptake pays maintenance and biomass formation is zero.
+validity:
+- Positive true yield; nonnegative uptake and maintenance.
+limitations:
+- Only bibliographic record and publisher abstract verified; no equation number or
+  numerical values transcribed from inaccessible full text.
+- Capping maintenance at available uptake is a modelling extension; no death or storage
+  metabolism.

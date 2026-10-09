@@ -1,0 +1,2 @@
+strain_id,enzyme_class,evidence,source
+strain,cutter,synthetic software case,Illustrative synthetic inputs invented for software verification; no empirical data.

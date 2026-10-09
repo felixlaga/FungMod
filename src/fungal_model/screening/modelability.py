@@ -349,6 +349,12 @@ def _evaluate_compatibility_parameters(
     if compatibility.case_template_id:
         try:
             template = registry.get_case_template(compatibility.case_template_id)
+            for evidence in template.process_state_metadata.get("additional_parameter_evidence", ()):
+                target = incompatible if mode == "scientific" and evidence.get("evidence_type") == "estimate" else (
+                    uncertain if evidence.get("evidence_type") == "estimate" else known)
+                target.append(_item("parameter", str(evidence.get("quantity", "additional_input")),
+                    "Explicit auxiliary input requires exploratory mode." if target is incompatible else
+                    "Explicit auxiliary input retains its supplied evidence classification.", dict(evidence)))
             explicit_records = resolve_exact_template_parameter_records(
                 registry=registry,
                 template=template,

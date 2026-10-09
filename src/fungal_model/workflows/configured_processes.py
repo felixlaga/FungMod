@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any
 
 from fungal_model.core.errors import (
@@ -13,6 +14,7 @@ from fungal_model.core.errors import (
     ModelAssemblyError,
 )
 from fungal_model.io.model_config import ModelConfig
+from fungal_model.processes.base import StateVariableSpec
 from fungal_model.processes import (
     AssembledModel,
     ModelBuilder,
@@ -152,6 +154,7 @@ class ConfiguredProcessAssembler:
                 environment=inputs.environment,
                 geometry=inputs.geometry,
                 process_library=ProcessRegistry(processes),
+                state_variables=_declared_state_domains(config, inputs.state_units()),
                 parameters=inputs.parameters,
                 requested_processes=tuple(process.name for process in processes),
                 validators=validators,
@@ -178,6 +181,25 @@ class ConfiguredProcessAssembler:
             processes=tuple(processes),
             model=model,
         )
+
+
+def _declared_state_domains(config: ModelConfig, state_units: Mapping[str, str]) -> tuple[StateVariableSpec, ...]:
+    declared = dict(config.raw.get("state_domains", {}))
+    for name, item in config.initial_state.states.items():
+        bounds = {key: item[key] for key in ("domain", "lower_bound", "upper_bound") if key in item}
+        if bounds:
+            if name in declared:
+                raise ValueError(f"State domain for {name!r} is declared twice.")
+            declared[name] = bounds
+    specs = []
+    for name, value in declared.items():
+        if name not in state_units:
+            raise ValueError(f"State domain references unknown state {name!r}.")
+        fields: dict[str, Any] = {"domain": value} if isinstance(value, str) else dict(value)
+        if set(fields) - {"domain", "lower_bound", "upper_bound"}:
+            raise ValueError("Unknown state-domain fields.")
+        specs.append(StateVariableSpec(name, state_units[name], **fields))
+    return tuple(specs)
 
 
 def require_runnable_config(config: ModelConfig) -> None:

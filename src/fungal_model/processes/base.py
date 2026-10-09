@@ -32,18 +32,32 @@ class StateVariableSpec:
     units: str
     description: str = ""
     role: str = "state"
+    domain: str = "non_negative"
+    lower_bound: float | None = None
+    upper_bound: float | None = None
 
     def __post_init__(self) -> None:
         _validate_identifier(self.name, field_name="StateVariableSpec.name")
         _validate_identifier(self.units, field_name=f"StateVariableSpec({self.name}).units")
         Q_(1, self.units)
+        if self.domain not in {"non_negative", "signed"}:
+            raise InvalidMechanismError("State domain must be non_negative or signed.")
+        import math
+        for bound in (self.lower_bound, self.upper_bound):
+            if bound is not None and not math.isfinite(bound):
+                raise InvalidMechanismError("State bounds must be finite.")
+        if self.lower_bound is not None and self.upper_bound is not None and self.lower_bound >= self.upper_bound:
+            raise InvalidMechanismError("State lower_bound must be below upper_bound.")
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "units": self.units,
             "description": self.description,
             "role": self.role,
+            **({"domain": self.domain} if self.domain != "non_negative" else {}),
+            **({"lower_bound": self.lower_bound} if self.lower_bound is not None else {}),
+            **({"upper_bound": self.upper_bound} if self.upper_bound is not None else {}),
         }
 
 

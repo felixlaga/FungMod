@@ -1,0 +1,6 @@
+state,role,value,units,source,chain_length
+S,substrate,10,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,
+H,peroxide,1,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,
+E,enzyme,0.1,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,
+P,product,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,
+inactive,inactive_enzyme,0,millimolar,Synthetic BIO-004 software benchmark only; not biological measurements.,

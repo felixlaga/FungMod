@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+import numpy as np
 from typing import Mapping
 
 from fungal_model.core.assumptions import Assumption
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
@@ -19,6 +21,7 @@ from fungal_model.kinetics.cardinal import (
     cardinal_water_activity_assumption,
 )
 from fungal_model.modifiers.base import constant_activity_kernel
+from fungal_model.modifiers.state_environment import check_state_environment, state_activity_quantity
 
 CARDINAL_TEMPERATURE_MODIFIER_TYPE = "temperature_cardinal_rosso"
 CARDINAL_PH_MODIFIER_TYPE = "ph_cardinal_rosso"
@@ -94,6 +97,7 @@ class CardinalPHModifier:
     maximum_ph_symbol: str
     source: str
     name: str = "cardinal_ph_modifier"
+    state_source: str | None = None
 
     @property
     def assumptions(self) -> tuple[Assumption, ...]:
@@ -106,7 +110,9 @@ class CardinalPHModifier:
         environment: Environment,
         state: Mapping[str, Quantity] | None = None,
     ) -> Quantity:
-        del state
+        if self.state_source is not None:
+            return state_activity_quantity(self, state_source=self.state_source, state=state,
+                parameters=parameters, environment=environment)
         return cardinal_ph_activity(
             ph=environment.require_ph(),
             minimum_ph=parameters.require_quantity(self.minimum_ph_symbol, "dimensionless"),
@@ -132,7 +138,44 @@ class CardinalPHModifier:
     def compile_activity(self, context: KernelContext) -> RateKernel | None:
         """Environment-only activity: evaluated once at build time."""
 
-        return constant_activity_kernel(self, context)
+        if self.state_source is None:
+            return constant_activity_kernel(self, context)
+        return self._dynamic(context)[0]
+
+    def compile_activity_jacobian(self, context: KernelContext) -> JacobianKernel:
+        if self.state_source is None:
+            return lambda t, y: np.zeros(len(y))
+        return self._dynamic(context)[1]
+
+    def _dynamic(self, context: KernelContext) -> tuple[RateKernel, JacobianKernel]:
+        assert self.state_source is not None
+        if not self.source.strip():
+            raise ValueError("A source is required for a state-driven pH response.")
+        check_state_environment(environment=context.environment, field="ph")
+        idx, scale = context.state_slot(self.state_source, "dimensionless")
+        low = context.parameter(self.minimum_ph_symbol, "dimensionless")
+        opt = context.parameter(self.optimum_ph_symbol, "dimensionless")
+        high = context.parameter(self.maximum_ph_symbol, "dimensionless")
+        if not all(map(math.isfinite, (low, opt, high))) or not 0 <= low < opt < high <= 14:
+            raise ValueError("State-driven cardinal pH requires ordered cardinals in 0 to 14.")
+        def terms(y: np.ndarray) -> tuple[float, float, float, float]:
+            ph = y[idx] * scale
+            if not low <= ph <= high:
+                raise ValueError("pH left the declared cardinal response domain.")
+            n = (ph-low)*(ph-high)
+            d = n-(ph-opt)**2
+            dn = 2*ph-low-high
+            dd = dn-2*(ph-opt)
+            return n, d, dn, dd
+        def activity(t: float, y: np.ndarray) -> float:
+            n, d, _, _ = terms(y)
+            return n/d
+        def gradient(t: float, y: np.ndarray) -> np.ndarray:
+            n, d, dn, dd = terms(y)
+            result = np.zeros(len(y))
+            result[idx] = (dn*d-n*dd)/d**2*scale
+            return result
+        return activity, gradient
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -142,6 +185,7 @@ class CardinalPHModifier:
             "optimum_ph_symbol": self.optimum_ph_symbol,
             "maximum_ph_symbol": self.maximum_ph_symbol,
             "source": self.source,
+            **({"state_source": self.state_source} if self.state_source is not None else {}),
         }
 
 

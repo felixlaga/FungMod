@@ -1,0 +1,138 @@
+kind: model_config
+name: Synthetic buffered-reaction input before adding medium
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod foundation benchmark config; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Exercises generic model-config loading for a homogeneous toy process.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    loader: environment
+    data:
+      kind: environment
+      name: toy lab 30C pH7
+      provenance:
+        source: Toy lab environment configuration for FungMod integration tests.
+        measurement_method: defined benchmark metadata
+        confidence_level: testing
+        notes: Constant environment used for assembly and modifier demos.
+        validity_range: toy benchmark only
+        units: not_applicable
+      conditions:
+        temperature:
+          value: 303.15
+          units: kelvin
+        oxygen_concentration:
+          value: 0.25
+          units: mole / liter
+        water_activity:
+          value: 0.98
+          units: dimensionless
+      parameters: []
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+  substrates:
+  - id: dissolved_substrate
+    loader: generic_dissolved
+    data:
+      kind: substrate
+      name: generic dissolved benchmark substrate
+      substrate_type: generic_dissolved
+      chemical_class: framework benchmark
+      physical_state: dissolved
+      bond_types: []
+      accessible_bonds: []
+      required_enzyme_classes: []
+      degradation_products:
+      - name: generic product B
+        notes: Toy product for config loading only.
+parameters:
+- id: homogeneous_parameters
+  parameters:
+  - name: toy first-order conversion constant
+    symbol: k_ab
+    value: 0.1
+    units: 1/hour
+    uncertainty: 0.0
+    source: FungMod foundation benchmark config.
+    confidence_level: testing
+    notes: Artificial value for config loading only.
+    measurement_method: defined benchmark value
+    validity_range: framework tests only
+  - name: optimum
+    symbol: optimum
+    value: 7.0
+    units: dimensionless
+    uncertainty: 0.0
+    source: FungMod foundation benchmark config.
+    confidence_level: testing
+    notes: Artificial value for config loading only.
+    measurement_method: defined benchmark value
+    validity_range: framework tests only
+  - name: width
+    symbol: width
+    value: 2.0
+    units: dimensionless
+    uncertainty: 0.0
+    source: FungMod foundation benchmark config.
+    confidence_level: testing
+    notes: Artificial value for config loading only.
+    measurement_method: defined benchmark value
+    validity_range: framework tests only
+processes:
+- id: a_to_b
+  process_type: first_order
+  states:
+    source: dissolved_substrate_amount
+    product: released_product_amount
+  parameters:
+    rate_constant: k_ab
+  assumptions:
+  - toy homogeneous benchmark only
+  modifiers:
+  - type: ph_gaussian
+    optimum_symbol: optimum
+    width_symbol: width
+    source: Artificial response; not biological measurements.
+    state_source: ph
+initial_state:
+  states:
+    dissolved_substrate_amount:
+      value: 0.01
+      units: mol/L
+    released_product_amount:
+      value: 0.0
+      units: mol/L
+time:
+  start:
+    value: 0.0
+    units: hour
+  stop:
+    value: 2.0
+    units: hour
+  points: 21
+validators:
+- id: non_negative_states
+  validator_type: non_negative
+  species:
+  - dissolved_substrate_amount
+  - released_product_amount
+- id: closed_mass_balance
+  validator_type: mass_balance
+  conserved_weights:
+    dissolved_substrate_amount: 1.0
+    released_product_amount: 1.0
+outputs:
+  directory: outputs/toy_buffered_ph
+  save:
+  - record
+  - validation_report
+  plots:
+  - state_trajectories

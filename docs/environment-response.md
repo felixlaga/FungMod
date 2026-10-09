@@ -1,5 +1,10 @@
 # Environment response laws
 
+The opt-in [six-mechanism extension](bio004-mechanisms.md) adds adsorption,
+released-sugar uptake, oxygen and buffered-pH dynamics, finite-chain synergy and
+peroxide-driven cleavage. The older routes described below retain their existing
+contracts unless these explicit inputs are supplied.
+
 FungMod answers "how does pH or temperature change degradation dynamics" only
 through explicit laws. An environment is a static entity: every condition is
 read once when a case is assembled, folded into the compiled kernels, and

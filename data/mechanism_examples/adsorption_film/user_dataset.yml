@@ -1,0 +1,11 @@
+contributor: FungMod maintainers
+dataset_id: adsorption_checks
+date: '2026-10-09'
+notes: Illustrative synthetic inputs invented for software verification; no empirical
+  data.
+simulation:
+  duration: 48
+  points: 25
+  units: hour
+source: Illustrative synthetic inputs invented for software verification; no empirical
+  data.

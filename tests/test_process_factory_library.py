@@ -54,18 +54,24 @@ def test_default_foundation_library_registers_expected_factories() -> None:
 
     assert set(library.factory_types()) == {
         "first_order",
+        "chain_endo_scission",
+        "chain_exo_scission",
+        "peroxide_oxidative_cleavage",
+        "peroxide_inactivation",
         "mass_action",
         "homogeneous_michaelis_menten",
         "ph_ionization_michaelis_menten",
         "proportional_synthesis",
         "substrate_transglycosylation",
         "surface_catalysis",
+        "adsorbed_enzyme_hydrolysis",
         "thermal_inactivation",
         "resource_limited_growth",
         "resource_limited_maintenance",
         "costed_secretion",
         "dilution_exchange",
         "gas_transfer",
+        "proton_balance_ph",
     }
 
 

@@ -1,0 +1,1258 @@
+kind: model_config
+name: toy_chain_scission
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+parameters:
+- id: synthetic_constants
+  parameters:
+  - name: synthetic k_endo
+    symbol: k_endo
+    value: 0.15
+    units: 1/second
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic k_exo
+    symbol: k_exo
+    value: 1
+    units: 1/second
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic K_endo
+    symbol: K_endo
+    value: 1
+    units: millimolar
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic K_exo
+    symbol: K_exo
+    value: 2
+    units: millimolar
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic Fa
+    symbol: Fa
+    value: 1
+    units: dimensionless
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+processes:
+- id: endo_4_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: &id001
+      1: C1
+      2: C2
+      3: C3
+      4: C4
+      5: C5
+      6: C6
+      7: C7
+      8: C8
+      9: C9
+      10: C10
+      11: C11
+      12: C12
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 4
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_4_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 4
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_4_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 4
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_5_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 5
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_5_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 5
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_5_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 5
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_5_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 5
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_6_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 6
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_6_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 6
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_6_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 6
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_6_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 6
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_6_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 6
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_7_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_7_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_7_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_7_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_7_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_7_6
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 6
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_6
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 6
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_8_7
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 7
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_6
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 6
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_7
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 7
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_9_8
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 8
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_6
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 6
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_7
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 7
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_8
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 8
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_10_9
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 9
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_6
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 6
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_7
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 7
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_8
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 8
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_9
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 9
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_11_10
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 10
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_1
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 1
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_2
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_3
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 3
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_4
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 4
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_5
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 5
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_6
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 6
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_7
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 7
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_8
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 8
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_9
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 9
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_10
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 10
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: endo_12_11
+  process_type: chain_endo_scission
+  states:
+    enzyme: E_endo
+    chains: *id001
+  parameters:
+    kcat: k_endo
+    km: K_endo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 11
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_4_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 4
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_5_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 5
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_6_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 6
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_7_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 7
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_8_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 8
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_9_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 9
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_10_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 10
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_11_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 11
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+- id: exo_12_2
+  process_type: chain_exo_scission
+  states:
+    enzyme: E_exo
+    chains: *id001
+  parameters:
+    kcat: k_exo
+    km: K_exo
+    accessible_fraction: Fa
+  chain_structure:
+    parent_length: 12
+    fragment_length: 2
+    solid_min_length: 4
+    source: Niu et al. 2016 Eqs 12-20; Synthetic BIO-004 software benchmark only;
+      no measured biological constants.
+initial_state:
+  states:
+    C1:
+      value: 0
+      units: millimolar
+    C2:
+      value: 0
+      units: millimolar
+    C3:
+      value: 0
+      units: millimolar
+    C4:
+      value: 0
+      units: millimolar
+    C5:
+      value: 0
+      units: millimolar
+    C6:
+      value: 0
+      units: millimolar
+    C7:
+      value: 0
+      units: millimolar
+    C8:
+      value: 0
+      units: millimolar
+    C9:
+      value: 0
+      units: millimolar
+    C10:
+      value: 0
+      units: millimolar
+    C11:
+      value: 0
+      units: millimolar
+    C12:
+      value: 1
+      units: millimolar
+    E_endo:
+      value: 0.1
+      units: millimolar
+    E_exo:
+      value: 0.1
+      units: millimolar
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 60
+    units: second
+  points: 61
+validators:
+- id: material
+  validator_type: mass_balance
+  conserved_weights:
+    C1: 1
+    C2: 2
+    C3: 3
+    C4: 4
+    C5: 5
+    C6: 6
+    C7: 7
+    C8: 8
+    C9: 9
+    C10: 10
+    C11: 11
+    C12: 12
+- id: nonnegative
+  validator_type: non_negative
+  species:
+  - C1
+  - C2
+  - C3
+  - C4
+  - C5
+  - C6
+  - C7
+  - C8
+  - C9
+  - C10
+  - C11
+  - C12
+  - E_endo
+  - E_exo
+outputs:
+  directory: outputs/toy_chain_scission
+  save:
+  - record
+  - validation_report
+  plots:
+  - state_trajectories

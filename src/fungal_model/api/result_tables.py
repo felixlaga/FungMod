@@ -299,6 +299,9 @@ def _build_table_rows(
                     trajectory_rows=trajectory_rows,
                     state_rate_rows=state_rate_rows,
                     state_roles=state_roles,
+                    oxygen_threshold=_sample_oxygen_threshold(sample),
+                    medium_rows=_sample_medium_rows(sample),
+                    mechanism_metrics=_read_mechanism_metrics(sample),
                 )
             )
             rows["threshold_times"].extend(
@@ -938,7 +941,7 @@ def _mechanism_summary_rows(
 
 # Assemblers that build one process law per case, after which a template may declare further processes (the loss of
 # the enzyme state, ``enzyme_inactivation``); every such process gets a mechanism row of its own.
-_SINGLE_PROCESS_LAW_TYPES = frozenset({"homogeneous_michaelis_menten", "ph_ionization_michaelis_menten"})
+_SINGLE_PROCESS_LAW_TYPES = frozenset({"homogeneous_michaelis_menten", "ph_ionization_michaelis_menten", "adsorbed_enzyme_hydrolysis"})
 
 
 def _companion_process_mechanism_rows(
@@ -1260,6 +1263,14 @@ def _process_mechanism_descriptor(
 
 
 def _mechanism_family(process_type: str) -> str:
+    if process_type in {"chain_endo_scission", "chain_exo_scission"}:
+        return "finite-chain scission with explicit structural synergy and exhaustion"
+    if process_type == "peroxide_oxidative_cleavage":
+        return "primed peroxide-driven oxidative cleavage through an ordered ternary complex"
+    if process_type == "peroxide_inactivation":
+        return "substrate-protected peroxide inactivation of free enzyme"
+    if process_type == "adsorbed_enzyme_hydrolysis":
+        return "quasi-steady single-site adsorption with finite enzyme depletion"
     if process_type == "homogeneous_michaelis_menten":
         return "generic homogeneous Michaelis-Menten process"
     if process_type == "ph_ionization_michaelis_menten":
@@ -1280,6 +1291,16 @@ def _mechanism_family(process_type: str) -> str:
 
 
 def _mechanism_law(process_type: str) -> str:
+    if process_type == "chain_endo_scission":
+        return "r_(i,j) = k*E*Fa*G_i/(K+Fa*sum((n-1)*G_n)); G_i -> G_j+G_(i-j)"
+    if process_type == "chain_exo_scission":
+        return "r_i = k*E*Fa*G_i/(K+Fa*sum(G_n)); G_i -> G_m+G_(i-m); exact terminal exhaustion"
+    if process_type == "peroxide_oxidative_cleavage":
+        return "r_cut = kcat*E*S*H/(KiS*KmH+KmH*S+KmS*H+S*H); 1 peroxide/cut; explicit product yield"
+    if process_type == "peroxide_inactivation":
+        return "dE/dt = -ki*E*H*KmS/(KmS+S); dE_inactive/dt = -dE/dt"
+    if process_type == "adsorbed_enzyme_hydrolysis":
+        return "E_b = Gamma*S*E_f/(Kd+E_f); E_T = E_f+E_b; r = k_b*E_b"
     if process_type == "homogeneous_michaelis_menten":
         return "r = Vmax * S / (Km + S), or explicit-enzyme equivalent when configured"
     if process_type == "ph_ionization_michaelis_menten":
@@ -1309,6 +1330,14 @@ def _mechanism_law(process_type: str) -> str:
 
 
 def _mechanism_state_variables(process_type: str) -> tuple[str, ...]:
+    if process_type in {"chain_endo_scission", "chain_exo_scission"}:
+        return ("chain_populations", "enzyme", "derived_chain_ends", "derived_solid_equivalents", "derived_soluble_equivalents")
+    if process_type == "peroxide_oxidative_cleavage":
+        return ("substrate", "peroxide", "enzyme", "oxidized_product_equivalents", "oxidative_cuts")
+    if process_type == "peroxide_inactivation":
+        return ("substrate", "peroxide", "enzyme", "inactive_enzyme")
+    if process_type == "adsorbed_enzyme_hydrolysis":
+        return ("solid_substrate", "product", "total_enzyme", "derived_free_enzyme", "derived_bound_enzyme")
     if process_type == "homogeneous_michaelis_menten":
         return ("substrate", "product", "enzyme_or_vmax")
     if process_type == "ph_ionization_michaelis_menten":
@@ -1393,6 +1422,9 @@ def _mechanism_limitations(
     *,
     pool_units: Sequence[str] = (),
 ) -> tuple[str, ...]:
+    if process_type == "adsorbed_enzyme_hydrolysis":
+        from fungal_model.processes.adsorption import ADSORPTION_LIMITATIONS
+        return ADSORPTION_LIMITATIONS
     if process_type == "homogeneous_michaelis_menten":
         return (
             "Well-mixed homogeneous process only.",
@@ -1495,6 +1527,32 @@ def _base_sample_columns(context: Mapping[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _sample_medium_rows(sample: EnsembleSample) -> Sequence[Mapping[str, Any]]:
+    data = yaml.safe_load(Path(sample.config_path).read_text(encoding="utf-8"))
+    return data.get("provenance", {}).get("medium", {}).get("rows", ()) if isinstance(data, Mapping) else ()
+
+
+def _read_mechanism_metrics(sample: EnsembleSample) -> list[dict[str, Any]]:
+    """Forward configured reductions; absence preserves legacy metric tables."""
+    path = Path(sample.output_directory) / "mechanism_metrics.json"
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    fields = {"metric_name", "value", "units", "status", "notes"}
+    if not isinstance(data, list) or any(not isinstance(row, dict) or set(row) != fields for row in data):
+        raise ValueError(f"{path}: expected the configured mechanism metric row schema.")
+    return data
+
+
+def _sample_oxygen_threshold(sample: EnsembleSample) -> Mapping[str, Any] | None:
+    data = yaml.safe_load(Path(sample.config_path).read_text(encoding="utf-8"))
+    definitions = data.get("metric_definitions", {}) if isinstance(data, Mapping) else {}
+    threshold = definitions.get("oxygen_threshold") if isinstance(definitions, Mapping) else None
+    if threshold is not None and not isinstance(threshold, Mapping):
+        raise ValueError("metric_definitions.oxygen_threshold must explicitly give value and units.")
+    return threshold
+
+
 def _state_roles(sample: EnsembleSample) -> dict[str, str]:
     config_path = Path(sample.config_path)
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -1583,7 +1641,7 @@ def _time_series_rows(
     initial_product = _initial_state_value(trajectory_rows, product_state)
     role_rates = _role_rate_observables(state_rate_rows, state_roles)
     rate_rows_by_index = _quantity_rows_by_index(rate_rows)
-    derived_rows_by_index = _quantity_rows_by_index(derived_rows)
+    derived_rows_by_index = _quantity_rows_by_index(derived_rows, preserve_undefined=True)
     for index, row in enumerate(trajectory_rows):
         base = {
             **_base_sample_columns(sample_context),
@@ -1683,6 +1741,9 @@ def _final_metric_rows(
     trajectory_rows: Sequence[Mapping[str, str]],
     state_rate_rows: Sequence[Mapping[str, str]] | None,
     state_roles: Mapping[str, str],
+    oxygen_threshold: Mapping[str, Any] | None = None,
+    medium_rows: Sequence[Mapping[str, Any]] = (),
+    mechanism_metrics: Sequence[Mapping[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     base = _base_sample_columns(sample_context)
     if not trajectory_rows:
@@ -1866,6 +1927,16 @@ def _final_metric_rows(
                     role_rate.metric_note,
                 )
             )
+    from fungal_model.api.culture_metrics import trajectory_metrics as culture_metrics
+    from fungal_model.api.ph_metrics import trajectory_metrics as ph_metrics
+    for metric in (*culture_metrics(trajectory_rows, state_roles, oxygen_threshold=oxygen_threshold),
+                   *ph_metrics(trajectory_rows, state_roles, medium_rows=medium_rows)):
+        rows.append(_metric_row(base, metric["metric_name"], metric["value"], metric["units"], metric["status"], metric["notes"]))
+    existing_names = {row["metric"] for row in rows}
+    for metric in mechanism_metrics:
+        if metric["metric_name"] not in existing_names:
+            rows.append(_metric_row(base, metric["metric_name"], metric["value"], metric["units"], metric["status"], metric["notes"]))
+            existing_names.add(metric["metric_name"])
     return rows
 
 
@@ -3375,7 +3446,7 @@ def _role_rate_time_series_row(
 
 
 def _quantity_rows_by_index(
-    rows: Sequence[Mapping[str, str]],
+    rows: Sequence[Mapping[str, str]], *, preserve_undefined: bool = False,
 ) -> dict[int, list[dict[str, Any]]]:
     output: dict[int, list[dict[str, Any]]] = {}
     for row in rows:
@@ -3385,12 +3456,13 @@ def _quantity_rows_by_index(
             continue
         name = str(row.get("name", ""))
         value = _optional_float(row.get("value"))
-        if not name or value is None:
+        undefined = preserve_undefined and str(row.get("value", "")).strip() == ""
+        if not name or (value is None and not undefined):
             continue
         output.setdefault(index, []).append(
             {
                 "name": name,
-                "value": value,
+                "value": "" if undefined else value,
                 "units": row.get("units", ""),
             }
         )
@@ -3398,6 +3470,16 @@ def _quantity_rows_by_index(
 
 
 def _derived_quantity_role(name: str) -> str:
+    adsorption_roles = {
+        "free_enzyme": "free_enzyme",
+        "bound_enzyme": "bound_enzyme",
+        "total_enzyme": "total_enzyme",
+        "bound_fraction": "enzyme_bound_fraction",
+        "bound_fraction_defined": "enzyme_bound_fraction_defined",
+        "enzyme_conservation_residual": "enzyme_conservation_residual",
+    }
+    if name.rsplit(".", 1)[-1] in adsorption_roles:
+        return adsorption_roles[name.rsplit(".", 1)[-1]]
     if ".activity." in name:
         return "thermodynamic_activity"
     if name.endswith((".reaction_quotient", ".log_reaction_quotient")):

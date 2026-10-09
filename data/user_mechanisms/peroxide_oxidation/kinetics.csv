@@ -1,0 +1,8 @@
+quantity,value,units,source
+kcat,0.5,1/second,Synthetic BIO-004 software benchmark only; no measured biological constants.
+peroxide_km,0.2,millimolar,Synthetic BIO-004 software benchmark only; no measured biological constants.
+substrate_km,1,millimolar,Synthetic BIO-004 software benchmark only; no measured biological constants.
+substrate_binding,0.8,millimolar,Synthetic BIO-004 software benchmark only; no measured biological constants.
+inactivation_constant,0.1,1/(millimolar*second),Synthetic BIO-004 software benchmark only; no measured biological constants.
+peroxide_decay_rate,0.01,1/second,Synthetic BIO-004 software benchmark only; no measured biological constants.
+product_yield,2,dimensionless,Synthetic BIO-004 software benchmark only; not biological measurements.

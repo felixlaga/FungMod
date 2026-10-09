@@ -115,8 +115,8 @@ def test_resolution_separates_modellable_from_merely_present_capability() -> Non
     assert "cellobiohydrolase" in resolution.modellable_enzyme_classes
     # REGISTRY-002: the hemicellulose and chitin classes have registry records (categorical metadata, no kinetics).
     assert {"endo_xylanase", "chitinase"} <= set(resolution.modellable_enzyme_classes)
-    # The oxidative LPMO is encoded but has no registry enzyme class: no implemented rate law exists for it.
-    assert "lytic_polysaccharide_monooxygenase" in resolution.capabilities_without_model
+    # BIO-004 adds a class and an explicit peroxide law; constants and co-substrate states are still required.
+    assert "lytic_polysaccharide_monooxygenase" in resolution.modellable_enzyme_classes
     assert set(resolution.modellable_enzyme_classes).isdisjoint(resolution.capabilities_without_model)
 
 
@@ -147,7 +147,7 @@ def test_resolution_refuses_explicitly_when_nothing_is_modellable() -> None:
 
     # REGISTRY-002: GH10 resolves to the endo_xylanase record now, so CE1 (acetyl xylan esterase, no record)
     # takes its place.
-    annotation = _annotation(organism="Serpula lacrymans", families=("AA9", "CE1", "AA2"))
+    annotation = _annotation(organism="Serpula lacrymans", families=("CE1", "AA2"))
     resolution = CapabilityResolver.from_registry().resolve(annotation)
 
     assert resolution.modellable_enzyme_classes == ()
@@ -155,7 +155,7 @@ def test_resolution_refuses_explicitly_when_nothing_is_modellable() -> None:
         resolution.require_modellable()
     message = str(excinfo.value)
     assert "Serpula lacrymans" in message
-    assert "lytic_polysaccharide_monooxygenase" in message
+    assert "acetyl_xylan_esterase" in message
     assert "Add a registry enzyme-class record" in message
 
 

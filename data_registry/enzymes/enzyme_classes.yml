@@ -258,3 +258,31 @@ records:
       complete hydrolysis). Kinetics come only from user data or a future curated
       record: the only process law listed is the apparent Michaelis-Menten law on a
       suspended solid, with no adsorption, surface or synergy law.
+
+  - record_id: endoglucanase
+    name: Endoglucanase
+    ec_number: 3.2.1.4
+    aliases: [endo-beta-1,4-glucanase, EC 3.2.1.4]
+    maturity: literature_metadata
+    provenance:
+      source: 'Niu et al. (2016), doi:10.1016/j.bej.2015.10.017, Eqs 12-14; CAZy GH5/GH12/GH45 activity records, checked 2026-10-09.'
+      confidence_level: literature_curated
+      notes: 'Family assignments are candidate capabilities only. Explicit finite-chain populations and sourced kinetic parameters are needed to run structural synergy.'
+    target_bond_classes: [beta_1_4_glycosidic]
+    compatible_substrate_classes: [cellulose_particulate, cellulose_film_generic]
+    compatible_processes: [chain_endo_scission]
+    notes: 'Sourced finite-chain random-scission mechanism is software_tested; enzyme metadata does not provide biological constants. No stalling synergy is represented.'
+
+  - record_id: lytic_polysaccharide_monooxygenase
+    name: Lytic polysaccharide monooxygenase
+    ec_number: 1.14.99.53
+    aliases: [LPMO, EC 1.14.99.53, '1.14.99.54', EC 1.14.99.54, '1.14.99.56', EC 1.14.99.56]
+    maturity: literature_metadata
+    provenance:
+      source: 'Kuusk et al. (2018), doi:10.1074/jbc.M117.817593, Eqs 4-5; CAZy AA9/AA10 characterized enzyme tables, checked 2026-10-09.'
+      confidence_level: literature_curated
+      notes: 'EC 1.14.99.53 denotes chitin, 1.14.99.54 cellulose C1 and 1.14.99.56 cellulose C4 activity. Shared class membership does not establish substrate specificity for any individual enzyme.'
+    target_bond_classes: [beta_1_4_glycosidic, beta_1_4_n_acetylglucosaminidic]
+    compatible_substrate_classes: [chitin, cellulose_particulate, cellulose_film_generic]
+    compatible_processes: [peroxide_oxidative_cleavage]
+    notes: 'Requires primed enzyme, explicit peroxide and sourced ternary-law parameters and product yield. No hidden oxygen-driven or reductant-driven route. Starch and hemicellulose activities are not enabled by this record.'

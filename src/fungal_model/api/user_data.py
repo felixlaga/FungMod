@@ -155,6 +155,7 @@ import hashlib
 import io
 import math
 import re
+from copy import deepcopy
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
@@ -164,6 +165,7 @@ from typing import Any, TypeVar, cast
 
 import yaml
 
+from fungal_model.api.user_data_uptake import UPTAKE_QUANTITIES, OXYGEN_CULTURE_QUANTITIES, AERATION_QUANTITIES, augment_uptake_template
 from fungal_model.capability.dbcan import TOOL_COLUMNS, DbcanOverview, parse_overview
 from fungal_model.capability.uniprot import (
     CLAIM_BOUNDARY as UNIPROT_CLAIM_BOUNDARY,
@@ -186,6 +188,12 @@ from fungal_model.capability.resolution import (
     default_family_map_path,
 )
 from fungal_model.core.provenance import ProvenanceError
+from fungal_model.api.user_data_adsorption import (
+    ADSORPTION_QUANTITIES, ADSORPTION_PARAMETER_ROLES, ADSORPTION_DISSOCIATION_PARAMETER_ROLES,
+    adsorption_units_error, adsorption_case_unit_errors,
+)
+from fungal_model.processes.adsorption import ADSORPTION_LIMITATIONS, ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE
+from fungal_model.capability.mechanism_scope import legacy_annotation_registry, requires_explicit_mechanism_tables
 from fungal_model.core.units import ASSAY_BASE_UNITS, Q_, units_are_compatible
 from fungal_model.kinetics.arrhenius import arrhenius_reference_scaled_rate
 from fungal_model.kinetics.cardinal import cardinal_ph_activity, cardinal_temperature_activity
@@ -347,6 +355,7 @@ _COMPOSITE_PHYSICAL_STATES = frozenset({"mixed_solid", "solid_biomass"})
 REACTIVITY_EXPONENT_ROLE = "reactivity_exponent"
 
 KINETIC_QUANTITIES = (
+    *ADSORPTION_QUANTITIES,
     "km",
     "kcat",
     "substrate_initial_concentration",
@@ -384,6 +393,7 @@ PH_IONIZATION_QUANTITIES = (
     "ph_max",
 )
 _QUANTITY_ROLE = {
+    **{quantity: quantity for quantity in ADSORPTION_QUANTITIES},
     "km": "km",
     "kcat": "kcat",
     "substrate_initial_concentration": "substrate_initial_concentration",
@@ -405,7 +415,7 @@ _CONCENTRATION_QUANTITIES = ("substrate_initial_concentration", "km", "enzyme_co
 # Quantities that are kinetic constants measured at a condition; a bound
 # response law rescales them, so they must be stated at its reference condition.
 _KINETIC_CONSTANT_QUANTITIES = frozenset(
-    {"km", "kcat", "vmax", "specific_activity", "assay_activity", "kcat_limiting", "km_limiting"}
+    {"km", "kcat", "vmax", "specific_activity", "assay_activity", "kcat_limiting", "km_limiting", *ADSORPTION_QUANTITIES}
 )
 # The constants a bound response law requires at its reference condition: the kinetic constants and, in an enzyme
 # network, the competitive inhibition constant of the process (like Km, a constant of the rate at that condition).
@@ -419,7 +429,7 @@ _PK_PAIRS = (
 _PH_RANGE_QUANTITIES = ("ph_min", "ph_max")
 _DIMENSIONLESS_QUANTITIES = frozenset({*(name for pair in _PK_PAIRS for name in pair[:2]), *_PH_RANGE_QUANTITIES})
 _RATE_CONSTANT_QUANTITIES = frozenset({"kcat", "kcat_limiting"})
-_POSITIVE_QUANTITIES = frozenset({"km", "km_limiting", "ki"})
+_POSITIVE_QUANTITIES = frozenset({"km", "km_limiting", "ki", "adsorption_constant", "adsorption_dissociation_constant"})
 _PH_SCALE = (0.0, 14.0)
 _YIELD_BASIS = "mol/mol"
 _YIELD_BASIS_BY_STATE = MappingProxyType(
@@ -438,33 +448,42 @@ _NO = "no"
 RATE_FORM_KCAT = "kcat_enzyme"
 RATE_FORM_VMAX = "vmax"
 RATE_FORM_PH_IONIZATION = "ph_ionization"
+RATE_FORM_ADSORPTION = "adsorbed_enzyme"
+RATE_FORM_ADSORPTION_KD = "adsorbed_enzyme_dissociation"
+_ADSORPTION_FORMS = frozenset({RATE_FORM_ADSORPTION, RATE_FORM_ADSORPTION_KD})
 _FORM_ROLES = {
+    RATE_FORM_ADSORPTION: ADSORPTION_PARAMETER_ROLES,
+    RATE_FORM_ADSORPTION_KD: ADSORPTION_DISSOCIATION_PARAMETER_ROLES,
     RATE_FORM_KCAT: HOMOGENEOUS_MM_PARAMETER_ROLES,
     RATE_FORM_VMAX: HOMOGENEOUS_MM_VMAX_PARAMETER_ROLES,
     RATE_FORM_PH_IONIZATION: PH_IONIZATION_MM_PARAMETER_ROLES,
 }
 _FORM_QUANTITIES = {form: tuple(_ROLE_QUANTITY[role] for role in roles) for form, roles in _FORM_ROLES.items()}
 _FORM_PROCESS_TYPE = {
+    **{form: ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE for form in _ADSORPTION_FORMS},
     RATE_FORM_KCAT: USER_DATASET_PROCESS_TYPE,
     RATE_FORM_VMAX: USER_DATASET_PROCESS_TYPE,
     RATE_FORM_PH_IONIZATION: USER_DATASET_PH_IONIZATION_PROCESS_TYPE,
 }
 # Forms in the order a pair-level conflict names them: the first present is the reference.
-_FORM_ORDER = (RATE_FORM_KCAT, RATE_FORM_VMAX, RATE_FORM_PH_IONIZATION)
-_FORM_LABEL = {RATE_FORM_KCAT: "kcat", RATE_FORM_VMAX: "Vmax", RATE_FORM_PH_IONIZATION: "pH-ionization"}
+_FORM_ORDER = (RATE_FORM_KCAT, RATE_FORM_VMAX, RATE_FORM_PH_IONIZATION, RATE_FORM_ADSORPTION, RATE_FORM_ADSORPTION_KD)
+_FORM_LABEL = {RATE_FORM_ADSORPTION: "adsorption (K)", RATE_FORM_ADSORPTION_KD: "adsorption (Kd)", RATE_FORM_KCAT: "kcat", RATE_FORM_VMAX: "Vmax", RATE_FORM_PH_IONIZATION: "pH-ionization"}
 # Forms with an explicit enzyme state.
-_ENZYME_FORMS = frozenset({RATE_FORM_KCAT, RATE_FORM_PH_IONIZATION})
+_ENZYME_FORMS = frozenset({RATE_FORM_KCAT, RATE_FORM_PH_IONIZATION, *_ADSORPTION_FORMS})
 _PROCESS_LABEL = {
+    ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE: "adsorbed-enzyme hydrolysis",
     USER_DATASET_PROCESS_TYPE: "homogeneous Michaelis-Menten",
     USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "pH-ionization Michaelis-Menten",
     USER_DATASET_CULTURE_PROCESS_TYPE: "culture physiology",
     USER_DATASET_NETWORK_PROCESS_TYPE: "enzyme network",
 }
 _PROCESS_SENTENCE_LABEL = {
+    ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE: "Adsorbed-enzyme hydrolysis",
     USER_DATASET_PROCESS_TYPE: "Homogeneous Michaelis-Menten",
     USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "pH-ionization Michaelis-Menten",
 }
 _PROCESS_ID_SUFFIX = {
+    ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE: "adsorbed_enzyme",
     USER_DATASET_PROCESS_TYPE: "homogeneous_mm",
     USER_DATASET_PH_IONIZATION_PROCESS_TYPE: "ph_ionization_mm",
 }
@@ -524,9 +543,6 @@ _RETIRED_QUANTITY_HINTS = {
 # substrates.csv columns. Each maps to what it describes.
 _SURFACE_LAW_QUANTITIES = MappingProxyType(
     {
-        "adsorption_constant": "an adsorption (Langmuir) constant",
-        "adsorption_dissociation_constant": "an adsorption dissociation constant",
-        "binding_capacity": "an enzyme binding capacity",
         "accessible_surface_area": "an accessible surface area",
         "specific_surface_area": "a specific surface area",
         "surface_rate_constant": "a surface rate constant",
@@ -545,11 +561,9 @@ _SURFACE_LAW_SUBSTRATE_COLUMNS = MappingProxyType(
     }
 )
 _SURFACE_LAW_LIMIT = (
-    "no rate law of the user-data route reads it in this version: a solid substrate runs the apparent "
-    "Michaelis-Menten law on its dry mass per volume (km with kcat and an enzyme concentration or enzyme_dose, or "
-    "vmax, and optionally reactivity_exponent). Adsorption, binding capacity and surface area enter with the law "
-    "that consumes them (a Langmuir surface law is a later increment), and FungMod does not store a value no law "
-    "uses."
+    "no rate law consumes this morphology input. M1 accepts binding_capacity, adsorption_constant or "
+    "adsorption_dissociation_constant and bound_rate_constant as kinetics.csv rows for solid_polymer dry-mass "
+    "substrates; area, crystallinity and particle size remain refused. FungMod does not store a value no law uses."
 )
 # Quantities refused on a solid substrate, with the reason.
 _SOLID_REFUSED_QUANTITIES = MappingProxyType(
@@ -590,6 +604,7 @@ _SOLID_REFUSED_QUANTITIES = MappingProxyType(
 # Quantities that only a solid substrate on a dry-mass basis can carry, with the reason.
 _SOLID_ONLY_QUANTITIES = MappingProxyType(
     {
+        **{quantity: "Adsorption requires a solid_polymer substrate on a dry_mass basis." for quantity in ADSORPTION_QUANTITIES},
         "enzyme_dose": (
             "enzyme_dose is an enzyme amount per substrate mass and applies only to a solid_polymer substrate on a "
             "dry-mass basis; give a dissolved substrate's enzyme as enzyme_concentration."
@@ -620,9 +635,10 @@ _GENOME_CLAIM_BOUNDARY = (
 
 TIMECOURSE_TABLE = "timecourse.csv"
 # Measured observables of a time course and the case-template state role each one measures.
-TIMECOURSE_OBSERVABLES = ("substrate", "product")
+TIMECOURSE_OBSERVABLES = ("substrate", "product", "soluble_sugar", "biomass", "dissolved_oxygen")
 
 CULTURE_TABLE = "culture.csv"
+AERATION_TABLE = "aeration.csv"
 # Quantities of a culture as a whole (enzyme_class blank) ...
 CULTURE_LEVEL_QUANTITIES = (
     "substrate_initial_concentration",
@@ -631,16 +647,19 @@ CULTURE_LEVEL_QUANTITIES = (
     "biomass_loss_rate",
     "induction_half_saturation",
 )
+_BASE_CULTURE_LEVEL_QUANTITIES = CULTURE_LEVEL_QUANTITIES
+CULTURE_LEVEL_QUANTITIES = (*CULTURE_LEVEL_QUANTITIES, *UPTAKE_QUANTITIES, *OXYGEN_CULTURE_QUANTITIES, *AERATION_QUANTITIES, "release_yield")
 # ... of the enzyme pool that consumes the substrate (enzyme_class: that pool's class) ...
 CULTURE_CONSUMPTION_QUANTITIES = ("hydrolysis_capacity", "hydrolysis_half_saturation")
 # ... and of every enzyme pool (enzyme_class: the pool's class).
 CULTURE_POOL_QUANTITIES = ("initial_enzyme_concentration", "specific_production_rate", "enzyme_loss_rate")
-CULTURE_QUANTITIES = (*CULTURE_LEVEL_QUANTITIES, *CULTURE_CONSUMPTION_QUANTITIES, *CULTURE_POOL_QUANTITIES)
+CULTURE_QUANTITIES = (*(quantity for quantity in CULTURE_LEVEL_QUANTITIES if quantity != "release_yield"), *CULTURE_CONSUMPTION_QUANTITIES, *CULTURE_POOL_QUANTITIES)
 # culture.csv carries measured, literature, design and estimated values; fit_user_dataset fits no culture constant.
 CULTURE_EVIDENCE_TYPES = ("measured", "literature", "design", "estimate")
 # The template role each culture-level and consumption quantity binds; a pool quantity binds "<quantity>__<class>".
 _CULTURE_ROLE = MappingProxyType(
     {
+        **{q: q for q in (*UPTAKE_QUANTITIES, *OXYGEN_CULTURE_QUANTITIES, *AERATION_QUANTITIES, "release_yield")},
         "substrate_initial_concentration": "initial_substrate",
         "initial_biomass": "initial_biomass",
         "biomass_yield": "biomass_yield",
@@ -658,7 +677,7 @@ _CULTURE_DRY_MASS_QUANTITIES = frozenset(
 )
 
 _REQUIRED_TABLES = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv", "kinetics.csv")
-_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv", GENOME_TABLE, TIMECOURSE_TABLE, CULTURE_TABLE)
+_OPTIONAL_TABLES = ("enzyme_classes.csv", "responses.csv", GENOME_TABLE, TIMECOURSE_TABLE, CULTURE_TABLE, AERATION_TABLE, "medium.csv")
 _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "strains.csv": (("strain_id", "name"), ("scientific_name", "aliases")),
     "enzymes.csv": (("strain_id", "enzyme_class", "evidence", "source"), ()),
@@ -710,6 +729,7 @@ _TABLE_COLUMNS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("enzyme_class", "value", "lower", "upper", "method", "sd", "replicates"),
     ),
 }
+_TABLE_COLUMNS[AERATION_TABLE] = _TABLE_COLUMNS[CULTURE_TABLE]
 # Columns a table refuses with a specific reason instead of the generic unsupported-column message.
 _REFUSED_COLUMNS: Mapping[str, Mapping[str, str]] = MappingProxyType({"substrates.csv": _SURFACE_LAW_SUBSTRATE_COLUMNS})
 _TABLES_WITH_ROWS_REQUIRED = ("strains.csv", "enzymes.csv", "substrates.csv", "conditions.csv")
@@ -846,6 +866,9 @@ RESPONSE_LAWS: Mapping[str, ResponseLaw] = MappingProxyType(
                 reference_parameter="reference_temperature",
                 formula="rate(T) = rate(T_ref) x exp(-Ea / R x (1/T - 1/T_ref))",
             ),
+            ResponseLaw(law="oxygen_monod", label="state-driven oxygen Monod limitation",
+                parameters=(ResponseLawParameter("half_saturation", "oxygen half-saturation", "mmol/L", "an oxygen amount per volume"),),
+                reference_parameter="half_saturation", formula="rate = oxygen-unlimited rate * O/(K_O+O)"),
             ResponseLaw(
                 law=INACTIVATION_LAW,
                 label="Arrhenius law of the first-order inactivation constant",
@@ -1214,6 +1237,12 @@ def load_user_dataset(
             issues=issues,
         )
     context = _Context(base=base, issues=issues)
+    if "medium.csv" in raw_files:
+        from fungal_model.api.user_data_medium import validate_medium_rows
+        try:
+            context.medium_rows = validate_medium_rows(list(csv.DictReader(io.StringIO(raw_files["medium.csv"].decode("utf-8-sig")))))
+        except (ValueError, KeyError, TypeError) as exc:
+            context.add("medium.csv", None, None, str(exc))
     parsed = _parse_rows(tables, context, directory=directory)
     if parsed is not None:
         parsed.network_entries = _network_entry_ids(manifest)
@@ -1270,6 +1299,7 @@ def load_user_dataset(
 class _Context:
     base: FungModRegistry
     issues: list[dict[str, Any]]
+    medium_rows: list[dict[str, Any]] = field(default_factory=list)
 
     def add(self, file: str, row: int | None, column: str | None, message: str) -> None:
         self.issues.append(_issue(file, row, column, message))
@@ -1634,6 +1664,7 @@ class _CultureRow:
     source: str
     sd: float | None
     replicates: int | None
+    file: str = "culture.csv"
 
     @property
     def culture_key(self) -> tuple[str, str]:
@@ -1665,6 +1696,9 @@ class _CulturePair:
     pools: tuple[str, ...]
     pool_rows: Mapping[str, int | None]
     consumers: tuple[str, ...] = ()
+    uptake: bool = False
+    oxygen: bool = False
+    oxygen_response_pools: tuple[str, ...] = ()
 
     @property
     def started(self) -> bool:
@@ -2098,6 +2132,10 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context, *, direc
             context=context,
         )
     )
+    aeration_table = tables.get(AERATION_TABLE)
+    if aeration_table is not None:
+        culture_rows.extend(_parse_culture(aeration_table, strains=strains, classes=classes, strain_classes=strain_classes,
+            substrates=substrates, conditions=conditions, resolver=resolver, context=context))
     responses_table = tables.get("responses.csv")
     responses = (
         []
@@ -2110,8 +2148,31 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context, *, direc
             substrates=substrates,
             resolver=resolver,
             context=context,
+            oxygen_culture_cases={row.culture_key for row in culture_rows if row.quantity == "initial_dissolved_oxygen"},
         )
     )
+    retained_responses = []
+    for response in responses:
+        if response.law != "oxygen_monod":
+            retained_responses.append(response)
+            continue
+        matching = [row for row in culture_rows if row.culture_key == (response.strain_id, response.substrate_id)]
+        if not any(row.quantity == "initial_dissolved_oxygen" for row in matching):
+            context.add("responses.csv", response.row, "law", "oxygen_monod requires a dissolved-oxygen state: bind an uptake culture and aeration.csv with initial_dissolved_oxygen.")
+            continue
+        if not any(row.class_key == response.class_key and row.quantity in CULTURE_CONSUMPTION_QUANTITIES for row in matching):
+            context.add("responses.csv", response.row, "enzyme_class", "oxygen_monod must name an existing consuming enzyme pool in culture.csv.")
+            continue
+        if not response.kinetics_at_reference:
+            context.add("responses.csv", response.row, "kinetics_at_reference", "oxygen_monod requires kinetics_at_reference=yes to declare that the culture's hydrolysis capacity is the oxygen-unlimited capacity; no finite reference oxygen is inferred.")
+        if response.value <= 0:
+            context.add("responses.csv", response.row, "value", "oxygen_monod half_saturation must be positive.")
+        for condition_id in dict.fromkeys(row.condition_id for row in matching):
+            culture_rows.append(_CultureRow(row=response.row, file="responses.csv", strain_id=response.strain_id, substrate_id=response.substrate_id,
+                condition_id=condition_id, quantity="oxygen_response_half_saturation", class_key=response.class_key,
+                value=response.value, lower=None, upper=None, units=response.units, evidence_type=response.evidence_type,
+                method=response.method, source=response.source, sd=None, replicates=None))
+    responses = retained_responses
     timecourse_table = tables.get(TIMECOURSE_TABLE)
     timecourses = (
         []
@@ -2127,6 +2188,7 @@ def _parse_rows(tables: Mapping[str, _Table | None], context: _Context, *, direc
             resolver=resolver,
             context=context,
             cultured={row.culture_key: row.row for row in reversed(culture_rows)},
+            culture_rows=culture_rows,
         )
     )
     return _Parsed(
@@ -2247,6 +2309,9 @@ def _resolve_class(
             f"enzyme_class {text!r} is neither a registry enzyme class (ID, name, alias or EC number) "
             "nor a class_id defined in enzyme_classes.csv.",
         )
+        return None
+    if requires_explicit_mechanism_tables(context.base.get_enzyme_class(resolved.record_id)):
+        context.add(file, line, "enzyme_class", f"Enzyme class {text!r} requires explicit chain populations or peroxide states. Use fungmod assemble-mechanisms with mechanism.yml, states.csv and kinetics.csv; ordinary enzyme tables cannot substitute a homogeneous hydrolysis law.")
         return None
     return _registry_class_info(resolved.record_id, classes=classes, context=context)
 
@@ -2398,7 +2463,7 @@ def _parse_genomes(
             try:
                 resolver = CapabilityResolver(
                     family_map=CazymeFamilyMap.load(),
-                    registry_enzyme_classes=tuple(sorted(context.base.enzyme_classes)),
+                    registry_enzyme_classes=tuple(sorted(legacy_annotation_registry(context.base).enzyme_classes)),
                 )
                 family_map_sha256 = hashlib.sha256(default_family_map_path().read_bytes()).hexdigest()
             except (OSError, yaml.YAMLError, CapabilityResolutionError, ProvenanceError) as exc:
@@ -2596,7 +2661,7 @@ def _parse_proteome_row(
     try:
         resolver = CapabilityResolver(
             family_map=CazymeFamilyMap.load(),
-            registry_enzyme_classes=tuple(sorted(context.base.enzyme_classes)),
+            registry_enzyme_classes=tuple(sorted(legacy_annotation_registry(context.base).enzyme_classes)),
         )
         family_map_sha256 = hashlib.sha256(default_family_map_path().read_bytes()).hexdigest()
     except (OSError, yaml.YAMLError, CapabilityResolutionError, ProvenanceError) as exc:
@@ -2607,7 +2672,7 @@ def _parse_proteome_row(
         resolution = resolve_uniprot_proteome(
             proteome,
             capability_resolver=resolver,
-            registry=context.base,
+            registry=legacy_annotation_registry(context.base),
             organism=strains[strain_id].name,
             proteome_source=source,
             annotation_tool=tool_name,
@@ -2852,8 +2917,8 @@ def _parse_substrates(table: _Table, resolver: RegistryResolver, context: _Conte
             physical_state=physical_state,
             amount_basis=_AMOUNT_BASIS[physical_state],
             yield_units=yield_units,
-            yield_evidence_type=row.get(YIELD_EVIDENCE_COLUMN, "") if yield_units else "",
-            yield_method=row.get(YIELD_METHOD_COLUMN, "") if yield_units else "",
+            yield_evidence_type=row.get(YIELD_EVIDENCE_COLUMN, ""),
+            yield_method=row.get(YIELD_METHOD_COLUMN, ""),
         )
     return substrates
 
@@ -2872,8 +2937,9 @@ def _unit_bearing_yield_units(row: Mapping[str, str], state: str) -> str:
 def _yield_evidence_ok(row: Mapping[str, str], *, unit_bearing: bool, file: str, line: int, context: _Context) -> bool:
     """A unit-bearing yield states its evidence type (and a method for measured or literature values); no other row.
 
-    The pure-number yields (g/g, mol/mol) stay template constants that do not
-    set the mode, as before, so their rows leave both columns blank.
+    Dissolved mol/mol yields retain their template-constant contract. A dry-mass
+    g/g yield may carry evidence for an explicitly requested uptake culture;
+    the culture/network cross-check enforces that additional context.
     """
 
     evidence = row.get(YIELD_EVIDENCE_COLUMN, "")
@@ -2881,18 +2947,18 @@ def _yield_evidence_ok(row: Mapping[str, str], *, unit_bearing: bool, file: str,
     if not unit_bearing and row.get("yield_basis", "") not in _YIELD_BASIS_BY_STATE.values():
         # The yield_basis itself is refused (with the reason) by the basis check; its evidence is not judged.
         return True
-    if not unit_bearing:
+    if not unit_bearing and row.get("yield_basis", "") != _SOLID_YIELD_BASIS:
         filled = [column for column, value in ((YIELD_EVIDENCE_COLUMN, evidence), (YIELD_METHOD_COLUMN, method)) if value]
         for column in filled:
             context.add(
-                file,
-                line,
-                column,
-                f"{column} applies to a unit-bearing yield only (an amount of product per dry mass of a solid, for "
-                "example mmol/g, on an enzyme-network link). A g/g or mol/mol yield is a template constant that does "
-                "not set the mode in this version; leave the column blank.",
+                file, line, column,
+                f"{column} applies to a unit-bearing yield only (an amount of product per dry mass of a solid, "
+                "for example mmol/g, on an enzyme-network link). A dissolved mol/mol yield remains a template "
+                "constant; leave the column blank.",
             )
         return not filled
+    if not unit_bearing and not evidence and not method:
+        return True
     if evidence not in YIELD_EVIDENCE_TYPES:
         stated = "is blank" if not evidence else f"is {evidence!r}"
         context.add(
@@ -3158,6 +3224,8 @@ def _parse_kinetics(
     file = table.name
     declared = {(item.strain_id, item.class_key) for item in strain_classes}
     rows: list[_Kinetics] = []
+    adsorption_cases = {tuple(row.get(key, "") for key in ("strain_id", "enzyme_class", "substrate_id", "condition_id"))
+                        for _, row in table.rows if row.get("quantity") in ADSORPTION_QUANTITIES}
     for line, row in table.rows:
         quantity = _required_text(row, "quantity", file=file, line=line, context=context)
         if quantity is not None and quantity not in KINETIC_QUANTITIES:
@@ -3208,7 +3276,10 @@ def _parse_kinetics(
                 substrate_id = None
         units = _required_text(row, "units", file=file, line=line, context=context)
         if units is not None and quantity is not None:
-            message = _quantity_units_error(quantity, units, solid=solid)
+            adsorption_case = tuple(row.get(key, "") for key in ("strain_id", "enzyme_class", "substrate_id", "condition_id")) in adsorption_cases
+            message = (adsorption_units_error(quantity, units, solid=solid)
+                       if adsorption_case and quantity == "enzyme_concentration"
+                       else _quantity_units_error(quantity, units, solid=solid))
             if message is not None:
                 context.add(file, line, "units", message)
                 units = None
@@ -3367,6 +3438,9 @@ def _parse_culture(
     rows: list[_CultureRow] = []
     for line, row in table.rows:
         quantity = _required_text(row, "quantity", file=file, line=line, context=context)
+        if quantity == "release_yield" or (file == AERATION_TABLE and quantity not in AERATION_QUANTITIES) or (file == CULTURE_TABLE and quantity in AERATION_QUANTITIES):
+            context.add(file, line, "quantity", "Release yield belongs in substrates.csv; aeration quantities belong in aeration.csv and culture quantities in culture.csv.")
+            quantity = None
         if quantity is not None and quantity not in CULTURE_QUANTITIES:
             context.add(file, line, "quantity", _unsupported_culture_quantity_text(quantity))
             quantity = None
@@ -3475,6 +3549,7 @@ def _parse_culture(
         rows.append(
             _CultureRow(
                 row=line,
+                file=file,
                 strain_id=strain_id,
                 substrate_id=substrate_id,
                 condition_id=condition_id,
@@ -3515,8 +3590,17 @@ def _culture_units_error(quantity: str, units: str) -> str | None:
     error = _unit_parse_error(units)
     if error is not None:
         return f"units {units!r} cannot be parsed: {error}"
+    if quantity in (*UPTAKE_QUANTITIES, *OXYGEN_CULTURE_QUANTITIES, *AERATION_QUANTITIES):
+        expected = {
+            "uptake_capacity": ("1/h", "mmol/g/h"), "maintenance_demand": ("1/h", "mmol/g/h"),
+            "uptake_half_saturation": ("g/L", "mmol/L"), "initial_soluble_sugar": ("g/L", "mmol/L"),
+            "oxygen_half_saturation": ("mmol/L",), "oxygen_yield": ("mmol/g",),
+            "oxygen_maintenance": ("mmol/g", "mmol/mmol"), "kla": ("1/h",),
+            "oxygen_saturation": ("mmol/L",), "initial_dissolved_oxygen": ("mmol/L",),
+        }[quantity]
+        return None if any(units_are_compatible(units, target) for target in expected) else f"{quantity} units {units!r} require one of {expected}."
     if quantity == "biomass_yield":
-        if _unit_dimension_error(units, _DIMENSIONLESS_REFERENCE_UNITS) is None:
+        if units_are_compatible(units, "g/mmol") or _unit_dimension_error(units, _DIMENSIONLESS_REFERENCE_UNITS) is None:
             return None
         return (
             f"biomass_yield units {units!r} must be dimensionless (write g/g or dimensionless): grams of biomass dry "
@@ -3598,13 +3682,13 @@ def _culture_value_bounds(
     value, lower, upper = values
     smallest = value if value is not None else lower
     largest = value if value is not None else upper
-    if quantity == "biomass_yield" and units is not None and largest is not None:
+    if quantity == "biomass_yield" and units is not None and largest is not None and units_are_compatible(units, "dimensionless"):
         largest = float(Q_(largest, units).to("dimensionless").magnitude)
     column = "value" if value is not None else "lower"
-    if quantity in _CULTURE_POSITIVE_QUANTITIES and smallest is not None and smallest <= 0.0:
+    if quantity in (_CULTURE_POSITIVE_QUANTITIES | {"uptake_half_saturation", "oxygen_half_saturation"}) and smallest is not None and smallest <= 0.0:
         context.add(file, line, column, f"{quantity} must be positive.")
         return None
-    if quantity == "biomass_yield" and largest is not None and largest > 1.0:
+    if quantity == "biomass_yield" and units is not None and units_are_compatible(units, "dimensionless") and largest is not None and largest > 1.0:
         context.add(
             file,
             line,
@@ -3625,6 +3709,7 @@ def _parse_responses(
     substrates: Mapping[str, _Substrate],
     resolver: RegistryResolver,
     context: _Context,
+    oxygen_culture_cases: set[tuple[str, str]] | None = None,
 ) -> list[_Response]:
     file = table.name
     declared = {(item.strain_id, item.class_key) for item in strain_classes}
@@ -3656,6 +3741,9 @@ def _parse_responses(
             )
             substrate_id = None
         law = _required_text(row, "law", file=file, line=line, context=context)
+        if law == "oxygen_monod" and (strain_id, substrate_id) not in (oxygen_culture_cases or set()):
+            context.add(file, line, "law", "responses.csv supports only static temperature/pH laws for this case; oxygen_monod requires an uptake culture with a dissolved-oxygen state and aeration.csv.")
+            law = None
         if law is not None and law not in RESPONSE_LAWS:
             if law in ENVIRONMENT_MODIFIER_TYPES:
                 message = (
@@ -3769,23 +3857,25 @@ def _parse_timecourses(
     resolver: RegistryResolver,
     context: _Context,
     cultured: Mapping[tuple[str, str], int] | None = None,
+    culture_rows: Sequence[_CultureRow] = (),
 ) -> list[_TimecourseRow]:
     """Read timecourse.csv: substrate remaining or product formed over time in declared cases.
 
     Every reference must be declared, and the enzyme class must be declared for
     the strain and able to act on the substrate. Times are finite, zero or
-    positive, in a time unit; values are finite concentrations in amount per
-    volume, the kind of the case's state units (the mol/mol yield works on
-    amounts, so a mass concentration would need a molar mass). ``sd`` is
-    positive when given, in the row's units. One series (case and observable)
-    uses one time unit and one value unit and lists each time once. A strain
-    and substrate with a culture in ``culture.csv`` (``cultured``: the first
-    culture row of each) have culture cases, whose time courses are refused.
+    positive, in a time unit. Assay observables use amount per volume;
+    uptake-culture observables use the units of their explicitly bound pools.
+    No molar-mass conversion is inferred. ``sd`` is positive when given, in
+    the row's units. Each series uses one time unit and one value unit and
+    lists each time once. Legacy cultures without uptake retain their earlier
+    refusal; uptake cultures support comparison, but no culture-parameter fit.
     """
 
     file = table.name
     declared = {(item.strain_id, item.class_key) for item in strain_classes}
     cultured = cultured or {}
+    uptake_cases = {row.culture_key for row in culture_rows if row.quantity in UPTAKE_QUANTITIES}
+    culture_units = {(row.strain_id, row.substrate_id, row.condition_id, row.quantity): row.units for row in culture_rows if not row.class_key}
     case_rows: dict[tuple[str, str, str, str], _Kinetics] = {}
     for kinetic in kinetics:
         if kinetic.quantity in _CONCENTRATION_QUANTITIES:
@@ -3818,7 +3908,7 @@ def _parse_timecourses(
                 "produce this time course.",
             )
             substrate_id = None
-        if substrate_id is not None and strain_id is not None and (strain_id, substrate_id) in cultured:
+        if substrate_id is not None and strain_id is not None and (strain_id, substrate_id) in cultured and (strain_id, substrate_id) not in uptake_cases:
             context.add(
                 file,
                 line,
@@ -3831,7 +3921,7 @@ def _parse_timecourses(
                 "culture and compare it outside FungMod, or leave its rows out of timecourse.csv.",
             )
             substrate_id = None
-        if substrate_id is not None and substrates[substrate_id].is_solid:
+        if substrate_id is not None and substrates[substrate_id].is_solid and (strain_id, substrate_id) not in uptake_cases:
             context.add(
                 file,
                 line,
@@ -3843,6 +3933,13 @@ def _parse_timecourses(
             )
             substrate_id = None
         observable = _required_text(row, "observable", file=file, line=line, context=context)
+        is_uptake = (strain_id, substrate_id) in uptake_cases
+        if is_uptake and observable == "product":
+            context.add(file, line, "observable", "An uptake culture measures the soluble_sugar pool, not cumulative product formed; use soluble_sugar.")
+            observable = None
+        if not is_uptake and observable in {"soluble_sugar", "biomass", "dissolved_oxygen"}:
+            context.add(file, line, "observable", "observable must be one of substrate, product for an enzyme assay; this observable requires an explicitly bound uptake culture state.")
+            observable = None
         if observable is not None and observable not in TIMECOURSE_OBSERVABLES:
             context.add(
                 file,
@@ -3870,7 +3967,21 @@ def _parse_timecourses(
                 if strain_id is None or class_key is None or substrate_id is None or condition_id is None
                 else case_rows.get((strain_id, class_key, substrate_id, condition_id))
             )
-            problem = _timecourse_units_problem(units, case_row)
+            if is_uptake:
+                quantity = {"substrate": "substrate_initial_concentration", "soluble_sugar": "initial_soluble_sugar", "biomass": "initial_biomass", "dissolved_oxygen": "initial_dissolved_oxygen"}.get(observable or "")
+                expected = (
+                    culture_units.get((strain_id, substrate_id, condition_id, quantity))
+                    if strain_id is not None and substrate_id is not None
+                    and condition_id is not None and quantity is not None
+                    else None
+                )
+                problem = (
+                    None if expected is not None and units_are_compatible(units, expected)
+                    else f"Timecourse units require the explicit {quantity} state units of this culture "
+                    f"({expected or 'state not bound'})."
+                )
+            else:
+                problem = _timecourse_units_problem(units, case_row)
             if problem is not None:
                 context.add(file, line, "units", problem)
                 units = None
@@ -4443,6 +4554,8 @@ def _quantity_units_error(quantity: str, units: str, *, solid: bool = False) -> 
     error = _unit_parse_error(units)
     if error is not None:
         return f"units {units!r} cannot be parsed: {error}"
+    if quantity in ADSORPTION_QUANTITIES:
+        return adsorption_units_error(quantity, units, solid=solid)
     if quantity == "reactivity_exponent":
         if _unit_dimension_error(units, _DIMENSIONLESS_REFERENCE_UNITS) is not None:
             return (
@@ -4925,6 +5038,9 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
             pools=tuple(pools),
             pool_rows=MappingProxyType(dict(pools)),
             consumers=consumers if len(consumers) > 1 else (),
+            uptake=any(row.substrate_id == pair[1] and row.quantity in UPTAKE_QUANTITIES for row in parsed.culture_rows),
+            oxygen=any(row.substrate_id == pair[1] and row.quantity in (*OXYGEN_CULTURE_QUANTITIES, *AERATION_QUANTITIES) for row in parsed.culture_rows),
+            oxygen_response_pools=tuple(dict.fromkeys(row.class_key for row in parsed.culture_rows if row.substrate_id == pair[1] and row.quantity == "oxygen_response_half_saturation")),
         )
     parsed.culture_classes.update(culture_classes)
     declared_by_strain: dict[str, dict[str, _StrainClass]] = {}
@@ -4992,6 +5108,7 @@ def _validate_cultures(parsed: _Parsed, context: _Context) -> None:
         else:
             kept_responses.append(response)
     parsed.responses[:] = kept_responses
+    _validate_uptake_inputs(parsed, context)
     _validate_culture_case_units(parsed, context)
     for pair, culture in parsed.culture_pairs.items():
         substrate = parsed.substrates[pair[1]]
@@ -5016,6 +5133,39 @@ def _culture_inactivation_refusal(what: str) -> str:
         "of one pool are one constant stated twice, which no data could tell apart. State the loss of the pool as "
         f"enzyme_loss_rate in {CULTURE_TABLE}, or keep the enzyme-assay case in a separate dataset."
     )
+
+
+def _validate_uptake_inputs(parsed: _Parsed, context: _Context) -> None:
+    for culture in parsed.culture_pairs.values():
+        substrate = parsed.substrates[culture.substrate_id]
+        if culture.oxygen and not culture.uptake:
+            context.add(AERATION_TABLE, None, "quantity", "Dissolved oxygen requires an explicit soluble uptake culture; supply uptake_capacity, uptake_half_saturation, maintenance_demand and initial_soluble_sugar.")
+        if culture.uptake and not substrate.yield_evidence_type:
+            context.add("substrates.csv", substrate.row, "yield_evidence_type", "A released-sugar culture requires the product yield's explicit evidence type and source.")
+    grouped: dict[tuple[str, str, str], dict[str, _CultureRow]] = {}
+    for row in parsed.culture_rows:
+        if not row.class_key:
+            grouped.setdefault((row.strain_id, row.substrate_id, row.condition_id), {})[row.quantity] = row
+    for (_strain, substrate_id, _condition), rows in grouped.items():
+        if not any(q in rows for q in UPTAKE_QUANTITIES):
+            continue
+        sugar = rows.get("initial_soluble_sugar")
+        biomass = rows.get("initial_biomass")
+        initial = rows.get("substrate_initial_concentration")
+        if sugar is None or biomass is None or initial is None:
+            continue  # Explicit gap records block execution.
+        substrate = parsed.substrates[substrate_id]
+        expected = {"uptake_capacity": f"({sugar.units})/({biomass.units})/h", "maintenance_demand": f"({sugar.units})/({biomass.units})/h",
+            "uptake_half_saturation": sugar.units, "biomass_yield": f"({biomass.units})/({sugar.units})", "oxygen_yield": f"mmol/L/({biomass.units})", "oxygen_maintenance": f"mmol/L/({sugar.units})"}
+        if not units_are_compatible(f"({initial.units})*({substrate.yield_units or 'g/g'})", sugar.units):
+            context.add("substrates.csv", substrate.row, "yield_basis", "Product yield must convert the solid's concentration units into initial_soluble_sugar units.")
+        for quantity, units in expected.items():
+            row = rows.get(quantity)
+            if row is not None and not units_are_compatible(row.units, units):
+                context.add(row.file, row.row, "units", f"{quantity} must be compatible with {units}; its explicit resource and biomass bases differ.")
+        kla = rows.get("kla")
+        if kla is not None and kla.evidence_type != "measured":
+            context.add(kla.file, kla.row, "evidence_type", "kla must be a stated measurement; vessel correlations or estimated defaults are not supported.")
 
 
 def _validate_culture_case_units(parsed: _Parsed, context: _Context) -> None:
@@ -5112,6 +5262,8 @@ def _form_rows(rows: Sequence[_Kinetics], form: str) -> list[_Kinetics]:
     """The rows of one case that set ``form``."""
 
     kcat_rows, routes, ionization_rows = _case_form_rows(rows)
+    if form in _ADSORPTION_FORMS:
+        return [row for row in rows if row.quantity in ADSORPTION_QUANTITIES]
     if form == RATE_FORM_KCAT:
         return kcat_rows
     if form == RATE_FORM_VMAX:
@@ -5131,6 +5283,9 @@ def _pair_form(parsed: _Parsed, pair: tuple[str, str]) -> str:
     form = parsed.pair_forms.get(pair)
     if form is not None:
         return form
+    adsorption_forms = [form for key, form in parsed.pair_forms.items() if key[0] == pair[0] and form in _ADSORPTION_FORMS]
+    if adsorption_forms:
+        return adsorption_forms[0]
     return RATE_FORM_PH_IONIZATION if pair[0] in parsed.ionization_classes else RATE_FORM_KCAT
 
 
@@ -5140,6 +5295,8 @@ def _class_process_type(parsed: _Parsed, class_key: str) -> str:
         return USER_DATASET_NETWORK_PROCESS_TYPE
     if class_key in parsed.culture_classes:
         return USER_DATASET_CULTURE_PROCESS_TYPE
+    if any(pair[0] == class_key and form in _ADSORPTION_FORMS for pair, form in parsed.pair_forms.items()):
+        return ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE
     return _FORM_PROCESS_TYPE[RATE_FORM_PH_IONIZATION if class_key in parsed.ionization_classes else RATE_FORM_KCAT]
 
 
@@ -5165,6 +5322,20 @@ def _validate_rate_forms(parsed: _Parsed, context: _Context) -> None:
     case_forms: dict[tuple[str, str, str, str], str] = {}
     for case_key, rows in by_case.items():
         kcat_rows, routes, ionization_rows = _case_form_rows(rows)
+        adsorption_rows = [row for row in rows if row.quantity in ADSORPTION_QUANTITIES]
+        if adsorption_rows:
+            others = [row for row in rows if row.quantity in {"km", "kcat", *PH_IONIZATION_QUANTITIES, *_QUANTITY_VMAX_ROUTE}]
+            for row in others:
+                context.add(file, row.row, "quantity", "Adsorption is a separate rate form; do not mix km, kcat, Vmax or pH-ionization rows with its binding and bound-rate constants.")
+            units = {row.quantity: row.units for row in rows}
+            if "enzyme_concentration" not in units and "enzyme_dose" in units and "substrate_initial_concentration" in units:
+                units["enzyme_concentration"] = str((Q_(1, units["enzyme_dose"]) * Q_(1, units["substrate_initial_concentration"])).units)
+            problems = adsorption_case_unit_errors(units)
+            for problem in problems:
+                context.add(file, adsorption_rows[0].row, "units", problem)
+            if not others and not problems:
+                case_forms[case_key] = RATE_FORM_ADSORPTION if "adsorption_constant" in units else RATE_FORM_ADSORPTION_KD
+            continue
         if ionization_rows:
             others = [
                 *(row for row in kcat_rows if row.quantity == "kcat"),
@@ -5260,6 +5431,13 @@ def _validate_class_processes(parsed: _Parsed, context: _Context) -> None:
     for pair, form in parsed.pair_forms.items():
         by_class.setdefault(pair[0], {}).setdefault(_FORM_PROCESS_TYPE[form], []).append(pair)
     for class_key, processes in by_class.items():
+        adsorption_pairs = processes.get(ADSORBED_ENZYME_HYDROLYSIS_PROCESS_TYPE, [])
+        if adsorption_pairs:
+            if len(processes) > 1:
+                context.add("kinetics.csv", None, "quantity", f"Enzyme class {class_key!r} mixes adsorption and another process law across substrates; use one law per class in a dataset.")
+            for substrate in parsed.substrates.values():
+                if not substrate.is_solid and _shared_bonds(parsed.classes[class_key], substrate) is not None:
+                    context.add("substrates.csv", substrate.row, "physical_state", "An adsorption enzyme class cannot be applied to a dissolved substrate; use a separate dataset.")
         ionization_pairs = processes.get(USER_DATASET_PH_IONIZATION_PROCESS_TYPE, [])
         if not ionization_pairs:
             continue
@@ -6169,6 +6347,15 @@ def _emit(
     *,
     origin: tuple[str, int | None, str | None],
 ) -> RegistryRecord | None:
+    if record_type == "case_templates" and context.medium_rows:
+        enriched = deepcopy(dict(mapping))
+        metadata = enriched.setdefault("process_state_metadata", {})
+        metadata["medium_rows"] = deepcopy(context.medium_rows)
+        metadata["additional_parameter_evidence"] = deepcopy(context.medium_rows)
+        if any(row["evidence_type"] == "estimate" for row in context.medium_rows):
+            metadata["config_mode"] = "exploratory"
+            metadata["config_maturity"] = "exploratory"
+        mapping = enriched
     try:
         record = load_registry_record_mapping(cast(RegistryRecordType, record_type), mapping)
     except (RegistryLoadError, ValueError, TypeError) as exc:
@@ -6437,7 +6624,7 @@ def _compatibility_mapping(
             f"{namespace.dataset_id}; the enzyme class and substrate share the listed bond classes."
             + (
                 f" The law runs as an apparent bulk law on the {substrate.physical_state} substrate (dry-mass basis)."
-                if substrate.is_solid
+                if substrate.is_solid and form not in _ADSORPTION_FORMS
                 else ""
             )
         ),
@@ -6616,7 +6803,7 @@ def _template_mapping(
         "process_state_metadata": process_state_metadata,
         "limitations": [
             (
-                f"Apparent {process_label} kinetics on a suspended {substrate.physical_state} substrate (dry-mass "
+                f"{'Quasi-steady' if form in _ADSORPTION_FORMS else 'Apparent'} {process_label} kinetics on a suspended {substrate.physical_state} substrate (dry-mass "
                 f"basis) from user dataset {namespace.dataset_id}."
                 if substrate.is_solid
                 else f"Dissolved {process_label} kinetics from user dataset {namespace.dataset_id}."
@@ -6624,7 +6811,7 @@ def _template_mapping(
             "This is an enzyme-kinetics case, not a whole-fungus growth, secretion or uptake model.",
             law_limitation,
             *([rate_limitation] if rate_limitation is not None else []),
-            *(_solid_limitations(reactivity) if substrate.is_solid else []),
+            *(list(ADSORPTION_LIMITATIONS) + ([_SOLID_REACTIVITY_LIMITATION] if reactivity else []) if form in _ADSORPTION_FORMS else (_solid_limitations(reactivity) if substrate.is_solid else [])),
             *(
                 [_inactivation_limitation(info.name, law=inactivation, where=substrate.name)]
                 if inactivation_stated and form in _ENZYME_FORMS
@@ -7275,6 +7462,10 @@ _GAP_UNITS_TEXT = {
 # The dimension and the units wording of each gap of a case on a solid substrate (dry-mass basis).
 _SOLID_GAP_DIMENSION = MappingProxyType(
     {
+        "binding_capacity": "enzyme amount per dry substrate mass, in the case's enzyme basis",
+        "adsorption_constant": "inverse enzyme concentration, in the case's enzyme basis",
+        "adsorption_dissociation_constant": "enzyme concentration, in the case's enzyme basis",
+        "bound_rate_constant": "dry substrate mass per enzyme amount per time",
         "km": "dry mass of the solid substrate per volume",
         "substrate_initial_concentration": "dry mass of the solid substrate per volume",
         "kcat": "substrate mass per time per enzyme amount (per protein mass, which is 1/time, or per assay unit)",
@@ -7286,6 +7477,10 @@ _SOLID_GAP_DIMENSION = MappingProxyType(
 )
 _SOLID_GAP_UNITS_TEXT = MappingProxyType(
     {
+        "binding_capacity": "enzyme amount per dry substrate mass, in the case's enzyme basis",
+        "adsorption_constant": "inverse enzyme concentration, in the case's enzyme basis",
+        "adsorption_dissociation_constant": "enzyme concentration, in the case's enzyme basis",
+        "bound_rate_constant": "dry substrate mass per enzyme amount per time",
         "km": "dry mass per volume, for example g/L",
         "substrate_initial_concentration": "dry mass per volume, for example g/L",
         "kcat": "substrate mass per time per enzyme amount, for example g/(FPU h) or g/(mg h)",
@@ -7310,6 +7505,7 @@ def _solid_gap_units(quantity: str, case_rows: Mapping[str, _Kinetics]) -> str |
 
 
 _QUANTITY_LABEL = {
+    **{quantity: quantity.replace("_", " ") for quantity in ADSORPTION_QUANTITIES},
     "km": "km",
     "kcat": "kcat",
     "substrate_initial_concentration": "initial substrate concentration",
@@ -7385,6 +7581,8 @@ def _with_measured_condition_note(request: str, measured: Sequence[_Condition]) 
 def _measurement_request_text(quantity: str, *, case: _CaseContext, units_text: str) -> str:
     strain, info, substrate, condition = case.strain, case.info, case.substrate, case.condition
     where = _condition_text(condition)
+    if quantity in ADSORPTION_QUANTITIES:
+        return f"Measure {quantity} of {info.name} from {strain.name} on {substrate.name} at {where} ({units_text}); fit an adsorption isotherm for capacity and affinity, or initial rate versus bound enzyme for bound_rate_constant."
     if quantity in _PH_IONIZATION_REQUEST:
         return (
             f"Measure {_PH_IONIZATION_REQUEST[quantity]} of {info.name} from {strain.name} on {substrate.name} "
@@ -8089,9 +8287,14 @@ def _generate_culture_records(
                 )
                 for quantity, pool in _culture_role_keys(culture):
                     row = case.rows.get((quantity, pool if quantity not in CULTURE_LEVEL_QUANTITIES else ""))
+                    if quantity == "release_yield" and substrate.yield_evidence_type:
+                        row = _CultureRow(row=substrate.row, file="substrates.csv", strain_id=strain.strain_id, substrate_id=substrate.substrate_id,
+                            condition_id=condition.condition_id, quantity=quantity, class_key="", value=substrate.product_yield, lower=None, upper=None,
+                            units=substrate.yield_units or "g/g", evidence_type=substrate.yield_evidence_type, method=substrate.yield_method,
+                            source=substrate.source, sd=None, replicates=None)
                     if row is not None:
                         mapping = _culture_parameter_mapping(row, quantity=quantity, pool=pool, case=case)
-                        origin: tuple[str, int | None, str | None] = (CULTURE_TABLE, row.row, "quantity")
+                        origin: tuple[str, int | None, str | None] = (row.file, row.row, "quantity")
                     else:
                         mapping = _culture_gap_mapping(quantity, pool, case=case)
                         origin = (CULTURE_TABLE, None, "quantity")
@@ -8162,10 +8365,12 @@ def _culture_role_keys(culture: _CulturePair) -> tuple[tuple[str, str], ...]:
     """(quantity, pool class) of every role of a culture model in record order; culture-level roles name the
     first consuming class, and the consumption roles each consuming pool."""
 
-    keys = [(quantity, culture.class_key) for quantity in CULTURE_LEVEL_QUANTITIES]
+    quantities = (*_BASE_CULTURE_LEVEL_QUANTITIES, *(UPTAKE_QUANTITIES if culture.uptake else ()), *((*OXYGEN_CULTURE_QUANTITIES, *AERATION_QUANTITIES) if culture.oxygen else ()), *(("release_yield",) if culture.uptake else ()))
+    keys = [(quantity, culture.class_key) for quantity in quantities]
     keys.extend((quantity, pool) for pool in culture.consuming_pools for quantity in CULTURE_CONSUMPTION_QUANTITIES)
     for pool in culture.pools:
         keys.extend((quantity, pool) for quantity in CULTURE_POOL_QUANTITIES)
+    keys.extend(("oxygen_response_half_saturation", pool) for pool in culture.oxygen_response_pools)
     return tuple(keys)
 
 
@@ -8184,7 +8389,7 @@ def _culture_role(quantity: str, pool: str, *, several: bool = False) -> str:
 def _culture_pool_part(culture: _CulturePair, quantity: str, pool: str) -> tuple[str, ...]:
     """The pool in a symbol or record id: for a pool quantity, and for a consumption quantity of several consumers."""
 
-    per_pool = quantity in CULTURE_POOL_QUANTITIES or (culture.several and quantity in CULTURE_CONSUMPTION_QUANTITIES)
+    per_pool = quantity in (*CULTURE_POOL_QUANTITIES, "oxygen_response_half_saturation") or (culture.several and quantity in CULTURE_CONSUMPTION_QUANTITIES)
     return (pool,) if per_pool else ()
 
 
@@ -8229,7 +8434,7 @@ def _culture_label(quantity: str, pool: str, case: _CultureCase) -> str:
         "specific_production_rate": f"Specific production rate of {pool_name}",
         "enzyme_loss_rate": f"Loss rate of {pool_name}",
     }
-    return labels[quantity]
+    return labels.get(quantity, quantity.replace("_", " ").capitalize())
 
 
 def _culture_parameter_mapping(row: _CultureRow, *, quantity: str, pool: str, case: _CultureCase) -> dict[str, Any]:
@@ -8238,7 +8443,7 @@ def _culture_parameter_mapping(row: _CultureRow, *, quantity: str, pool: str, ca
     strain, substrate, condition, namespace = case.strain, case.substrate, case.condition, case.namespace
     exact = row.value is not None
     confidence = _confidence(row.evidence_type)
-    notes = [f"User dataset {namespace.dataset_id}, {CULTURE_TABLE} row {row.row}; evidence type {row.evidence_type}."]
+    notes = [f"User dataset {namespace.dataset_id}, {row.file} row {row.row}; evidence type {row.evidence_type}."]
     if row.sd is not None:
         notes.append(f"Reported standard deviation {_number_text(row.sd)} {row.units} (kept as provenance, not sampled).")
     if row.replicates is not None:
@@ -8261,7 +8466,7 @@ def _culture_parameter_mapping(row: _CultureRow, *, quantity: str, pool: str, ca
         "measurement_method": row.method or "user estimate without a stated method",
         "validity_range": _culture_validity_range(case),
         USER_DATASET_PROVENANCE_KEY: namespace.provenance(
-            CULTURE_TABLE,
+            row.file,
             row.row,
             source=row.source,
             method=row.method or None,
@@ -8284,7 +8489,7 @@ def _culture_parameter_mapping(row: _CultureRow, *, quantity: str, pool: str, ca
         "maturity": _EVIDENCE_MATURITY[row.evidence_type],
         "provenance": provenance,
         "notes": (
-            f"User-supplied {quantity} of the culture model from dataset {namespace.dataset_id} ({CULTURE_TABLE} row "
+            f"User-supplied {quantity} of the culture model from dataset {namespace.dataset_id} ({row.file} row "
             f"{row.row}); evidence type {row.evidence_type}."
         ),
         **_culture_selectors(case, quantity, pool),
@@ -8345,8 +8550,8 @@ def _culture_gap_units(quantity: str, rows: Mapping[tuple[str, str], _CultureRow
 def _culture_gap_mapping(quantity: str, pool: str, *, case: _CultureCase) -> dict[str, Any]:
     strain, substrate, condition, namespace = case.strain, case.substrate, case.condition, case.namespace
     units = _culture_gap_units(quantity, case.rows)
-    dimension = _CULTURE_GAP_DIMENSION[quantity]
-    units_text = units if units is not None else _CULTURE_GAP_UNITS_TEXT[quantity]
+    dimension = _CULTURE_GAP_DIMENSION.get(quantity, "explicit units compatible with the soluble pool and biomass")
+    units_text = units if units is not None else _CULTURE_GAP_UNITS_TEXT.get(quantity, dimension)
     pool_row = case.rows.get(("initial_enzyme_concentration", pool))
     if units is None and pool_row is not None and quantity in {"hydrolysis_capacity", "specific_production_rate"}:
         # Name the pool's own amount, so that a rate is not requested per another pool's unit.
@@ -8448,7 +8653,7 @@ def _culture_measurement_request(quantity: str, pool: str, *, case: _CultureCase
             f"({units_text}), for example from the decay of activity in cell-free broth."
         ),
     }
-    request = requests[quantity]
+    request = requests.get(quantity, f"Measure or state {quantity} of {strain} on {substrate} at {where} ({units_text}); no default is supplied.")
     if case.measured_elsewhere:
         stated = " and ".join(
             f"{condition.condition_id} ({_condition_text(condition)})" for condition in case.measured_elsewhere
@@ -8512,7 +8717,21 @@ _CULTURE_LIMITATIONS = (
 )
 
 
-def _culture_template_mapping(
+def _culture_template_mapping(culture: _CulturePair, *, parsed: _Parsed, namespace: _Namespace, scientific: bool) -> dict[str, Any]:
+    mapping = _legacy_culture_template_mapping(culture, parsed=parsed, namespace=namespace, scientific=scientific)
+    if not culture.uptake:
+        return mapping
+    mapping = augment_uptake_template(mapping, sugar_state=f"{parsed.substrates[culture.substrate_id].product}_soluble_concentration", oxygen=culture.oxygen)
+    for pool in culture.oxygen_response_pools:
+        for process in mapping["process_state_metadata"]["process_templates"]:
+            if process["state_roles"].get("enzyme") == _culture_pool_role(culture, pool):
+                process.setdefault("modifiers", []).append({"type": "oxygen_monod", "state_source_role": "dissolved_oxygen",
+                    "half_saturation_role": _culture_role("oxygen_response_half_saturation", pool)})
+                process["assumptions"].append("Hydrolysis capacity is explicitly declared oxygen-unlimited; its response reads the dissolved-oxygen state. The response itself adds no oxygen demand beyond the explicit culture stoichiometries.")
+    return mapping
+
+
+def _legacy_culture_template_mapping(
     culture: _CulturePair,
     *,
     parsed: _Parsed,
@@ -8970,9 +9189,23 @@ def _validate_networks(parsed: _Parsed, context: _Context) -> None:
 
     if parsed.network_entries is None:
         return
+    if parsed.network_entries and parsed.culture_pairs and all(c.uptake for c in parsed.culture_pairs.values()):
+        entries = {c.substrate_id for c in parsed.culture_pairs.values()}
+        culture_pools = {pool for c in parsed.culture_pairs.values() for pool in c.pools}
+        if set(parsed.network_entries) != entries or set(parsed.substrates) != entries:
+            context.add(USER_DATASET_MANIFEST, None, _NETWORK_ENTRY_COLUMN,
+                "A released-sugar culture network currently binds one pooled uptake product per solid entry; every declared substrate must be a culture entry. Separate downstream enzyme-assay chains and several sugar pools require a sourced multi-pool uptake law.")
+        if any(item.class_key not in culture_pools for item in parsed.strain_classes):
+            context.add(CULTURE_TABLE, None, "enzyme_class", "Every class in an uptake culture network must be an explicitly bound culture enzyme pool.")
+        # The culture composition already contains every enzyme consumer and one uptake pool;
+        # a second assay network would duplicate those same fluxes.
+        parsed.network_entries = ()
+    for substrate in parsed.substrates.values():
+        if not substrate.yield_units and substrate.yield_evidence_type and not any(c.substrate_id == substrate.substrate_id and c.uptake for c in parsed.culture_pairs.values()):
+            context.add("substrates.csv", substrate.row, "yield_evidence_type", "Evidence on a mass yield requires an explicit released-sugar uptake culture; other pure-number yields remain template constants.")
     if not parsed.network_entries:
         for substrate in parsed.substrates.values():
-            if substrate.yield_units:
+            if substrate.yield_units and not any(c.substrate_id == substrate.substrate_id and c.uptake for c in parsed.culture_pairs.values()):
                 context.add(
                     "substrates.csv",
                     substrate.row,
@@ -9254,6 +9487,9 @@ def _network_members(
         for class_key in acting[pool]:
             pair = (class_key, pool)
             form = _pair_form(parsed, pair)
+            if form in _ADSORPTION_FORMS:
+                context.add("kinetics.csv", None, "quantity", "Adsorption currently binds one enzyme pool per solid case; competing adsorption in an enzyme_network is not implemented. Use a dataset without enzyme_network.")
+                continue
             if form == RATE_FORM_PH_IONIZATION:
                 rows = [row for row in parsed.kinetics if row.pair_key == pair and row.quantity in PH_IONIZATION_QUANTITIES]
                 file, line = ("kinetics.csv", min(row.row for row in rows)) if rows else _first_class_row(parsed, class_key)

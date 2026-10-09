@@ -117,6 +117,8 @@ class CompiledModel:
     processes: tuple[CompiledProcess, ...]
     stoichiometry: np.ndarray
     context: KernelContext
+    state_domains: tuple[str, ...] = ()
+    state_bounds: tuple[tuple[float | None, float | None], ...] = ()
     _columns: tuple[np.ndarray, ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -129,10 +131,21 @@ class CompiledModel:
             tuple(np.array(self.stoichiometry[:, index], dtype=float) for index in range(len(self.processes))),
         )
 
+    def evaluation_state(self, state: np.ndarray) -> np.ndarray:
+        values = np.asarray(state, dtype=float)
+        projected = evaluation_state_for_rates(values)
+        if self.state_domains:
+            signed = np.array([domain == "signed" for domain in self.state_domains])
+            projected[signed] = values[signed]
+        for index, (lower, upper) in enumerate(self.state_bounds):
+            if (lower is not None and values[index] < lower) or (upper is not None and values[index] > upper):
+                raise ValueError(f"State {self.state_names[index]!r} outside declared bounds [{lower}, {upper}].")
+        return projected
+
     def rates(self, time: float, state: np.ndarray) -> np.ndarray:
         """Process rate vector, each entry in its process's own rate units."""
 
-        evaluation_state = evaluation_state_for_rates(state)
+        evaluation_state = self.evaluation_state(state)
         return np.array([process.rate(time, evaluation_state) for process in self.processes], dtype=float)
 
     def rhs(self, time: float, state: np.ndarray) -> np.ndarray:
@@ -145,7 +158,7 @@ class CompiledModel:
         clipped.
         """
 
-        evaluation_state = evaluation_state_for_rates(state)
+        evaluation_state = self.evaluation_state(state)
         derivative = np.zeros(len(self.state_names), dtype=float)
         for process, column in zip(self.processes, self._columns, strict=True):
             derivative += column * process.rate(time, evaluation_state)
@@ -160,8 +173,11 @@ class CompiledModel:
         :meth:`rhs` wherever :meth:`rhs` is differentiable.
         """
 
-        evaluation_state = evaluation_state_for_rates(state)
+        evaluation_state = self.evaluation_state(state)
         mask = (np.asarray(state, dtype=float) >= 0.0).astype(float)
+        for index, domain in enumerate(self.state_domains):
+            if domain == "signed":
+                mask[index] = 1.0
         matrix = np.zeros((len(self.state_names), len(self.state_names)), dtype=float)
         for process, column in zip(self.processes, self._columns, strict=True):
             if process.gradient is None:
@@ -183,7 +199,7 @@ class CompiledModel:
 
         values = np.empty((len(self.processes), times.size), dtype=float)
         for column_index, time in enumerate(times):
-            state = evaluation_state_for_rates(states[:, column_index])
+            state = self.evaluation_state(states[:, column_index])
             for row_index, process in enumerate(self.processes):
                 values[row_index, column_index] = process.rate(float(time), state)
         return {
@@ -208,7 +224,10 @@ class CompiledModel:
             "jacobian": JACOBIAN_BY_BACKEND,
             "jacobian_kernels": jacobian_kinds,
             "analytic_jacobian_count": sum(kind == JACOBIAN_ANALYTIC for kind in jacobian_kinds.values()),
-            "negative_state_policy": NEGATIVE_STATE_POLICY,
+            "negative_state_policy": NEGATIVE_STATE_POLICY if not any(d == "signed" for d in self.state_domains)
+            else "non_negative_states_projected_signed_states_preserved_trajectory_never_clipped",
+            **({"state_domains": dict(zip(self.state_names, self.state_domains))}
+               if any(d == "signed" for d in self.state_domains) else {}),
         }
 
 
@@ -236,6 +255,8 @@ def compile_assembled_model(
         environment=model.context.environment,
         geometry=model.context.geometry,
     )
+    state_bounds = tuple((spec.lower_bound, spec.upper_bound) for spec in model.state_variables)
+    signed_indices = {index for index, spec in enumerate(model.state_variables) if spec.domain == "signed"}
     constraints = dict(constraints_by_process or {})
     unknown = sorted(set(constraints).difference(process.name for process in model.processes))
     if unknown:
@@ -247,7 +268,8 @@ def compile_assembled_model(
         column = _stoichiometry_column(process, rate_units=rate_units, context=context)
         constraint = constraints.get(process.name)
         kernel, kind = _rate_kernel(process, context, rate_units=rate_units, constraint=constraint)
-        gradient, jacobian_kind = _gradient_kernel(process, context, rate_kernel=kernel, kernel_kind=kind)
+        gradient, jacobian_kind = _gradient_kernel(process, context, rate_kernel=kernel, kernel_kind=kind,
+            state_bounds=state_bounds, signed_indices=signed_indices)
         compiled.append(
             CompiledProcess(
                 name=process.name,
@@ -273,6 +295,8 @@ def compile_assembled_model(
         processes=tuple(compiled),
         stoichiometry=stoichiometry,
         context=context,
+        state_domains=tuple(spec.domain for spec in model.state_variables),
+        state_bounds=state_bounds,
     )
 
 
@@ -386,6 +410,8 @@ def _gradient_kernel(
     *,
     rate_kernel: RateKernel,
     kernel_kind: str,
+    state_bounds: tuple[tuple[float | None, float | None], ...] = (),
+    signed_indices: set[int] | None = None,
 ) -> tuple[JacobianKernel, str]:
     """The process's analytic gradient when it offers one and nothing blocks it; central differences otherwise.
 
@@ -400,11 +426,17 @@ def _gradient_kernel(
         if analytic is not None:
             return analytic, JACOBIAN_ANALYTIC
     indices = sorted({context.state_index[spec.name] for spec in process.state_variables if spec.name in context.state_index})
-    return _finite_difference_gradient(rate_kernel, indices, len(context.state_index)), JACOBIAN_FINITE_DIFFERENCE
+    signed = signed_indices if signed_indices is not None else {
+        context.state_index[spec.name] for spec in process.state_variables if spec.domain == "signed"}
+    return _finite_difference_gradient(rate_kernel, indices, len(context.state_index),
+        signed=signed, bounds=state_bounds), JACOBIAN_FINITE_DIFFERENCE
 
 
-def _finite_difference_gradient(rate_kernel: RateKernel, indices: list[int], size: int) -> JacobianKernel:
-    """Central differences of ``rate_kernel`` over ``indices``; one-sided at the non-negative boundary."""
+def _finite_difference_gradient(
+    rate_kernel: RateKernel, indices: list[int], size: int, *, signed: set[int] | None = None,
+    bounds: tuple[tuple[float | None, float | None], ...] = (),
+) -> JacobianKernel:
+    """Central differences; use in-domain one-sided probes at declared boundaries."""
 
     relative_step = FINITE_DIFFERENCE_RELATIVE_STEP
 
@@ -415,8 +447,26 @@ def _finite_difference_gradient(rate_kernel: RateKernel, indices: list[int], siz
             value = work[index]
             step = relative_step * max(abs(value), 1.0)
             lower = value - step
-            if lower < 0.0:
-                # Keep both evaluations in the non-negative orthant the rate is defined on.
+            if bounds and any(bound is not None for bound in bounds[index]):
+                minimum, maximum = bounds[index]
+                if index not in (signed or set()):
+                    minimum = max(0.0, minimum) if minimum is not None else 0.0
+                if (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+                    raise ValueError("Finite-difference state lies outside its declared bounds.")
+                lower_room = float("inf") if minimum is None else value - minimum
+                upper_room = float("inf") if maximum is None else maximum - value
+                if step > min(lower_room, upper_room):
+                    offset = min(step, upper_room) if upper_room >= lower_room else -min(step, lower_room)
+                    probe = value + offset
+                    if probe == value:
+                        raise ValueError("Declared state domain is too narrow for a finite-difference probe.")
+                    work[index] = probe
+                    probe_rate = rate_kernel(time, work)
+                    work[index] = value
+                    result[index] = (probe_rate - rate_kernel(time, work)) / (probe - value)
+                    continue
+            if lower < 0.0 and index not in (signed or set()):
+                # Keep the historical unbounded non-negative policy exactly.
                 work[index] = value + step
                 upper_rate = rate_kernel(time, work)
                 work[index] = value

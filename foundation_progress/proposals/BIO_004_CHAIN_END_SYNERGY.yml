@@ -1,38 +1,46 @@
 proposal_kind: bio_mechanism_proposal
 milestone_id: BIO-004
 mechanism_id: chain_end_mediated_synergy
-general_process_family: synergy between endo- and exo-acting depolymerases through an accessible chain-end state
-  of the solid
-mathematical_law: 'Candidate aggregated form: dN/dt = nu_ends*r_endo - (chain-end consumption stated by the source);
-  r_exo = k_exo*E_exo*N/(K_N+N). The exact equations, including ends created per endo cut and ends consumed per
-  exo action, are taken from the chosen source at the sourcing gate, not designed here. No synergy multiplier exists.'
+general_process_family: Endo/exo synergy through finite linear-chain population balances and the derived number
+  of exo-eligible chains.
+mathematical_law: 'Niu et al. Eqs 12-20: each endo cut i -> j+(i-j), j=1..i-1, has r_endo(i,j)=kcat_endo*E_endo*Fa*G_i/(Km_endo+Fa*sum_(n>=4)((n-1)*G_n)).
+  Each exo cut i -> 2+(i-2) has r_exo(i)=kcat_exo*E_exo*Fa*G_i/(Km_exo+Fa*sum_(n>=4)(G_n)). The sourced solid threshold
+  is DP4; other explicitly stated thresholds and terminal fragment lengths are exploratory structural generalizations.
+  Material=sum_i i*G_i; chain_ends=sum_(i>=4)G_i. Degree of synergy is full-mixture increment divided by the sum
+  of singleton increments at identical member doses; leave-one-out is separate attribution.'
 state_variables:
-- name: solid_substrate
-  role: substrate
-  units: dry mass or monomer equivalents per volume
-- name: chain_ends
-  role: chain_end
-  units: amount per volume
-- name: soluble_product
-  role: product
-  units: amount per volume
+- name: chain_population_i
+  role: chain_population
+  units: molar concentration of chains for every integer length i from 1 to maximum
+- name: endo_enzyme
+  role: enzyme
+  units: molar enzyme concentration
+- name: exo_enzyme
+  role: enzyme
+  units: molar enzyme concentration
 parameters:
-- symbol: nu_ends
-  meaning: chain ends created per endo cut
+- symbol: kcat_endo
+  meaning: Endo turnover per eligible internal position.
+  units: 1/time
+- symbol: Km_endo
+  meaning: Michaelis constant on the accessible bond-weighted chain concentration basis.
+  units: molar concentration
+- symbol: kcat_exo
+  meaning: Exo turnover per eligible chain.
+  units: 1/time
+- symbol: Km_exo
+  meaning: Michaelis constant on the accessible chain concentration basis.
+  units: molar concentration
+- symbol: Fa
+  meaning: Explicit accessibility fraction in [0,1].
   units: dimensionless
-- symbol: k_exo
-  meaning: exo-action rate constant per enzyme
-  units: per time
-- symbol: K_N
-  meaning: half-saturation of exo action in chain ends
-  units: amount per volume
 units:
   state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
     silently
   parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
     units is refused
 valid_substrate_classes:
-- any linear polysaccharide solid with a stated initial chain-end content
+- Linear polysaccharides with a complete explicit initial chain-length distribution and sourced structural conventions.
 valid_enzyme_or_source_classes:
 - endo-acting and exo-acting depolymerase classes of one network
 environment_variables:
@@ -41,45 +49,54 @@ environment_variables:
   units: kelvin
   notes: constants at the condition of their rows
 output_curves:
-- solid remaining
-- chain ends
-- soluble product
-- degree of synergy from leave-one-out runs
+- Explicit chain population trajectories.
+- Solid and soluble monomer equivalents.
+- One exo-eligible chain end per solid chain.
+- Degree of synergy from matching net increments in a caller-supplied full/singleton run callback.
 summary_metrics:
-- degree of synergy
-- time to stated conversion thresholds
+- Final degree of synergy with an explicit defined mask; zero denominators give NaN.
+- Material and chain-end observables from the full distribution.
 assumptions:
-- Represents the chain-end mechanism only; synergy by relief of exo-enzyme stalling is a separate law with its own
-  source.
-- Synergy emerges from the state; no factor imposes it.
+- Uniform accessible internal-bond cutting for endo action and terminal shortening for exo action.
+- One exo-eligible end per solid chain; exhaustion follows exactly when residual chains leave the solid population.
+- Effective enzyme pools follow the sourced scission submodel; no adsorption-occupancy conversion is inferred.
+- Synergy emerges from shared chain populations; no rate multiplier is imposed.
+- Initial populations and kinetic constants need separate provenance; source supplies the law form only.
 not_in_scope:
-- Explicit chain-length distributions.
-- Stalling and recruitment of exo-acting enzymes (separate law).
-- Crystallinity as a state.
+- Stalling, recruitment, processivity or explicit adsorption-occupancy coupling.
+- Crystallinity and spatial transport.
+- An independently integrated aggregated chain-end pool.
+- Soluble-fragment hydrolysis unless separately assembled.
 unknowns:
-- The source's exact chain-end bookkeeping.
-- Initial chain-end content of a given solid.
+- Preparation-specific kinetic constants and accessibility.
+- Initial chain-length populations for a given material.
 suggested_experiments:
-- Measure exo-acting enzyme time courses with and without the endo-acting enzyme on the same solid.
-- Measure reducing ends of the solid before hydrolysis.
+- Measure matched endo, exo and mixed-enzyme time courses at fixed member doses.
+- Measure initial chain-length distribution and soluble fragment distribution, with uncertainty.
 blocking_failure_modes:
-- An exo member without a chain-end state.
-- Chain-end creation without a source.
-- Any synergy multiplier.
+- Missing initial chain populations, including undeclared zero populations.
+- Unspecified or noninteger structural lengths.
+- Chain-end creation/exhaustion without stoichiometric support.
+- Any synergy multiplier or leave-one-out sum used as the singleton denominator.
 tests_required:
-- Degree of synergy above 1 with both enzymes; 1 without the endo enzyme or with no ends created; tends to 1 with
-  abundant ends.
-- Exo action alone at fixed chain ends reduces to Michaelis-Menten in chain ends.
-- Mass balance between solid lost and soluble product.
-- Two materially different synthetic solids.
+- Exact recovery of source population-balance rates from individual channels.
+- Exact material conservation, central-cut fragment multiplicity, and exo end exhaustion.
+- Analytic gradients versus finite differences with mixed molar concentration scales.
+- Structural synergy in a synthetic pair; singleton comparison equals one when defined.
+- Three-member comparison distinguishes singleton from leave-one-out results; zero-denominator and run-count guards.
+- Cellulose-like dimer and xylan-like monomer synthetic cases.
+- Standalone channel retains the whole declared chain distribution; malformed structural inputs fail closed.
 limitations:
-- Proposed only.
+- Implemented and software-tested with checked law-form evidence; synthetic examples are not calibration or independent
+  empirical validation.
 - One of the two synergy mechanisms the sources describe.
+- Exact finite-chain population form replaces the unclosed aggregate-end proposal; no invented chain-end exhaustion
+  law or universal stalling factor.
 demo_case:
   case_id: CASE-SYNERGY-SYNTH
   purpose: Exercise endo and exo members on synthetic solids.
   distinction: Synthetic benchmark; not scientific data.
-validation_status: proposed
+validation_status: software_tested
 plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 9 (M5)
 candidate_sources:
 - key: jalak2012
@@ -101,3 +118,6 @@ candidate_sources:
   citation: Kostylev and Wilson (2012), Biofuels 3(1):61-70
   supports: degree-of-synergy definition
   verification: checked bibliographically; definition to confirm
+mechanism_sources:
+- data/mechanism_sources/niu2016_chain_scission/source.yml
+implementation_document: docs/bio004-chain-peroxide.md

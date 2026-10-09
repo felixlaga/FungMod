@@ -1,0 +1,189 @@
+kind: model_config
+name: toy_peroxide_oxidation
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+  validity_range: framework tests only
+  units: not_applicable
+entities:
+  environment:
+    id: environment
+    path: data/environments/lab_30C_pH7.yml
+    loader: environment
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+parameters:
+- id: synthetic_constants
+  parameters:
+  - name: synthetic kcat
+    symbol: kcat
+    value: 0.5
+    units: 1/second
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic Kh
+    symbol: Kh
+    value: 0.2
+    units: millimolar
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic Ks
+    symbol: Ks
+    value: 1
+    units: millimolar
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic Ki
+    symbol: Ki
+    value: 0.8
+    units: millimolar
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic ki
+    symbol: ki
+    value: 0.1
+    units: 1/(millimolar*second)
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+  - name: synthetic kd
+    symbol: kd
+    value: 0.01
+    units: 1/second
+    uncertainty: 0
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    confidence_level: testing
+    notes: Synthetic BIO-004 software benchmark only; no measured biological constants.
+    measurement_method: defined software benchmark
+    validity_range: software tests only
+processes:
+- id: oxidation
+  process_type: peroxide_oxidative_cleavage
+  states:
+    substrate: S
+    peroxide: H
+    enzyme: E
+    product: P
+    cuts: cuts
+  parameters:
+    kcat: kcat
+    peroxide_km: Kh
+    substrate_km: Ks
+    substrate_binding: Ki
+  oxidative_yield:
+    value: 2
+    units: dimensionless
+    source: Synthetic BIO-004 software benchmark only; no measured biological constants.
+- id: damage
+  process_type: peroxide_inactivation
+  states:
+    substrate: S
+    peroxide: H
+    enzyme: E
+    inactive: inactive
+  parameters:
+    inactivation_constant: ki
+    substrate_km: Ks
+- id: decay
+  process_type: first_order
+  states:
+    source: H
+    product: H_decay
+  parameters:
+    rate_constant: kd
+initial_state:
+  states:
+    S:
+      value: 10
+      units: millimolar
+    H:
+      value: 1
+      units: millimolar
+    E:
+      value: 0.1
+      units: millimolar
+    P:
+      value: 0
+      units: millimolar
+    cuts:
+      value: 0
+      units: millimolar
+    inactive:
+      value: 0
+      units: millimolar
+    H_decay:
+      value: 0
+      units: millimolar
+time:
+  start:
+    value: 0.0
+    units: second
+  stop:
+    value: 60
+    units: second
+  points: 61
+validators:
+- id: material
+  validator_type: mass_balance
+  conserved_weights:
+    S: 1
+    P: 1
+- id: peroxide
+  validator_type: mass_balance
+  conserved_weights:
+    H: 1
+    cuts: 1
+    H_decay: 1
+- id: enzyme
+  validator_type: mass_balance
+  conserved_weights:
+    E: 1
+    inactive: 1
+- id: nonnegative
+  validator_type: non_negative
+  species:
+  - S
+  - H
+  - E
+  - P
+  - cuts
+  - inactive
+  - H_decay
+outputs:
+  directory: outputs/toy_peroxide_oxidation
+  save:
+  - record
+  - validation_report
+  plots:
+  - state_trajectories
+
+metric_definitions:
+  peroxide_ledgers:
+    H:
+      feed: null
+      decay: H_decay

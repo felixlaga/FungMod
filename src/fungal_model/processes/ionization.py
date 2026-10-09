@@ -15,7 +15,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.kinetics.ionization import (
@@ -26,6 +26,7 @@ from fungal_model.kinetics.ionization import (
     ph_ionization_michaelis_menten_rate,
 )
 from fungal_model.kinetics.ph import warn_if_ph_outside_range
+from fungal_model.modifiers.state_environment import check_state_environment, state_environment_value
 from fungal_model.processes.base import (
     ParameterRequirement,
     Process,
@@ -43,6 +44,7 @@ PH_IONIZATION_MICHAELIS_MENTEN_ENVIRONMENT_CONDITIONS = ("ph",)
 class PHIonizationMichaelisMentenProcess(Process):
     """Enzyme-explicit Michaelis-Menten process with diprotic pH-dependent constants."""
 
+    state_source: str | None
     substrate_state: str
     product_state: str | None
     enzyme_state: str
@@ -80,7 +82,10 @@ class PHIonizationMichaelisMentenProcess(Process):
         maximum_ph_symbol: str | None = None,
         source: str = "Generic pH-dependent Michaelis-Menten process.",
         notes: str = "",
+        state_source: str | None = None,
     ) -> None:
+        if state_source is not None and state_source in {substrate_state, enzyme_state, product_state}:
+            raise ValueError("pH state must be distinct from material states.")
         if substrate_state == enzyme_state:
             raise ValueError("substrate_state and enzyme_state must be distinct.")
         if (minimum_ph_symbol is None) != (maximum_ph_symbol is None):
@@ -116,6 +121,7 @@ class PHIonizationMichaelisMentenProcess(Process):
             name=name,
             process_type=PH_IONIZATION_MICHAELIS_MENTEN_PROCESS_TYPE,
             required_state_variables=(
+                *((StateVariableSpec(state_source, "dimensionless", role="ph", domain="signed", lower_bound=0, upper_bound=14),) if state_source is not None else ()),
                 StateVariableSpec(substrate_state, substrate_units, role="substrate"),
                 StateVariableSpec(enzyme_state, enzyme_units, role="enzyme"),
             ),
@@ -127,7 +133,8 @@ class PHIonizationMichaelisMentenProcess(Process):
                 labels=("homogeneous", "dissolved", "ph_response"),
                 limitations=(
                     "Not valid for solid-substrate surface accessibility by itself.",
-                    "The pH is read once from the static environment; no pH dynamics or buffering.",
+                    "The pH is read once from the static environment; no pH dynamics or buffering." if state_source is None
+                    else "pH comes from the explicitly declared state; response limits are enforced.",
                 ),
             ),
             failure_modes=(
@@ -141,6 +148,7 @@ class PHIonizationMichaelisMentenProcess(Process):
             source=source,
             notes=notes,
         )
+        object.__setattr__(self, "state_source", state_source)
         object.__setattr__(self, "substrate_state", substrate_state)
         object.__setattr__(self, "product_state", product_state)
         object.__setattr__(self, "enzyme_state", enzyme_state)
@@ -157,6 +165,12 @@ class PHIonizationMichaelisMentenProcess(Process):
         object.__setattr__(self, "maximum_ph_symbol", maximum_ph_symbol)
         object.__setattr__(self, "product_coefficients", coefficients)
 
+    def _ph(self, environment: Any, state: Mapping[str, Quantity] | None) -> Quantity:
+        if self.state_source is None:
+            return _require_environment_ph(environment, process_name=self.name)
+        return state_environment_value(state=state, state_source=self.state_source,
+            environment=environment, field="ph", units="dimensionless")
+
     @property
     def turnover_units(self) -> str:
         return f"{self.rate_units} / ({self.enzyme_units})"
@@ -169,11 +183,16 @@ class PHIonizationMichaelisMentenProcess(Process):
             parameters.require_quantity(self.maximum_ph_symbol, "dimensionless"),
         )
 
-    def effective_constants(self, *, parameters: ParameterSet, environment: Any) -> dict[str, Any]:
+    def effective_constants(self, *, parameters: ParameterSet, environment: Any, state: Mapping[str, Quantity] | None = None) -> dict[str, Any]:
         """Return the pH, ionization factors, and the constants that apply at that pH."""
 
-        ph = _require_environment_ph(environment, process_name=self.name)
+        ph = self._ph(environment, state)
         minimum_ph, maximum_ph = self._ph_range(parameters)
+        if self.state_source is not None:
+            lower = 0.0 if minimum_ph is None else float(minimum_ph.magnitude)
+            upper = 14.0 if maximum_ph is None else float(maximum_ph.magnitude)
+            if not 0 <= lower < upper <= 14 or not lower <= float(ph.magnitude) <= upper:
+                raise ValueError("pH left the declared ionization response domain.")
         warn_if_ph_outside_range(ph=ph, minimum_ph=minimum_ph, maximum_ph=maximum_ph, source=self.source or self.name)
         free_lower = parameters.require_quantity(self.free_enzyme_lower_pk_symbol, "dimensionless")
         free_upper = parameters.require_quantity(self.free_enzyme_upper_pk_symbol, "dimensionless")
@@ -213,8 +232,17 @@ class PHIonizationMichaelisMentenProcess(Process):
         environment: Any = None,
         geometry: Any = None,
     ) -> Quantity:
+        if self.state_source is not None:
+            names = tuple(state)
+            context = KernelContext(
+                {name: i for i, name in enumerate(names)},
+                {name: str(value.units) for name, value in state.items()},
+                str(time.units), parameters, environment, geometry,
+            )
+            values = np.array([float(state[name].magnitude) for name in names])
+            return Q_(self._dynamic(context)[0](float(time.magnitude), values), self.rate_units)
         del time, geometry
-        ph = _require_environment_ph(environment, process_name=self.name)
+        ph = self._ph(environment, state)
         minimum_ph, maximum_ph = self._ph_range(parameters)
         return ph_ionization_michaelis_menten_rate(
             substrate=assert_compatible(
@@ -239,6 +267,8 @@ class PHIonizationMichaelisMentenProcess(Process):
     def compile_rate(self, context: KernelContext) -> RateKernel | None:
         """Fold the pH-dependent constants once; the environment is static during a run."""
 
+        if self.state_source is not None:
+            return self._dynamic(context)[0]
         constants = self.effective_constants(parameters=context.parameters, environment=context.environment)
         substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
         enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
@@ -272,6 +302,53 @@ class PHIonizationMichaelisMentenProcess(Process):
 
         return kernel
 
+    def _dynamic(self, context: KernelContext) -> tuple[RateKernel, JacobianKernel]:
+        assert self.state_source is not None
+        check_state_environment(environment=context.environment, field="ph")
+        si, sf = context.state_slot(self.substrate_state, self.substrate_units)
+        ei, ef = context.state_slot(self.enzyme_state, self.enzyme_units)
+        pi, pf = context.state_slot(self.state_source, "dimensionless")
+        k0 = context.parameter(self.turnover_symbol, self.turnover_units)
+        km0 = context.parameter(self.michaelis_constant_symbol, self.substrate_units)
+        fl = context.parameter(self.free_enzyme_lower_pk_symbol, "dimensionless")
+        fu = context.parameter(self.free_enzyme_upper_pk_symbol, "dimensionless")
+        cl = context.parameter(self.complex_lower_pk_symbol, "dimensionless")
+        cu = context.parameter(self.complex_upper_pk_symbol, "dimensionless")
+        lower = 0.0 if self.minimum_ph_symbol is None else context.parameter(self.minimum_ph_symbol, "dimensionless")
+        upper = 14.0 if self.maximum_ph_symbol is None else context.parameter(self.maximum_ph_symbol, "dimensionless")
+        if not all(np.isfinite(v) for v in (k0, km0, fl, fu, cl, cu, lower, upper)) or not (
+            k0 >= 0 and km0 > 0 and fl < fu and cl < cu and 0 <= lower < upper <= 14
+        ):
+            raise ValueError("Invalid state-driven ionization parameters or pH domain.")
+        def parts(y: np.ndarray):
+            ph = y[pi]*pf
+            if not lower <= ph <= upper:
+                raise ValueError("pH left the declared ionization response domain.")
+            s, e = y[si]*sf, y[ei]*ef
+            if not np.isfinite(s) or not np.isfinite(e) or min(s, e) < 0:
+                raise ValueError("Substrate and enzyme must be finite and non-negative.")
+            flt, fut = 10.0**(fl-ph), 10.0**(ph-fu)
+            clt, cut = 10.0**(cl-ph), 10.0**(ph-cu)
+            free, complex_ = (1+flt)*(1+fut), (1+clt)*(1+cut)
+            d_free, d_complex = np.log(10)*(fut-flt), np.log(10)*(cut-clt)
+            # kcat=k0/complex; Km=Km0*free/complex => rate=k0*E*S/(Km0*free+S*complex).
+            denominator = km0*free+s*complex_
+            return s, e, free, complex_, d_free, d_complex, denominator
+        def rate(t: float, y: np.ndarray) -> float:
+            s, e, _, _, _, _, d = parts(y)
+            return k0*e*s/d
+        def gradient(t: float, y: np.ndarray) -> np.ndarray:
+            s, e, free, _, df, dc, d = parts(y)
+            result = np.zeros(len(y))
+            result[si] = k0*e*km0*free/d**2*sf
+            result[ei] = k0*s/d*ef
+            result[pi] = -k0*e*s*(km0*df+s*dc)/d**2*pf
+            return result
+        return rate, gradient
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        return None if self.state_source is None else self._dynamic(context)[1]
+
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
         contributions: dict[str, Quantity] = {self.substrate_state: cast(Quantity, -value)}
@@ -284,6 +361,7 @@ class PHIonizationMichaelisMentenProcess(Process):
         data.update(
             {
                 "substrate_state": self.substrate_state,
+                **({"state_source": self.state_source} if self.state_source is not None else {}),
                 "product_state": self.product_state,
                 "enzyme_state": self.enzyme_state,
                 "product_coefficients": dict(self.product_coefficients),

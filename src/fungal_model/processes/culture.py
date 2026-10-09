@@ -17,6 +17,10 @@ other shipped process. They name roles, never organisms:
 * ``dilution_exchange``: ``D (c_feed - c)`` for one pool of a chemostat.
 * ``gas_transfer``: ``k_La (c_sat - c)`` for one dissolved pool.
 
+Absent nutrient or oxidant pools are an explicit nonlimiting assumption.
+Per-state units and unit-bearing coefficients allow a soluble amount pool to
+feed biomass dry mass without inferring a molar mass.
+
 Every extent is converted into pool changes by an explicit stoichiometry
 (formula units per unit extent) supplied by the caller from a macrochemical
 balance; reservoir species that are not model states are left out of the
@@ -91,26 +95,35 @@ def _state_specs(names: Mapping[str, str], units: str, roles: Mapping[str, str])
     return tuple(StateVariableSpec(name, units, role=roles[role]) for role, name in names.items())
 
 
-def _stoichiometry_specs(stoichiometry: Mapping[str, float], units: str) -> tuple[StateVariableSpec, ...]:
-    return tuple(StateVariableSpec(name, units, role="product" if coefficient > 0 else "reactant") for name, coefficient in stoichiometry.items())
+def _stoichiometry_specs(stoichiometry: Mapping[str, Any], units: str, state_units: Mapping[str, str]) -> tuple[StateVariableSpec, ...]:
+    specs = []
+    for name, coefficient in stoichiometry.items():
+        quantity = Q_(1, units) * coefficient
+        target_units = state_units.get(name, str(quantity.units))
+        assert_compatible(quantity, target_units, name=f"stoichiometry of {name}")
+        numeric = float(coefficient.magnitude if isinstance(coefficient, Quantity) else coefficient)
+        specs.append(StateVariableSpec(name, target_units, role="product" if numeric > 0 else "reactant"))
+    return tuple(specs)
 
 
-def _check_stoichiometry(stoichiometry: Mapping[str, float], *, name: str) -> dict[str, float]:
+def _check_stoichiometry(stoichiometry: Mapping[str, Any], *, name: str) -> dict[str, Any]:
     if not stoichiometry:
         raise ValueError(f"{name} needs a stoichiometry: formula units per unit extent for every pool it changes.")
-    cleaned: dict[str, float] = {}
+    cleaned: dict[str, Any] = {}
     for state, coefficient in stoichiometry.items():
-        value = float(coefficient)
+        if isinstance(coefficient, Mapping):
+            coefficient = Q_(coefficient["value"], coefficient["units"])
+        value = float(coefficient.magnitude if isinstance(coefficient, Quantity) else coefficient)
         if not np.isfinite(value) or value == 0.0:
             raise ValueError(f"{name}: stoichiometric coefficient of {state!r} must be finite and non-zero.")
-        cleaned[str(state)] = value
+        cleaned[str(state)] = coefficient if isinstance(coefficient, Quantity) else value
     return cleaned
 
 
 def _non_negative(quantity: Quantity, name: str) -> float:
     value = float(np.asarray(quantity.magnitude, dtype=float))
-    if value < 0:
-        raise ValueError(f"{name} must be non-negative.")
+    if not np.isfinite(value) or value < 0:
+        raise ValueError(f"{name} must be non-negative and finite.")
     return value
 
 
@@ -122,10 +135,18 @@ class ClosureConstants:
     maintenance_demand: float
     uptake_capacity: float
     substrate_half_saturation: float
-    nutrient_half_saturation: float
-    oxidant_half_saturation: float
+    nutrient_half_saturation: float | None
+    oxidant_half_saturation: float | None
+
+    def nutrient_factor(self, nutrient: float) -> float:
+        return 1.0 if self.nutrient_half_saturation is None else nutrient / (self.nutrient_half_saturation + nutrient)
+
+    def oxidant_factor(self, oxidant: float) -> float:
+        return 1.0 if self.oxidant_half_saturation is None else oxidant / (self.oxidant_half_saturation + oxidant)
 
     def capacity(self, substrate: float, oxidant: float) -> float:
+        if self.oxidant_half_saturation is None:
+            return self.uptake_capacity * substrate / (self.substrate_half_saturation + substrate)
         return (
             self.uptake_capacity
             * substrate / (self.substrate_half_saturation + substrate)
@@ -135,11 +156,10 @@ class ClosureConstants:
     def potential_growth(self, substrate: float, nutrient: float, oxidant: float) -> float:
         """``Y max(capacity - m, 0) N/(K_N+N)``: the specific growth rate before any allocation."""
 
-        return (
-            self.true_yield
-            * max(self.capacity(substrate, oxidant) - self.maintenance_demand, 0.0)
-            * nutrient / (self.nutrient_half_saturation + nutrient)
-        )
+        budget = max(self.capacity(substrate, oxidant) - self.maintenance_demand, 0.0)
+        if self.nutrient_half_saturation is None:
+            return self.true_yield * budget
+        return self.true_yield * budget * nutrient / (self.nutrient_half_saturation + nutrient)
 
     def maintenance(self, substrate: float, oxidant: float) -> float:
         return min(self.maintenance_demand, self.capacity(substrate, oxidant))
@@ -149,9 +169,9 @@ class ClosureConstants:
 
         return (
             self.uptake_capacity * self.substrate_half_saturation / (self.substrate_half_saturation + substrate) ** 2
-            * oxidant / (self.oxidant_half_saturation + oxidant),
+            * self.oxidant_factor(oxidant),
             self.uptake_capacity * substrate / (self.substrate_half_saturation + substrate)
-            * self.oxidant_half_saturation / (self.oxidant_half_saturation + oxidant) ** 2,
+            * (0.0 if self.oxidant_half_saturation is None else self.oxidant_half_saturation / (self.oxidant_half_saturation + oxidant) ** 2),
         )
 
     def budget_gradient(self, substrate: float, nutrient: float, oxidant: float, biomass: float) -> tuple[float, float, float, float]:
@@ -160,12 +180,12 @@ class ClosureConstants:
         budget = self.capacity(substrate, oxidant) - self.maintenance_demand
         if budget <= 0.0:
             return (0.0, 0.0, 0.0, 0.0)
-        limitation = nutrient / (self.nutrient_half_saturation + nutrient)
+        limitation = self.nutrient_factor(nutrient)
         d_substrate, d_oxidant = self.capacity_gradient(substrate, oxidant)
         return (
             d_substrate * limitation * biomass,
             budget * limitation,
-            budget * self.nutrient_half_saturation / (self.nutrient_half_saturation + nutrient) ** 2 * biomass,
+            budget * (0.0 if self.nutrient_half_saturation is None else self.nutrient_half_saturation / (self.nutrient_half_saturation + nutrient) ** 2) * biomass,
             d_oxidant * limitation * biomass,
         )
 
@@ -176,18 +196,19 @@ class _ClosureProcess(Process):
 
     substrate_state: str
     biomass_state: str
-    nutrient_state: str
-    oxidant_state: str
+    nutrient_state: str | None
+    oxidant_state: str | None
     concentration_units: str
+    state_units: Mapping[str, str]
     rate_units: str
     time_units: str
     true_yield_symbol: str
     maintenance_demand_symbol: str
     uptake_capacity_symbol: str
     substrate_half_saturation_symbol: str
-    nutrient_half_saturation_symbol: str
-    oxidant_half_saturation_symbol: str
-    stoichiometry: Mapping[str, float]
+    nutrient_half_saturation_symbol: str | None
+    oxidant_half_saturation_symbol: str | None
+    stoichiometry: Mapping[str, Any]
     extent_state: str | None
 
     def _init_closure(
@@ -197,48 +218,58 @@ class _ClosureProcess(Process):
         process_type: str,
         substrate_state: str,
         biomass_state: str,
-        nutrient_state: str,
-        oxidant_state: str,
+        nutrient_state: str | None = None,
+        oxidant_state: str | None = None,
         concentration_units: str,
         time_units: str,
         true_yield_symbol: str,
         maintenance_demand_symbol: str,
         uptake_capacity_symbol: str,
         substrate_half_saturation_symbol: str,
-        nutrient_half_saturation_symbol: str,
-        oxidant_half_saturation_symbol: str,
-        stoichiometry: Mapping[str, float],
+        nutrient_half_saturation_symbol: str | None = None,
+        oxidant_half_saturation_symbol: str | None = None,
+        stoichiometry: Mapping[str, Any],
         extent_state: str | None,
+        state_units: Mapping[str, str] | None,
         extra_requirements: tuple[ParameterRequirement, ...],
         extra_states: tuple[StateVariableSpec, ...],
         description: str,
         source: str,
         notes: str,
     ) -> None:
-        pools = (substrate_state, biomass_state, nutrient_state, oxidant_state)
-        if len(set(pools)) != 4:
-            raise ValueError(f"{name}: substrate, biomass, nutrient and oxidant must be four distinct states.")
+        pools = tuple(pool for pool in (substrate_state, biomass_state, nutrient_state, oxidant_state) if pool is not None)
+        if len(set(pools)) != len(pools):
+            raise ValueError(f"{name}: substrate, biomass, nutrient and oxidant must be four distinct states when all are bound (or distinct optional pools).")
+        for pool, symbol in ((nutrient_state, nutrient_half_saturation_symbol), (oxidant_state, oxidant_half_saturation_symbol)):
+            if (pool is None) != (symbol is None):
+                raise ValueError(f"{name}: optional nutrient/oxidant state and its half-saturation symbol must be supplied together.")
+        units_by_state = {pool: concentration_units for pool in pools}
+        units_by_state.update(state_units or {})
+        substrate_units = units_by_state[substrate_state]
+        biomass_units = units_by_state[biomass_state]
+        if process_type == COSTED_SECRETION_PROCESS_TYPE and Q_(1, substrate_units) != Q_(1, biomass_units):
+            raise ValueError(
+                f"{name}: costed secretion requires substrate and biomass on the same concentration basis and scale; "
+                "a separate protein-extent yield is not implemented for mixed bases."
+            )
+        extent_units = substrate_units if process_type == RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE else biomass_units
         cleaned = _check_stoichiometry(stoichiometry, name=name)
         if extent_state is not None and (extent_state in cleaned or extent_state in pools):
             raise ValueError(f"{name}: the extent ledger state must not be a pool the process reads or changes.")
-        rate_units = f"({concentration_units}) / ({time_units})"
-        specific_units = f"1 / ({time_units})"
-        roles = {"substrate": "substrate", "biomass": "biomass", "nutrient": "nutrient", "oxidant": "oxidant"}
-        required = _state_specs(
-            {"substrate": substrate_state, "biomass": biomass_state, "nutrient": nutrient_state, "oxidant": oxidant_state},
-            concentration_units,
-            roles,
-        ) + extra_states
-        changed = list(_stoichiometry_specs(cleaned, concentration_units))
+        rate_units = f"({extent_units}) / ({time_units})"
+        specific_units = f"({substrate_units}) / ({biomass_units}) / ({time_units})"
+        required = tuple(StateVariableSpec(pool, units_by_state[pool], role=role) for role, pool in
+                         (("substrate", substrate_state), ("biomass", biomass_state), ("nutrient", nutrient_state), ("oxidant", oxidant_state)) if pool is not None) + extra_states
+        changed = list(_stoichiometry_specs(cleaned, extent_units, units_by_state))
         if extent_state is not None:
-            changed.append(StateVariableSpec(extent_state, concentration_units, role="extent ledger"))
+            changed.append(StateVariableSpec(extent_state, extent_units, role="extent ledger"))
         requirements = (
-            ParameterRequirement(symbol=true_yield_symbol, units="dimensionless", name="true yield (biomass per substrate formula unit)"),
+            ParameterRequirement(symbol=true_yield_symbol, units=f"({biomass_units}) / ({substrate_units})", name="true yield (biomass per substrate formula unit)"),
             ParameterRequirement(symbol=maintenance_demand_symbol, units=specific_units, name="maintenance demand"),
             ParameterRequirement(symbol=uptake_capacity_symbol, units=specific_units, name="uptake capacity"),
-            ParameterRequirement(symbol=substrate_half_saturation_symbol, units=concentration_units, name="substrate half-saturation"),
-            ParameterRequirement(symbol=nutrient_half_saturation_symbol, units=concentration_units, name="nutrient half-saturation"),
-            ParameterRequirement(symbol=oxidant_half_saturation_symbol, units=concentration_units, name="oxidant half-saturation"),
+            ParameterRequirement(symbol=substrate_half_saturation_symbol, units=substrate_units, name="substrate half-saturation"),
+            *((ParameterRequirement(symbol=nutrient_half_saturation_symbol, units=units_by_state[nutrient_state], name="nutrient half-saturation"),) if nutrient_state is not None and nutrient_half_saturation_symbol is not None else ()),
+            *((ParameterRequirement(symbol=oxidant_half_saturation_symbol, units=units_by_state[oxidant_state], name="oxidant half-saturation"),) if oxidant_state is not None and oxidant_half_saturation_symbol is not None else ()) ,
             *extra_requirements,
         )
         Process.__init__(
@@ -248,7 +279,9 @@ class _ClosureProcess(Process):
             required_state_variables=tuple(required),
             changed_state_variables=tuple(changed),
             required_parameters=requirements,
-            assumptions=(resource_limited_closure_assumption(),),
+            assumptions=(resource_limited_closure_assumption(), *(
+                (Assumption(name="unbound resource pools are nonlimiting", description="Absent nutrient or oxidant pools contribute a factor of one and have no state or demand inferred.", justification="Explicitly selected reduced closure.", known_limitations="Missing resource dynamics are not empirical evidence of abundance.", source=source),)
+                if nutrient_state is None or oxidant_state is None else ())),
             validity=ValidityDomain(
                 description=description,
                 labels=("homogeneous", "physiology", "resource-limited"),
@@ -269,6 +302,7 @@ class _ClosureProcess(Process):
         object.__setattr__(self, "nutrient_state", nutrient_state)
         object.__setattr__(self, "oxidant_state", oxidant_state)
         object.__setattr__(self, "concentration_units", concentration_units)
+        object.__setattr__(self, "state_units", units_by_state)
         object.__setattr__(self, "rate_units", rate_units)
         object.__setattr__(self, "time_units", time_units)
         object.__setattr__(self, "true_yield_symbol", true_yield_symbol)
@@ -282,11 +316,13 @@ class _ClosureProcess(Process):
 
     @property
     def specific_units(self) -> str:
-        return f"1 / ({self.time_units})"
+        return f"({self.state_units[self.substrate_state]}) / ({self.state_units[self.biomass_state]}) / ({self.time_units})"
 
     def closure_constants(self, parameters: ParameterSet) -> ClosureConstants:
         def value(symbol: str, units: str, *, positive: bool = False, non_negative: bool = False) -> float:
             magnitude = float(np.asarray(parameters.require_quantity(symbol, units).magnitude, dtype=float))
+            if not np.isfinite(magnitude):
+                raise ValueError(f"{symbol} must be finite.")
             if positive and magnitude <= 0:
                 raise ValueError(f"{symbol} must be positive.")
             if non_negative and magnitude < 0:
@@ -294,18 +330,18 @@ class _ClosureProcess(Process):
             return magnitude
 
         return ClosureConstants(
-            true_yield=value(self.true_yield_symbol, "dimensionless", non_negative=True),
+            true_yield=value(self.true_yield_symbol, f"({self.state_units[self.biomass_state]}) / ({self.state_units[self.substrate_state]})", non_negative=True),
             maintenance_demand=value(self.maintenance_demand_symbol, self.specific_units, non_negative=True),
             uptake_capacity=value(self.uptake_capacity_symbol, self.specific_units, non_negative=True),
-            substrate_half_saturation=value(self.substrate_half_saturation_symbol, self.concentration_units, positive=True),
-            nutrient_half_saturation=value(self.nutrient_half_saturation_symbol, self.concentration_units, positive=True),
-            oxidant_half_saturation=value(self.oxidant_half_saturation_symbol, self.concentration_units, positive=True),
+            substrate_half_saturation=value(self.substrate_half_saturation_symbol, self.state_units[self.substrate_state], positive=True),
+            nutrient_half_saturation=value(self.nutrient_half_saturation_symbol, self.state_units[self.nutrient_state], positive=True) if self.nutrient_state is not None and self.nutrient_half_saturation_symbol is not None else None,
+            oxidant_half_saturation=value(self.oxidant_half_saturation_symbol, self.state_units[self.oxidant_state], positive=True) if self.oxidant_state is not None and self.oxidant_half_saturation_symbol is not None else None,
         )
 
     def _compiled_closure(self, context: KernelContext) -> tuple[ClosureConstants, tuple[tuple[int, float], ...]]:
         constants = self.closure_constants(context.parameters)
         slots = tuple(
-            context.state_slot(state, self.concentration_units)
+            context.state_slot(state, self.state_units[state]) if state is not None else (0, 0.0)
             for state in (self.substrate_state, self.biomass_state, self.nutrient_state, self.oxidant_state)
         )
         return constants, slots
@@ -313,8 +349,11 @@ class _ClosureProcess(Process):
     def _pools(self, state: Mapping[str, Quantity]) -> tuple[float, float, float, float]:
         values = []
         for name in (self.substrate_state, self.biomass_state, self.nutrient_state, self.oxidant_state):
-            quantity = assert_compatible(require_quantity(state[name], name=name), self.concentration_units, name=name)
-            values.append(_non_negative(quantity, name))
+            if name is None:
+                values.append(0.0)
+            else:
+                quantity = assert_compatible(require_quantity(state[name], name=name), self.state_units[name], name=name)
+                values.append(_non_negative(quantity, name))
         return values[0], values[1], values[2], values[3]
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
@@ -334,7 +373,7 @@ class _ClosureProcess(Process):
                     "nutrient": self.nutrient_state,
                     "oxidant": self.oxidant_state,
                 },
-                "stoichiometry": dict(self.stoichiometry),
+                "stoichiometry": {name: {"value": float(coef.magnitude), "units": str(coef.units)} if isinstance(coef, Quantity) else coef for name, coef in self.stoichiometry.items()},
                 "extent_state": self.extent_state,
                 "rate_units": self.rate_units,
             }
@@ -354,18 +393,19 @@ class ResourceLimitedGrowthProcess(_ClosureProcess):
         name: str,
         substrate_state: str,
         biomass_state: str,
-        nutrient_state: str,
-        oxidant_state: str,
+        nutrient_state: str | None = None,
+        oxidant_state: str | None = None,
         concentration_units: str,
         time_units: str,
         true_yield_symbol: str,
         maintenance_demand_symbol: str,
         uptake_capacity_symbol: str,
         substrate_half_saturation_symbol: str,
-        nutrient_half_saturation_symbol: str,
-        oxidant_half_saturation_symbol: str,
-        stoichiometry: Mapping[str, float],
+        nutrient_half_saturation_symbol: str | None = None,
+        oxidant_half_saturation_symbol: str | None = None,
+        stoichiometry: Mapping[str, Any],
         extent_state: str | None = None,
+        state_units: Mapping[str, str] | None = None,
         allocation_fraction_symbol: str | None = None,
         source: str = "Generic resource-limited growth process.",
         notes: str = "",
@@ -390,6 +430,7 @@ class ResourceLimitedGrowthProcess(_ClosureProcess):
             oxidant_half_saturation_symbol=oxidant_half_saturation_symbol,
             stoichiometry=stoichiometry,
             extent_state=extent_state,
+            state_units=state_units,
             extra_requirements=extra,
             extra_states=(),
             description="Well-mixed resource-limited growth after maintenance, optionally sharing its budget with secretion.",
@@ -439,8 +480,8 @@ class ResourceLimitedGrowthProcess(_ClosureProcess):
             result = np.zeros(size, dtype=float)
             result[s_index] = share * d_s * s_scale
             result[x_index] = share * d_x * x_scale
-            result[n_index] = share * d_n * n_scale
-            result[o_index] = share * d_o * o_scale
+            result[n_index] += share * d_n * n_scale
+            result[o_index] += share * d_o * o_scale
             return result
 
         return gradient
@@ -461,18 +502,19 @@ class ResourceLimitedMaintenanceProcess(_ClosureProcess):
         name: str,
         substrate_state: str,
         biomass_state: str,
-        nutrient_state: str,
-        oxidant_state: str,
+        nutrient_state: str | None = None,
+        oxidant_state: str | None = None,
         concentration_units: str,
         time_units: str,
         true_yield_symbol: str,
         maintenance_demand_symbol: str,
         uptake_capacity_symbol: str,
         substrate_half_saturation_symbol: str,
-        nutrient_half_saturation_symbol: str,
-        oxidant_half_saturation_symbol: str,
-        stoichiometry: Mapping[str, float],
+        nutrient_half_saturation_symbol: str | None = None,
+        oxidant_half_saturation_symbol: str | None = None,
+        stoichiometry: Mapping[str, Any],
         extent_state: str | None = None,
+        state_units: Mapping[str, str] | None = None,
         source: str = "Generic resource-limited maintenance process.",
         notes: str = "",
     ) -> None:
@@ -493,6 +535,7 @@ class ResourceLimitedMaintenanceProcess(_ClosureProcess):
             oxidant_half_saturation_symbol=oxidant_half_saturation_symbol,
             stoichiometry=stoichiometry,
             extent_state=extent_state,
+            state_units=state_units,
             extra_requirements=(),
             extra_states=(),
             description="Well-mixed maintenance consumption capped by the uptake capacity; unmet demand is not consumed.",
@@ -530,7 +573,7 @@ class ResourceLimitedMaintenanceProcess(_ClosureProcess):
             if capacity < constants.maintenance_demand:
                 d_substrate, d_oxidant = constants.capacity_gradient(substrate, oxidant)
                 result[s_index] = d_substrate * biomass * s_scale
-                result[o_index] = d_oxidant * biomass * o_scale
+                result[o_index] += d_oxidant * biomass * o_scale
                 result[x_index] = capacity * x_scale
             else:
                 result[x_index] = constants.maintenance_demand * x_scale
@@ -558,20 +601,21 @@ class CostedSecretionProcess(_ClosureProcess):
         name: str,
         substrate_state: str,
         biomass_state: str,
-        nutrient_state: str,
-        oxidant_state: str,
+        nutrient_state: str | None = None,
+        oxidant_state: str | None = None,
         concentration_units: str,
         time_units: str,
         true_yield_symbol: str,
         maintenance_demand_symbol: str,
         uptake_capacity_symbol: str,
         substrate_half_saturation_symbol: str,
-        nutrient_half_saturation_symbol: str,
-        oxidant_half_saturation_symbol: str,
+        nutrient_half_saturation_symbol: str | None = None,
+        oxidant_half_saturation_symbol: str | None = None,
         allocation_fraction_symbol: str,
         secretion_yield_symbol: str,
-        stoichiometry: Mapping[str, float],
+        stoichiometry: Mapping[str, Any],
         extent_state: str | None = None,
+        state_units: Mapping[str, str] | None = None,
         source: str = "Generic costed secretion process.",
         notes: str = "",
     ) -> None:
@@ -592,6 +636,7 @@ class CostedSecretionProcess(_ClosureProcess):
             oxidant_half_saturation_symbol=oxidant_half_saturation_symbol,
             stoichiometry=stoichiometry,
             extent_state=extent_state,
+            state_units=state_units,
             extra_requirements=(
                 ParameterRequirement(symbol=allocation_fraction_symbol, units="dimensionless", name="allocation fraction diverted to secretion"),
                 ParameterRequirement(symbol=secretion_yield_symbol, units="dimensionless", name="product formula units per substrate formula unit"),
@@ -619,7 +664,7 @@ class CostedSecretionProcess(_ClosureProcess):
         constants = self.closure_constants(parameters)
         fraction, secretion_yield = self._allocation(parameters)
         budget = max(constants.capacity(substrate, oxidant) - constants.maintenance_demand, 0.0)
-        limitation = nutrient / (constants.nutrient_half_saturation + nutrient)
+        limitation = constants.nutrient_factor(nutrient)
         return Q_(fraction * budget * limitation * secretion_yield * biomass, self.rate_units)
 
     def compile_rate(self, context: KernelContext) -> RateKernel | None:
@@ -632,7 +677,7 @@ class CostedSecretionProcess(_ClosureProcess):
             del time
             substrate, nutrient, oxidant = state[s_index] * s_scale, state[n_index] * n_scale, state[o_index] * o_scale
             budget = max(constants.capacity(substrate, oxidant) - constants.maintenance_demand, 0.0)
-            return scale * budget * nutrient / (constants.nutrient_half_saturation + nutrient) * (state[x_index] * x_scale)
+            return scale * budget * constants.nutrient_factor(nutrient) * (state[x_index] * x_scale)
 
         return kernel
 
@@ -651,8 +696,8 @@ class CostedSecretionProcess(_ClosureProcess):
             result = np.zeros(size, dtype=float)
             result[s_index] = scale * d_s * s_scale
             result[x_index] = scale * d_x * x_scale
-            result[n_index] = scale * d_n * n_scale
-            result[o_index] = scale * d_o * o_scale
+            result[n_index] += scale * d_n * n_scale
+            result[o_index] += scale * d_o * o_scale
             return result
 
         return gradient

@@ -1,0 +1,392 @@
+kind: model_config
+name: synthetic buffered acid release
+mode: toy
+maturity: framework_benchmark
+provenance:
+  source: FungMod foundation benchmark config; not a scientific case.
+  measurement_method: defined software benchmark
+  confidence_level: testing
+  notes: Exercises generic model-config loading for a homogeneous toy process.
+  validity_range: framework tests only
+  units: not_applicable
+  medium:
+    maturity: software_tested
+    validated: false
+    rows:
+    - quantity: buffer_concentration
+      value: 0.1
+      units: mol/L
+      buffer: buffer_a
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: buffer_pka
+      value: 7.0
+      units: dimensionless
+      buffer: buffer_a
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: initial_ph
+      value: 7.0
+      units: dimensionless
+      buffer: ''
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: minimum_ph
+      value: 2.0
+      units: dimensionless
+      buffer: ''
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: maximum_ph
+      value: 12.0
+      units: dimensionless
+      buffer: ''
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: water_ion_product
+      value: 1.0e-14
+      units: (mol/L)**2
+      buffer: ''
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: standard_concentration
+      value: 1.0
+      units: mol/L
+      buffer: ''
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: temperature
+      value: 303.15
+      units: kelvin
+      buffer: ''
+      process: ''
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    - quantity: proton_coefficient
+      value: 1.0
+      units: dimensionless
+      buffer: ''
+      process: a_to_b
+      evidence_type: estimate
+      source: Synthetic numerical benchmark; no empirical measurements.
+      measurement_method: defined software test
+      notes: Artificial inputs for verifying equations.
+    limitations:
+    - Fixed volume and temperature; independent ideal monoprotic buffers; no full
+      speciation.
+    - Proton production comes exclusively from explicit driver coefficients.
+entities:
+  environment:
+    id: environment
+    loader: environment
+    data:
+      kind: environment
+      name: toy lab 30C pH7
+      provenance:
+        source: Toy lab environment configuration for FungMod integration tests.
+        measurement_method: defined benchmark metadata
+        confidence_level: testing
+        notes: Constant environment used for assembly and modifier demos.
+        validity_range: toy benchmark only
+        units: not_applicable
+      conditions:
+        temperature:
+          value: 303.15
+          units: kelvin
+        oxygen_concentration:
+          value: 0.25
+          units: mole / liter
+        water_activity:
+          value: 0.98
+          units: dimensionless
+      parameters: []
+  geometry:
+    id: geometry
+    path: data/geometries/well_mixed_100ml.yml
+    loader: well_mixed
+  substrates:
+  - id: dissolved_substrate
+    loader: generic_dissolved
+    data:
+      kind: substrate
+      name: generic dissolved benchmark substrate
+      substrate_type: generic_dissolved
+      chemical_class: framework benchmark
+      physical_state: dissolved
+      bond_types: []
+      accessible_bonds: []
+      required_enzyme_classes: []
+      degradation_products:
+      - name: generic product B
+        notes: Toy product for config loading only.
+parameters:
+- id: homogeneous_parameters
+  parameters:
+  - name: toy first-order conversion constant
+    symbol: k_ab
+    value: 0.1
+    units: 1/hour
+    uncertainty: 0.0
+    source: FungMod foundation benchmark config.
+    confidence_level: testing
+    notes: Artificial value for config loading only.
+    measurement_method: defined benchmark value
+    validity_range: framework tests only
+  - name: optimum
+    symbol: optimum
+    value: 7.0
+    units: dimensionless
+    uncertainty: 0.0
+    source: FungMod foundation benchmark config.
+    confidence_level: testing
+    notes: Artificial value for config loading only.
+    measurement_method: defined benchmark value
+    validity_range: framework tests only
+  - name: width
+    symbol: width
+    value: 2.0
+    units: dimensionless
+    uncertainty: 0.0
+    source: FungMod foundation benchmark config.
+    confidence_level: testing
+    notes: Artificial value for config loading only.
+    measurement_method: defined benchmark value
+    validity_range: framework tests only
+- id: medium_parameters
+  parameters:
+  - name: buffer_concentration
+    symbol: medium_0
+    value: 0.1
+    units: mol/L
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: buffer_pka
+    symbol: medium_1
+    value: 7.0
+    units: dimensionless
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: initial_ph
+    symbol: medium_2
+    value: 7.0
+    units: dimensionless
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: minimum_ph
+    symbol: medium_3
+    value: 2.0
+    units: dimensionless
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: maximum_ph
+    symbol: medium_4
+    value: 12.0
+    units: dimensionless
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: water_ion_product
+    symbol: medium_5
+    value: 1.0e-14
+    units: (mol/L)**2
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: standard_concentration
+    symbol: medium_6
+    value: 1.0
+    units: mol/L
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: temperature
+    symbol: medium_7
+    value: 303.15
+    units: kelvin
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+  - name: proton_coefficient
+    symbol: medium_8
+    value: 1.0
+    units: dimensionless
+    uncertainty: null
+    source: Synthetic numerical benchmark; no empirical measurements.
+    confidence_level: assumed
+    measurement_method: defined software test
+    notes: Artificial inputs for verifying equations.; evidence_type=estimate
+processes:
+- id: a_to_b
+  process_type: first_order
+  states:
+    source: dissolved_substrate_amount
+    product: released_product_amount
+  parameters:
+    rate_constant: k_ab
+  assumptions:
+  - toy homogeneous benchmark only
+  modifiers:
+  - type: ph_gaussian
+    optimum_symbol: optimum
+    width_symbol: width
+    source: Artificial response; not biological measurements.
+    state_source: ph
+- id: medium_ph_a_to_b
+  process_type: proton_balance_ph
+  states:
+    ph: ph
+    output: ph
+  parameters:
+    buffers: &id001
+    - concentration: medium_0
+      pka: medium_1
+    proton_coefficient: medium_8
+    water_ion_product: medium_5
+    standard_concentration: medium_6
+    temperature: medium_7
+  driver:
+    id: a_to_b
+    process_type: first_order
+    states:
+      source: dissolved_substrate_amount
+      product: released_product_amount
+    parameters:
+      rate_constant: k_ab
+    assumptions:
+    - toy homogeneous benchmark only
+    modifiers:
+    - type: ph_gaussian
+      optimum_symbol: optimum
+      width_symbol: width
+      source: Artificial response; not biological measurements.
+      state_source: ph
+  balance:
+    concentration_units: mol/L
+    time_units: hour
+    ph_bounds: &id002
+    - 2.0
+    - 12.0
+    source: 'doi:10.1021/ed074p937; proton coefficient: Synthetic numerical benchmark;
+      no empirical measurements.'
+    mode: ph
+- id: medium_proton_ledger_a_to_b
+  process_type: proton_balance_ph
+  states:
+    ph: ph
+    output: proton_ledger
+  parameters:
+    buffers: *id001
+    proton_coefficient: medium_8
+    water_ion_product: medium_5
+    standard_concentration: medium_6
+    temperature: medium_7
+  driver:
+    id: a_to_b
+    process_type: first_order
+    states:
+      source: dissolved_substrate_amount
+      product: released_product_amount
+    parameters:
+      rate_constant: k_ab
+    assumptions:
+    - toy homogeneous benchmark only
+    modifiers:
+    - type: ph_gaussian
+      optimum_symbol: optimum
+      width_symbol: width
+      source: Artificial response; not biological measurements.
+      state_source: ph
+  balance:
+    concentration_units: mol/L
+    time_units: hour
+    ph_bounds: *id002
+    source: 'doi:10.1021/ed074p937; proton coefficient: Synthetic numerical benchmark;
+      no empirical measurements.'
+    mode: proton_ledger
+initial_state:
+  states:
+    dissolved_substrate_amount:
+      value: 0.01
+      units: mol/L
+    released_product_amount:
+      value: 0.0
+      units: mol/L
+    ph:
+      value: 7.0
+      units: dimensionless
+      domain: signed
+      lower_bound: 2.0
+      upper_bound: 12.0
+    proton_ledger:
+      value: 0.0
+      units: mol/L
+      domain: signed
+time:
+  start:
+    value: 0.0
+    units: hour
+  stop:
+    value: 2.0
+    units: hour
+  points: 21
+validators:
+- id: non_negative_states
+  validator_type: non_negative
+  species:
+  - dissolved_substrate_amount
+  - released_product_amount
+- id: closed_mass_balance
+  validator_type: mass_balance
+  conserved_weights:
+    dissolved_substrate_amount: 1.0
+    released_product_amount: 1.0
+outputs:
+  directory: outputs/toy_buffered_ph
+  save:
+  - record
+  - validation_report
+  plots:
+  - state_trajectories

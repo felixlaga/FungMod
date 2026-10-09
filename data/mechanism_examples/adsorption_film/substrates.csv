@@ -1,0 +1,2 @@
+substrate_id,name,substrate_class,physical_state,bond_classes,amount_basis,product,product_yield,yield_basis,source
+solid,Synthetic film,film_like,solid_polymer,film_link,dry_mass,soluble,1,g/g,Illustrative synthetic inputs invented for software verification; no empirical data.

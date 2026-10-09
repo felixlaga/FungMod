@@ -1,5 +1,10 @@
 # User-supplied data
 
+The opt-in [six-mechanism extension](bio004-mechanisms.md) adds adsorption,
+released-sugar uptake, oxygen and buffered-pH dynamics, finite-chain synergy and
+peroxide-driven cleavage. The older routes described below retain their existing
+contracts unless these explicit inputs are supplied.
+
 FungMod can simulate a strain, substrate and condition from your own tables
 without anyone editing the registry YAML. You put a small manifest and a few
 CSV tables in one directory; `load_user_dataset` checks them, reports every
@@ -2022,7 +2027,7 @@ substrate, whose rates add. The decisions, none of which adds biology:
 - **Additive, independent action**, as in an enzyme network: no competition for
   substrate or adsorption sites, no synergy, no product inhibition.
 - **No released pools.** A pool released by one enzyme and degraded by another
-  cannot be part of a growing culture: FungMod has no uptake law for a soluble
+  cannot be part of a growing culture: the legacy direct-growth route has no uptake law for a soluble
   pool with an explicit yield that `culture.csv` could bind, so the substrate a
   pool released would either be counted twice (as biomass and as the released
   pool) or feed nothing, and splitting it between the two is a partition no
@@ -2229,7 +2234,7 @@ Not modelled, and the template and outputs say so:
 - No soluble products: the product named in `substrates.csv` is not released
   by the culture (the row is still required by `substrates.csv`); consumed
   substrate is biomass or ledger. No pool degrades a product of another, and no
-  released pool feeds growth: FungMod has no uptake law for a soluble pool with
+  released pool feeds growth: the legacy direct-growth route has no uptake law for a soluble pool with
   an explicit yield that a user table binds.
 - Pools other than the consuming ones act on nothing; consuming pools act
   additively and independently: no synergy, competition for sites, product
@@ -2756,7 +2761,7 @@ Not modelled, and the template and outputs say so:
 - No time courses, comparison or fitting in a network yet, and no culture: a
   culture's secreted pools act together on its substrate in `culture.csv`
   itself ([several pools consuming the substrate](#several-pools-consuming-the-substrate)),
-  but a released pool cannot be part of a growing culture, because no uptake
+  but a released pool cannot be part of a growing culture, on the legacy route because no uptake
   law exists for it. Networks are drafted for a fungus by `assemble_user_tables(network=True)`
   ([drafting an enzyme network](#drafting-an-enzyme-network)); drafts follow
   dissolved pools only, so a link from a solid to a dissolved pool, with its

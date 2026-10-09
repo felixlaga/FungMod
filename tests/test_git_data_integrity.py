@@ -28,6 +28,9 @@ def test_git_round_trip_preserves_pinned_data_bytes(tmp_path, autocrlf):
         "data/experiments/literature/example/observations.csv": b"x,y\n1,2\n",
         "data/benchmarks/example/results/residuals.csv": b"x,y\r\n1,2\r\n",
         "data/benchmarks/example/results/artifacts.json": b'{"status":"fixture"}\n',
+        "data/mechanism_examples/example/kinetics.csv": b"x,y\r\n1,2\r\n",
+        "data/user_mechanisms/example/states.csv": b"x,y\r\n1,2\r\n",
+        "data/mechanism_sources/example/source.yml": b"source: synthetic transport fixture\r\n",
     }
     for name, contents in examples.items():
         path = repository / name
