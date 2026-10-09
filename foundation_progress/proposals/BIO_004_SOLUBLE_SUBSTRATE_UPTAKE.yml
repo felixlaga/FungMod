@@ -1,0 +1,111 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-004
+mechanism_id: released_sugar_uptake_growth
+general_process_family: release of a soluble sugar pool from a hydrolysed solid and its Monod uptake with Pirt maintenance
+  by a growing culture
+mathematical_law: dG/dt = y_GP*r_h - q_G*X with q_G = q_max*G/(K_G+G); dX/dt = Y*max(q_G - m, 0)*X; maintenance
+  min(q_G, m)*X goes to a respired-carbon ledger. y_GP is a stated, unit-bearing yield and is never derived from
+  a molar mass. Bound through the existing resource-limited closure with nitrogen and oxidant optional.
+state_variables:
+- name: solid_substrate
+  role: substrate
+  units: dry mass per volume
+- name: soluble_sugar
+  role: intermediate
+  units: mass or amount per volume
+- name: biomass
+  role: biomass
+  units: dry mass per volume
+- name: respired_carbon_ledger
+  role: ledger
+  units: as the sugar pool
+parameters:
+- symbol: y_GP
+  meaning: sugar released per solid consumed
+  units: sugar per dry mass of solid
+- symbol: q_max
+  meaning: maximum specific uptake rate
+  units: sugar per biomass per time
+- symbol: K_G
+  meaning: uptake half-saturation constant
+  units: as the sugar pool
+- symbol: Y
+  meaning: biomass yield on sugar
+  units: biomass per sugar
+- symbol: m
+  meaning: maintenance demand
+  units: sugar per biomass per time
+units:
+  state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
+    silently
+  parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
+    units is refused
+valid_substrate_classes:
+- any solid substrate whose consuming pools release a soluble sugar with a stated yield
+valid_enzyme_or_source_classes:
+- any culture whose rows state uptake, yield and maintenance constants
+environment_variables:
+- name: temperature
+  required: false
+  units: kelvin
+  notes: constants at the condition of their rows
+output_curves:
+- solid remaining
+- soluble sugar
+- biomass
+- respired-carbon ledger
+summary_metrics:
+- peak soluble sugar and its time
+- final biomass
+- closure residual
+assumptions:
+- One pooled soluble sugar; no preferential uptake among several sugars.
+- Nitrogen and oxygen are not limiting unless their states are bound.
+- Induced enzyme synthesis is not repressed by sugar until a quantitative repression law is sourced.
+not_in_scope:
+- Catabolite repression (gated on a quantitative source).
+- Several sugars with uptake preference.
+- Nitrogen uptake.
+unknowns:
+- Uptake and maintenance constants for any particular culture.
+- A quantitative source for catabolite repression.
+suggested_experiments:
+- Measure soluble sugar, biomass and solid remaining over time in the same culture.
+- Measure uptake rates on the soluble sugar alone.
+blocking_failure_modes:
+- An uptake row without a stated product yield.
+- A yield without evidence type.
+- Repression rows before a repression law exists.
+tests_required:
+- Closure across the solid, sugar, biomass and ledger at every output time to 1e-9.
+- Fast uptake limit reproduces the one-step culture; m = 0 removes maintenance exactly.
+- Two materially different synthetic cultures.
+- Byte identity of every earlier culture, including the shipped culture case.
+limitations:
+- Proposed only.
+- Monod uptake of one pooled sugar with Pirt maintenance; no regulation or morphology.
+demo_case:
+  case_id: CASE-UPTAKE-SYNTH
+  purpose: Exercise release and uptake on synthetic cultures.
+  distinction: Synthetic benchmark; not scientific data.
+validation_status: proposed
+plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 6 (M2)
+candidate_sources:
+- key: monod1949
+  citation: Monod (1949), Annual Review of Microbiology 3:371-394
+  supports: 'law form: saturable uptake and growth'
+  verification: re-check
+  doi: 10.1146/annurev.mi.03.100149.002103
+- key: pirt1965
+  citation: Pirt (1965), Proceedings of the Royal Society B 163:224-231
+  supports: 'law form: maintenance demand'
+  verification: re-check
+  doi: 10.1098/rspb.1965.0069
+- key: ilmen1997
+  citation: Ilmen, Saloheimo, Onnela and Penttila (1997), Applied and Environmental Microbiology 63(4):1298-1306
+  supports: repression phenomenon only, no rate law
+  verification: checked 2026-10-09
+- key: velkovska1997
+  citation: Velkovska, Marten and Ollis (1997), Journal of Biotechnology, batch cellulase production model
+  supports: candidate repression term
+  verification: unverified; confirm before use

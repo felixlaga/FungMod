@@ -1,0 +1,101 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-004
+mechanism_id: dissolved_oxygen_balance
+general_process_family: dissolved oxygen as a state supplied by gas-liquid transfer and consumed by growth and maintenance
+mathematical_law: dO/dt = kLa*(O_sat - O) - (nu_O_growth*growth extent + nu_O_maint*maintenance extent)*X; growth
+  limited by O/(K_O+O) inside the existing closure; O_sat stated or computed from temperature by the solubility
+  source within its validity range.
+state_variables:
+- name: dissolved_oxygen
+  role: oxidant
+  units: amount per volume
+- name: biomass
+  role: biomass
+  units: dry mass per volume
+- name: oxygen_ledger
+  role: ledger
+  units: amount per volume
+parameters:
+- symbol: kLa
+  meaning: volumetric oxygen transfer coefficient (measured)
+  units: per time
+- symbol: O_sat
+  meaning: dissolved-oxygen saturation
+  units: amount per volume
+- symbol: nu_O_growth
+  meaning: oxygen consumed per unit growth extent
+  units: oxygen per biomass
+- symbol: nu_O_maint
+  meaning: oxygen consumed per unit maintenance extent
+  units: oxygen per biomass per time
+- symbol: K_O
+  meaning: oxygen half-saturation of growth
+  units: amount per volume
+units:
+  state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
+    silently
+  parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
+    units is refused
+valid_substrate_classes:
+- any culture substrate bound through the closure
+valid_enzyme_or_source_classes:
+- any aerobic culture whose rows state oxygen stoichiometry and transfer
+environment_variables:
+- name: temperature
+  required: false
+  units: kelvin
+  notes: only for the solubility function, inside its stated range
+output_curves:
+- dissolved oxygen
+- biomass
+- oxygen transferred and consumed
+summary_metrics:
+- minimum dissolved oxygen
+- time below a stated oxygen threshold
+- oxygen ledger residual
+assumptions:
+- Well-mixed liquid with one transfer coefficient.
+- kLa is a stated measurement; no correlation is used in scientific mode.
+not_in_scope:
+- kLa correlations from vessel geometry.
+- Gas-phase composition dynamics.
+- Spatial oxygen gradients in pellets or mycelium.
+unknowns:
+- Oxygen stoichiometry and half-saturation for any particular culture.
+suggested_experiments:
+- Record dissolved oxygen and the off-gas oxygen uptake rate alongside biomass.
+- Measure kLa in the vessel used.
+blocking_failure_modes:
+- Temperature outside the solubility range.
+- kLa without units of inverse time.
+- An oxygen response law with neither a state nor a static value.
+tests_required:
+- Analytic approach to saturation without a culture and the analytic steady state under constant uptake.
+- Large kLa limit reproduces the oxygen-unlimited closure.
+- 'Oxygen ledger: transferred equals consumed plus accumulated.'
+- Solubility function against the source's tabulated values.
+limitations:
+- Proposed only.
+- Single well-mixed liquid phase; no gradients.
+demo_case:
+  case_id: CASE-OXYGEN-SYNTH
+  purpose: Exercise oxygen supply and demand on synthetic cultures.
+  distinction: Synthetic benchmark; not scientific data.
+validation_status: proposed
+plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 7 (M3)
+candidate_sources:
+- key: garciaochoa2009
+  citation: Garcia-Ochoa and Gomez (2009), Biotechnology Advances 27(2):153-176
+  supports: 'law form: transfer rate against uptake rate'
+  verification: checked 2026-10-09
+  doi: 10.1016/j.biotechadv.2008.10.006
+- key: benson1984
+  citation: Benson and Krause (1984), Limnology and Oceanography 29(3):620-632
+  supports: oxygen solubility from temperature and salinity, 0-40 C
+  verification: checked 2026-10-09
+  doi: 10.4319/lo.1984.29.3.0620
+- key: pirt1965
+  citation: Pirt (1965), Proceedings of the Royal Society B 163:224-231
+  supports: maintenance demand
+  verification: re-check
+  doi: 10.1098/rspb.1965.0069

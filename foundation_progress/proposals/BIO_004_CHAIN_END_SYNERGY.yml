@@ -1,0 +1,103 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-004
+mechanism_id: chain_end_mediated_synergy
+general_process_family: synergy between endo- and exo-acting depolymerases through an accessible chain-end state
+  of the solid
+mathematical_law: 'Candidate aggregated form: dN/dt = nu_ends*r_endo - (chain-end consumption stated by the source);
+  r_exo = k_exo*E_exo*N/(K_N+N). The exact equations, including ends created per endo cut and ends consumed per
+  exo action, are taken from the chosen source at the sourcing gate, not designed here. No synergy multiplier exists.'
+state_variables:
+- name: solid_substrate
+  role: substrate
+  units: dry mass or monomer equivalents per volume
+- name: chain_ends
+  role: chain_end
+  units: amount per volume
+- name: soluble_product
+  role: product
+  units: amount per volume
+parameters:
+- symbol: nu_ends
+  meaning: chain ends created per endo cut
+  units: dimensionless
+- symbol: k_exo
+  meaning: exo-action rate constant per enzyme
+  units: per time
+- symbol: K_N
+  meaning: half-saturation of exo action in chain ends
+  units: amount per volume
+units:
+  state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
+    silently
+  parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
+    units is refused
+valid_substrate_classes:
+- any linear polysaccharide solid with a stated initial chain-end content
+valid_enzyme_or_source_classes:
+- endo-acting and exo-acting depolymerase classes of one network
+environment_variables:
+- name: temperature
+  required: false
+  units: kelvin
+  notes: constants at the condition of their rows
+output_curves:
+- solid remaining
+- chain ends
+- soluble product
+- degree of synergy from leave-one-out runs
+summary_metrics:
+- degree of synergy
+- time to stated conversion thresholds
+assumptions:
+- Represents the chain-end mechanism only; synergy by relief of exo-enzyme stalling is a separate law with its own
+  source.
+- Synergy emerges from the state; no factor imposes it.
+not_in_scope:
+- Explicit chain-length distributions.
+- Stalling and recruitment of exo-acting enzymes (separate law).
+- Crystallinity as a state.
+unknowns:
+- The source's exact chain-end bookkeeping.
+- Initial chain-end content of a given solid.
+suggested_experiments:
+- Measure exo-acting enzyme time courses with and without the endo-acting enzyme on the same solid.
+- Measure reducing ends of the solid before hydrolysis.
+blocking_failure_modes:
+- An exo member without a chain-end state.
+- Chain-end creation without a source.
+- Any synergy multiplier.
+tests_required:
+- Degree of synergy above 1 with both enzymes; 1 without the endo enzyme or with no ends created; tends to 1 with
+  abundant ends.
+- Exo action alone at fixed chain ends reduces to Michaelis-Menten in chain ends.
+- Mass balance between solid lost and soluble product.
+- Two materially different synthetic solids.
+limitations:
+- Proposed only.
+- One of the two synergy mechanisms the sources describe.
+demo_case:
+  case_id: CASE-SYNERGY-SYNTH
+  purpose: Exercise endo and exo members on synthetic solids.
+  distinction: Synthetic benchmark; not scientific data.
+validation_status: proposed
+plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 9 (M5)
+candidate_sources:
+- key: jalak2012
+  citation: Jalak, Kurasin, Teugjas and Valjamae (2012), Journal of Biological Chemistry 287(34):28802-28815
+  supports: two parallel synergy mechanisms; data
+  verification: checked 2026-10-09
+  doi: 10.1074/jbc.M112.381624
+- key: levine2010
+  citation: Levine, Fox, Blanch and Clark (2010), Biotechnology and Bioengineering 107(1):37-51
+  supports: mechanistic structure with chain states
+  verification: checked 2026-10-09
+  doi: 10.1002/bit.22789
+- key: zhang2004
+  citation: Zhang and Lynd (2004), Biotechnology and Bioengineering 88(7):797-824
+  supports: aggregated chain-end framework (review)
+  verification: re-check
+  doi: 10.1002/bit.20282
+- key: kostylev2012
+  citation: Kostylev and Wilson (2012), Biofuels 3(1):61-70
+  supports: degree-of-synergy definition
+  verification: checked bibliographically; definition to confirm

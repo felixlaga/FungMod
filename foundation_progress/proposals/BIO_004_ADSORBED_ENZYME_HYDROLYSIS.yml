@@ -1,0 +1,100 @@
+proposal_kind: bio_mechanism_proposal
+milestone_id: BIO-004
+mechanism_id: adsorbed_enzyme_hydrolysis
+general_process_family: quasi-steady Langmuir partition of an enzyme between solution and a solid substrate, with
+  a hydrolysis rate proportional to bound enzyme
+mathematical_law: E_b = Gamma_max*S*K*E_f/(1+K*E_f) with E_T = E_f + E_b, so E_f is the positive root of K*E_f^2
+  + (1 + K*Gamma_max*S - K*E_T)*E_f - E_T = 0; the solid is consumed at r = k_b*E_b, optionally times the existing
+  (S/S0)^n reactivity factor. The exact form is confirmed against the chosen law-form source before implementation.
+state_variables:
+- name: solid_substrate
+  role: substrate
+  units: dry mass per volume
+- name: total_enzyme
+  role: enzyme
+  units: amount, protein mass or assay units per volume
+- name: soluble_product
+  role: product
+  units: amount or mass per volume through a stated product map
+parameters:
+- symbol: Gamma_max
+  meaning: binding capacity of the solid for the enzyme
+  units: enzyme per dry mass of solid
+- symbol: K
+  meaning: Langmuir association constant (or its reciprocal, the dissociation constant Kd; exactly one is given)
+  units: per enzyme concentration
+- symbol: k_b
+  meaning: rate constant per bound enzyme
+  units: dry mass of solid per enzyme amount per time
+units:
+  state_units_policy: explicit pint-checked units for every state; mass, amount and assay bases are never converted
+    silently
+  parameter_units_policy: explicit units for every parameter record; a record without units or with incompatible
+    units is refused
+valid_substrate_classes:
+- any suspended polysaccharide solid on a dry-mass basis with stated binding constants
+valid_enzyme_or_source_classes:
+- any enzyme class whose rows state a binding capacity, an adsorption constant and a bound-enzyme rate constant
+environment_variables:
+- name: temperature
+  required: false
+  units: kelvin
+  notes: constants apply at the condition of their rows; no adsorption temperature law is implied
+output_curves:
+- solid substrate remaining
+- soluble product
+- free and bound enzyme
+summary_metrics:
+- time to stated conversion thresholds
+- initial and final bound fraction
+- enzyme conservation residual
+assumptions:
+- Adsorption is fast compared with hydrolysis, so the partition is quasi-steady; a dynamic form is a separate later
+  step.
+- One productive binding site class; non-productive binding to other solid components is not represented.
+- Constants come from user or registry records with their own evidence type; the law-form source supplies no constants
+  for other systems.
+not_in_scope:
+- Non-productive binding to lignin or other components.
+- Accessible surface area, crystallinity or particle size as inputs.
+- Adsorption kinetics with on and off rates.
+unknowns:
+- The law-form source and its exact equations, to be taken in at the sourcing gate.
+- Binding constants for any particular enzyme and solid.
+suggested_experiments:
+- Measure adsorption isotherms (bound versus free enzyme) on the solid at the run's temperature.
+- Measure the initial hydrolysis rate against bound enzyme across loadings.
+blocking_failure_modes:
+- Both K and Kd given, or neither.
+- A binding capacity on a dissolved substrate or without a dry-mass basis.
+- Enzyme stated in assay units with a capacity in protein mass, without a stated conversion.
+tests_required:
+- Enzyme conservation at every output time to 1e-12.
+- Low-coverage limit equals the first-order apparent law; saturation is independent of total enzyme.
+- Analytic Jacobian against centred differences.
+- Two materially different synthetic solids, labelled synthetic.
+- Byte identity of every earlier dataset, case and draft.
+limitations:
+- Proposed only; no law-form source has been taken in yet.
+- Quasi-steady single-site Langmuir partition; no surface renewal, morphology or non-productive binding.
+demo_case:
+  case_id: CASE-ADSORB-SYNTH
+  purpose: Exercise the law on synthetic solids.
+  distinction: Synthetic benchmark; not scientific data.
+validation_status: proposed
+plan_section: foundation_progress/BIO_004_NEW_MECHANISMS_PLAN.md section 5 (M1)
+candidate_sources:
+- key: kadam2004
+  citation: Kadam, Rydholm and McMillan (2004), Biotechnology Progress 20(3):698-705
+  supports: 'law form: Langmuir partition inside a saccharification model'
+  verification: checked 2026-10-09
+  doi: 10.1021/bp034316x
+- key: medve1998
+  citation: Medve, Karlsson, Lee and Tjerneld (1998), Biotechnology and Bioengineering 59(5):621-634
+  supports: adsorption time scale and isotherms; rate linear in adsorbed exo-acting enzyme
+  verification: checked 2026-10-09
+  doi: 10.1002/(SICI)1097-0290(19980905)59:5<621::AID-BIT13>3.0.CO;2-C
+- key: bansal2009
+  citation: Bansal et al. (2009), Biotechnology Advances, review of cellulase kinetic models
+  supports: choice between forms (review)
+  verification: unverified; confirm before use
