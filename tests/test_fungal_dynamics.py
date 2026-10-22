@@ -588,3 +588,41 @@ def test_biomass_yield_coefficient_accepts_values_above_one_and_refuses_negative
             parameters=ParameterSet([parameter(name="yield", symbol="Y_B", value=-0.1, units="dimensionless")]),
             yield_symbol="Y_B",
         )
+
+
+def test_biomass_yield_coefficient_honours_a_caller_declared_maximum() -> None:
+    parameters = ParameterSet([parameter(name="yield", symbol="Y_B", value=1.2, units="dimensionless")])
+    with pytest.raises(ValueError, match="exceeds the caller's mass-closure maximum 1.0"):
+        biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=1.0)
+    assert biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=1.5) == pytest.approx(1.2)
+    with pytest.raises(ValueError, match="maximum for Y_B must be finite and positive"):
+        biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=0.0)
+    with pytest.raises(ValueError, match="maximum for Y_B must be finite and positive"):
+        biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=float("nan"))
+
+
+def test_fungal_coupling_refuses_a_mass_yield_above_one_on_its_single_input_uptake() -> None:
+    # FungalCouplingModel's uptake reaction is {product: 1} -> {active_biomass: Y_B}
+    # in kilogram / second with no co-substrate, so Y_B > 1 would create mass.
+    from dataclasses import replace
+
+    from tests.test_coupling_compiled import _degradation_process
+    from tests.test_fungal_coupling import _model
+
+    model = _model()
+    fungus = model.fungus
+    overridden = make_fungal_parameter_set(
+        [
+            replace(item, value=1.2) if item.symbol == "Y_B" else item
+            for item in fungus.parameters
+        ]
+    )
+    capped = replace(model, fungus=replace(fungus, parameters=overridden))
+    with pytest.raises(ValueError, match="Y_B = 1.2 exceeds the caller's mass-closure maximum 1.0"):
+        capped.reactions()
+    with pytest.raises(ValueError, match="Y_B = 1.2 exceeds the caller's mass-closure maximum 1.0"):
+        capped.compiled_processes([_degradation_process()])
+    # The unmodified fixture (Y_B = 0.5) still assembles.
+    uptake = [reaction for reaction in model.reactions() if "uptake" in reaction.name]
+    assert len(uptake) == 1
+    assert uptake[0].products["active_biomass"] == pytest.approx(0.5)

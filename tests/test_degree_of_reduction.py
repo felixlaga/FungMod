@@ -111,11 +111,11 @@ def test_oxygen_demand_from_degree_of_reduction_matches_hand_value() -> None:
         yield_source=ARTIFICIAL_SOURCE,
     )
 
-    assert demand.basis == "amount"
+    assert demand.basis == "carbon_amount"
     assert float(demand.oxygen_per_substrate.quantity.magnitude) == pytest.approx(0.475)
     assert demand.oxygen_per_substrate.source == DEGREE_OF_REDUCTION_SOURCE
     assert demand.required_oxygen(Q_(2.0, "mole")).to("mole").magnitude == pytest.approx(0.95)
-    assert demand.to_dict()["basis"] == "amount"
+    assert demand.to_dict()["basis"] == "carbon_amount"
     with pytest.raises(UnitError):
         demand.required_oxygen(Q_(1.0, "kilogram"))
 

@@ -173,19 +173,19 @@ class MacrochemicalSolution:
     def omitted_zero_coefficient_species(self, attribute: str) -> tuple[str, ...]:
         """Species with a zero coefficient and no ``attribute`` formation energy.
 
-        A coefficient counts as zero when it is exactly zero or within the
-        solve's own residual acceptance threshold. Such a species contributes
-        nothing to a reaction energy, so its missing energy is recorded, not
-        treated as a refusal.
+        Only a coefficient that is exactly ``0.0`` (a fixed zero) counts; a
+        solved coefficient of round-off size still carries an unknown energy
+        contribution and is refused like any other nonzero coefficient. A
+        fixed-zero species contributes nothing to a reaction energy, so its
+        missing energy is recorded, not treated as a refusal.
         """
 
         if attribute not in {"formation_gibbs", "formation_enthalpy"}:
             raise ValueError(f"Unknown formation energy attribute {attribute!r}.")
-        threshold = self.absolute_tolerance * self.residual_scale
         return tuple(
             species.name
             for species in self.balance.species
-            if getattr(species, attribute) is None and abs(self.coefficients[species.name]) <= threshold
+            if getattr(species, attribute) is None and self.coefficients[species.name] == 0.0
         )
 
     def _reaction_energy(self, attribute: str) -> Quantity:

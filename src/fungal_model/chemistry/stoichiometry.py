@@ -379,6 +379,7 @@ class CarbonContent:
 _OXYGEN_DEMAND_BASES: Mapping[str, tuple[str, str]] = {
     "mass": ("kilogram / kilogram", "kilogram"),
     "amount": ("mole / mole", "mole"),
+    "carbon_amount": ("mole / mole", "mole"),
 }
 
 
@@ -387,11 +388,12 @@ class OxygenDemand:
     """Oxygen demand per consumed substrate for an aerobic process.
 
     ``basis`` declares what the ratio means: ``"mass"`` is kilogram O2 per
-    kilogram substrate; ``"amount"`` is mole O2 per mole of the substrate unit
-    the ratio was derived for (a formula unit or a carbon atom, stated in the
-    parameter notes). Both ratios are dimensionless to the unit registry, so
-    the basis is an explicit declaration, and ``required_oxygen`` accepts
-    substrate in the matching unit only; no molar mass is inferred.
+    kilogram substrate; ``"amount"`` is mole O2 per mole of substrate formula
+    units; ``"carbon_amount"`` is mole O2 per mole of substrate carbon atoms
+    (C-mol). All ratios are dimensionless to the unit registry, so the basis
+    is an explicit declaration, and ``required_oxygen`` accepts substrate in
+    the matching unit only; no molar mass or carbon count is inferred, so a
+    caller must pass C-mol (not molecule moles) to a ``"carbon_amount"`` demand.
     """
 
     process_name: str
@@ -479,7 +481,7 @@ class OxygenDemand:
                 ),
                 measurement_method="electron balance",
             ),
-            basis="amount",
+            basis="carbon_amount",
         )
 
     def required_oxygen(self, substrate_consumed: Quantity) -> Quantity:

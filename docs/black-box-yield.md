@@ -32,8 +32,9 @@ Helpers:
   with composition-derived electron equivalents so `validate_electron_balance`
   can run without typed values. Every term must carry a composition and a charge.
 - `OxygenDemand.from_degree_of_reduction(...)` gives the oxygen demand per C-mol
-  substrate, `(gamma_S - Y_SX gamma_X) / 4`, on an explicit `"amount"` basis
-  (mole O2 per mole substrate carbon). A yield that would need negative oxygen
+  substrate, `(gamma_S - Y_SX gamma_X) / 4`, on an explicit `"carbon_amount"` basis
+  (mole O2 per mole substrate carbon atoms; pass C-mol, not molecule moles, to
+  `required_oxygen`). A yield that would need negative oxygen
   is refused. The identity assumes every other participant has zero degree of
   reduction under the ammonia reference.
 
@@ -134,6 +135,6 @@ prediction.
   yields, maintenance, growth rate, product formation and nitrogen sources
   other than ammonium.
 - Only the ammonia nitrogen reference is tabulated for the degree of reduction.
-- `OxygenDemand` on the `"amount"` basis cannot be consumed by
+- `OxygenDemand` on the `"amount"` or `"carbon_amount"` basis cannot be consumed by
   `validate_oxygen_limitation`, which works in kilograms; no molar mass is
   inferred.

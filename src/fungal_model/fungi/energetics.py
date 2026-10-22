@@ -307,8 +307,10 @@ class DissipationYieldPrediction:
             biomass_carbon_atoms=biomass_carbon,
             substrate_carbon_atoms=substrate_carbon,
         )
-        tolerance = solution.absolute_tolerance * solution.residual_scale
-        if prediction.yield_per_carbon > 1.0 + tolerance:
+        # Exact comparison: the atom-residual tolerance of the solve is not a
+        # yield tolerance, and the correlation never predicts a yield at the
+        # ceiling (D_e >= 200 kJ/Cmol), so no round-off allowance is needed.
+        if prediction.yield_per_carbon > 1.0:
             raise GrowthEnergeticsError(
                 f"Predicted yield {prediction.yield_per_carbon!r} Cmol/Cmol exceeds the carbon ceiling of 1; "
                 "the formation energies or the dissipation are inconsistent with conservation."
