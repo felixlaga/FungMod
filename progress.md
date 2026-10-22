@@ -57,7 +57,8 @@ Changed:
   excluded), `gelain_2020_figure_2_training_with_sd.csv`/`.yml` (calibration
   evidence and the training SDs the deposit lacks; fits must keep using the
   deposited means) and `digitization_calibration.json`. Both YAML files pass
-  `validate_literature_dataset_metadata`. Literature README updated.
+  `validate_literature_dataset_metadata`. Literature README updated; review
+  record `data/experiments/candidate_reviews/gelain_2020_figure_3_heldout_review.yml`.
 - Registry: environments `gelain_2020_cellulose_batch_5gl` and
   `gelain_2020_cellulose_batch_40gl` (`held_out_from` provenance) and the
   matching `gelain_2020_cellulose_initial_loading_5gl`/`_40gl` records from
@@ -85,8 +86,8 @@ Changed:
   calibrated constants shared; virtual-condition parity with the registry
   condition; draws only for the registry case; scoring and censoring logic;
   `threshold_time` and `apparent_yield` definitions; recorded held-out scores
-  and ranking). `tests/test_literature_schema_contract.py` lists the new
-  directory.
+  and ranking). `tests/test_literature_schema_contract.py` and
+  `tests/test_dataset_candidate_review.py` list the new directory and review.
 
 Results (retrospective, frozen, no refit): held-out mean normalized MSE
 published model 0.021, M2 0.128, registry M0 0.153, M1 0.158, M3 0.158
@@ -113,10 +114,19 @@ Found and not fixed here: `final_metrics.csv` reports one shared maximum
 process rate as both `maximum_substrate_depletion_rate` and
 `maximum_product_release_rate`; for the multi-process culture case that is
 the beta-glucosidase synthesis rate in assay units (separate task).
-`tests/test_literature_schema_contract.py::test_literature_directory_contains_only_reviewed_dataset_files`
+`test_literature_directory_contains_only_reviewed_dataset_files` and
+`test_dataset_candidate_review.py::test_literature_directory_contains_only_reviewed_sources`
 already failed before this change because `data/experiments/literature/lit/`
 (source PDFs added 2026-10-06) and four untracked folders holding only
-`.DS_Store` sit at the literature root; this entry does not move them.
+`.DS_Store` sit at the literature root; this entry does not move them. With
+those five folders set aside, both directory lists match exactly.
+
+Commands run (venv, Python 3.13): `ruff check` and `pyright` on the new and
+changed modules, scripts and tests: clean; `pytest` on 34 related test files
+(registry, literature, organism, Gelain, BGL1A, virtual-experiment and
+environment-grid suites): 1942 passed, 2 skipped (optional COPASI), 2 failed
+(the two pre-existing directory checks above); `mkdocs build --strict`: passed;
+`python scripts/run_showcase_study.py --output outputs/showcase-study`: 163 s.
 
 Remaining ambiguities: digitized means of duplicates, not raw replicates; the
 article was public before every fit, so the test is retrospective, not blind;

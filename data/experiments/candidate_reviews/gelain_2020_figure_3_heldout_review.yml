@@ -1,0 +1,47 @@
+kind: dataset_candidate_review
+candidate_id: gelain_2020_figure_3_heldout
+name: Gelain 2020 T. harzianum held-out cellulose cultures (5 and 40 g/L), digitized from article Figure 3
+status: approved_for_ingestion
+dataset_maturity: literature_raw
+source:
+  type: literature
+  citation: Gelain L, van der Wielen L, van Gulik WM, Pradella JGC, da Costa AC. Mathematical modelling for the optimization of cellulase production using glycerol for cell growth and cellulose as the inducer substrate. Chemical Engineering Science X 8 (2020), 100085.
+  doi: 10.1016/j.cesx.2020.100085
+  url: https://repository.tudelft.nl/file/File_7e2cf84c-4eab-4f61-9713-3facacea35bc
+  authors: [Lucas Gelain, Luuk van der Wielen, Walter M. van Gulik, Jose Geraldo da Cruz Pradella, Aline Carvalho da Costa]
+  year: 2020
+  notes: >-
+    CC BY 4.0. The article PDF is already archived and checksummed under
+    data/experiments/source_intake/gelain_2020/article.pdf. Figure 3 plots the 5 and
+    40 g/L cellulose cultures that Section 3.4 states were not used for parameter
+    estimation; the deposit (doi:10.17632/shd3wcczsr.2) holds no workbook for them.
+intended_use:
+  purpose: >-
+    Frozen-prediction tests of the T. harzianum P49P11 cellulose case and competing
+    model structures outside the 10 to 30 g/L training range, scored with the plotted
+    duplicate standard deviations.
+  measured_quantities: [biomass concentration, cellulose concentration, filter-paper activity, beta-glucosidase activity]
+  model_targets: [biomass, substrate, cellulase_activity, beta_glucosidase_activity]
+  not_for:
+    - Blind or independent validation (the article and figure predate every FungMod fit)
+    - Raw replicate analysis (the figure shows duplicate means and standard deviations only)
+    - Refitting the registry constants and then reporting held-out scores on the same data
+    - Conversion of filter-paper or beta-glucosidase activity into enzyme mass
+schema_gate:
+  requires_literature_schema: true
+  requires_units: true
+  requires_uncertainty: true
+  requires_preprocessing: true
+  requires_no_real_data_in_review: true
+review:
+  selected_by: Claude (Anthropic) for FungMod, held-out loading study HELDOUT-001
+  review_date: 2026-10-09
+  schema_result: passed
+  decision_notes: >-
+    Approved for ingestion as literature_raw only because the digitizer reproduces
+    the deposited Figure 2 means within its declared tolerances before it writes
+    anything (92 of 96 points; median error 0.06 percent and worst 0.70 percent of
+    the axis span; all zero-line markers consistent). Zero-line markers are stored
+    as left-censored values, hidden error bars as upper bounds, and two fully hidden
+    markers are excluded and listed.
+notes: Review record only; the observations live in data/experiments/literature/gelain_2020_t_harzianum_heldout/.
