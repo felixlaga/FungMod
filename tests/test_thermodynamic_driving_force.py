@@ -192,6 +192,12 @@ def test_configured_fixed_activity_and_temperature_dependence_round_trip(
     assert fixed[0]["state_name"] == ""
     assert fixed[0]["activity_basis"] == ACTIVITY_BASIS_FIXED
     assert fixed[0]["fixed_activity"] == pytest.approx(1.0)
+    # The bound trajectory state is still integrated but ignored by the quotient;
+    # the override is explicit on the participant and in the assumption record.
+    assert fixed[0]["overridden_state_name"] == "released_product_amount"
+    override = [item for item in constraint["assumptions"] if item["name"].endswith(".fixed_activity_participants")]
+    assert len(override) == 1
+    assert "product_species -> released_product_amount" in override[0]["known_limitations"]
     assert constraint["temperature_dependence"] == TEMPERATURE_DEPENDENCE_CONSTANT_ENTHALPY
     expected_standard = -5000.0 - 303.15 * (-5000.0 - 0.0) / 298.15
     validation = _dynamic_validation(result.validation_report())
@@ -464,6 +470,20 @@ def test_tolerance_only_flags_favorable_in_driving_force_mode() -> None:
         ),
         (
             lambda: _constraint(
+                (AB[0], DynamicActivityParticipant("B", "b", 1.0, overridden_state_name="B")),
+                standard_delta_gibbs=0.0,
+            ),
+            "only when its activity is fixed",
+        ),
+        (
+            lambda: _constraint(
+                (AB[0], DynamicActivityParticipant("", "b", 1.0, fixed_activity=1.0, activity_source=SOURCE, overridden_state_name="  ")),
+                standard_delta_gibbs=0.0,
+            ),
+            "nonblank state name or None",
+        ),
+        (
+            lambda: _constraint(
                 (
                     DynamicActivityParticipant("", "a", -1.0, fixed_activity=1.0, activity_source=SOURCE),
                     DynamicActivityParticipant("", "b", 1.0, fixed_activity=1.0, activity_source=SOURCE),
@@ -529,3 +549,54 @@ def test_trace_pool_is_conserved_by_the_equilibrium_solver() -> None:
         assert (x + y - trace) / trace == pytest.approx(0.0, abs=1.0e-8)
         assert y / x == pytest.approx(np.exp(-2000.0 / (GAS_CONSTANT * 298.15)), rel=1.0e-8)
         assert equilibrium["conservation_law_count"] == 2
+
+
+def _single_reaction_network(members: tuple[MacrochemicalSpecies, ...], reactants: dict[str, int],
+                             products: dict[str, int]) -> DetailedBalanceNetwork:
+    balance = MacrochemicalBalance("signed invariants", members, SOURCE, thermodynamic_conditions=SOURCE)
+    scale = Parameter(name="k", symbol="k", value=0.3, units="mol/L/s", source=SOURCE, uncertainty=None, confidence_level="testing", notes="")
+    return DetailedBalanceNetwork(
+        balance=balance,
+        reactions=(DetailedBalanceReaction("r", reactants, products, scale, SOURCE),),
+        temperature=_parameter("T", 298.15, "K"),
+        gas_constant=_parameter("R", GAS_CONSTANT, "J/mol/K"),
+        standard_concentration=_parameter("c0", 1.0, "mol/L"),
+    )
+
+
+@pytest.mark.parametrize("b0, c0", [(0.1, 0.1), (1.0e-3, 1.0e-3), (0.1, 0.2)])
+def test_equilibrium_with_zero_signed_invariant_total_dissociation(b0: float, c0: float) -> None:
+    """A <-> B + C conserves B - C, whose total is zero whenever B0 = C0.
+
+    Review regression: scaling that residual by the signed total divided by
+    zero and made a valid interior start raise. The scale must be positive for
+    every invariant row, not only for nonnegative pool rows.
+    """
+    network = _single_reaction_network(
+        (_species("A", "C4H8", 0.0), _species("B", "C2H4", -1000.0), _species("C", "C2H4", 500.0)), {"A": 1}, {"B": 1, "C": 1}
+    )
+    equilibrium = network.equilibrium({"A": Q_(1.0, "mol/L"), "B": Q_(b0, "mol/L"), "C": Q_(c0, "mol/L")})
+    a, b, c = (equilibrium["concentrations"][name].magnitude for name in "ABC")
+    assert b * c / a == pytest.approx(np.exp(500.0 / (GAS_CONSTANT * 298.15)), rel=1.0e-8)
+    assert a + c == pytest.approx(1.0 + c0, rel=1.0e-10)
+    assert b - c == pytest.approx(b0 - c0, abs=1.0e-10)
+    assert equilibrium["conservation_law_count"] == 2
+    assert equilibrium["maximum_scaled_residual"] <= 1.0e-10
+
+
+@pytest.mark.parametrize("start", [(0.7, 0.3, 0.2, 0.2), (0.5, 0.5, 0.1, 0.1), (0.5, 0.5, 0.3, 0.3), (1.0, 1.0, 1.0e-3, 1.0e-3)])
+def test_equilibrium_with_zero_signed_invariant_total_exchange(start: tuple[float, float, float, float]) -> None:
+    """A + B <-> C + D conserves C - D, whose total is zero whenever C0 = D0."""
+    network = _single_reaction_network(
+        (_species("A", "CH2", 0.0), _species("B", "CH2", 0.0), _species("C", "CH2", -1000.0), _species("D", "CH2", 500.0)),
+        {"A": 1, "B": 1},
+        {"C": 1, "D": 1},
+    )
+    equilibrium = network.equilibrium({name: Q_(value, "mol/L") for name, value in zip("ABCD", start, strict=True)})
+    a, b, c, d = (equilibrium["concentrations"][name].magnitude for name in "ABCD")
+    assert c * d / (a * b) == pytest.approx(np.exp(500.0 / (GAS_CONSTANT * 298.15)), rel=1.0e-8)
+    assert a + d == pytest.approx(start[0] + start[3], rel=1.0e-10)
+    assert b + d == pytest.approx(start[1] + start[3], rel=1.0e-10)
+    assert c - d == pytest.approx(start[2] - start[3], abs=1.0e-10)
+    assert equilibrium["conservation_law_count"] == 3
+    assert equilibrium["maximum_scaled_residual"] <= 1.0e-10

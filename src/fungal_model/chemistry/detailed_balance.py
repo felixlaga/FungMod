@@ -203,10 +203,14 @@ class DetailedBalanceNetwork:
         rank = int(np.sum(singular > max(self.stoichiometry.shape)*np.finfo(float).eps*singular[0]))
         directions, invariants = basis[:, :rank].T, _row_reduced(basis[:, rank:].T)
         total = invariants @ initial
-        # Each conservation residual is relative to its own pool total, so a trace
-        # pool is held to the same relative tolerance as the dominant one. The
-        # lower bound only keeps a zero total representable in floating point.
-        scale = np.maximum(np.abs(total), 1e-300)
+        # Each conservation residual is relative to the absolute-coefficient
+        # weighted pool size, |invariants| @ initial. For a nonnegative row this
+        # is the pool total, so a trace pool is held to the same relative
+        # tolerance as the dominant one. Reduced rows may carry negative
+        # entries (A <-> B + C conserves B - C), whose signed total is
+        # legitimately zero; the absolute weighting is strictly positive for
+        # every row because initial > 0, so no floor constant is needed.
+        scale = np.abs(invariants) @ initial
 
         def residual(log_activity):
             c = self.c_standard*np.exp(log_activity)

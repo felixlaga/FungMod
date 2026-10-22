@@ -432,6 +432,10 @@ def _participants(
                 )
             fixed = fixed_activities.get(participant.species_id)
             if fixed is not None:
+                # A declared fixed activity overrides a bound trajectory state.
+                # The solver still integrates that state; the override is
+                # recorded on the participant and in the assumption record.
+                bound = "" if participant.state_name is None else participant.state_name.strip()
                 participants.append(
                     DynamicActivityParticipant(
                         state_name="",
@@ -439,6 +443,7 @@ def _participants(
                         signed_coefficient=sign * coefficient,
                         fixed_activity=fixed[0],
                         activity_source=fixed[1],
+                        overridden_state_name=bound or None,
                     )
                 )
                 continue

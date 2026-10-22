@@ -98,8 +98,17 @@ Maturity of the driving-force law: `literature_backed_software_tested`.
   forward law (Michaelis-Menten) the result is not Haldane-consistent near and
   above equilibrium; a reversible modular law is a separate, deferred family.
 - A forward law that vanishes at zero reactant gives `r_net = 0` there, so a
-  reactant-free boundary state is a fixed point in both modes. Start such a
-  reaction with the reactant above the activity floor.
+  reactant-free boundary state is a fixed point in both modes. This fixed
+  point is an artefact of the activity floor (which caps `1 / a_reactant`
+  inside `phi`) combined with a forward law that vanishes at zero reactant.
+  It is not physics: the reversible limit at `A = 0` would be
+  `r_net -> -k B / K`. Start such a reaction with the reactant above the
+  activity floor, and do not let an analytic kernel inherit the fixed point
+  silently.
+- A species listed in `fixed_activities` that also binds a trajectory state
+  keeps that state integrated by the solver while the constraint ignores it.
+  The participant record carries `overridden_state_name` and the
+  `fixed_activity_participants` assumption names the ignored state.
 - Activities are ideal-dilute ratios with an explicit floor; no activity
   coefficients, no pH or ionic-strength transform, no pMg.
 - `dG / (R T) > 700` is refused (`ValueError`) rather than overflowing.
@@ -110,8 +119,12 @@ Maturity of the driving-force law: `literature_backed_software_tested`.
 
 ## Detailed-balance equilibrium
 
-`DetailedBalanceNetwork.equilibrium` now scales each conservation residual by
-its own pool total (`max(|total_j|, 1e-300)`), after row-reducing the
-null-space basis so that each residual row is one pool. A 1e-12 M pool next to
-a 1 M pool is conserved to machine precision instead of passing with a 10
-percent error.
+`DetailedBalanceNetwork.equilibrium` now scales each conservation residual
+`w_j . c - w_j . c_0` by `|w_j| . c_0`, after row-reducing the null-space
+basis so that each residual row is one pivot species. For a nonnegative row
+the scale is the pool total, so a 1e-12 M pool next to a 1 M pool is
+conserved to machine precision instead of passing with a 10 percent error.
+Reduced rows may carry negative entries (`A <-> B + C` conserves `B - C`),
+whose signed total is legitimately zero when `B_0 = C_0`; the
+absolute-coefficient scale stays strictly positive for every row because the
+solver already requires `c_0 > 0`, so no floor constant is involved.

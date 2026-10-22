@@ -115,6 +115,10 @@ class DynamicActivityParticipant:
     signed_coefficient: float
     fixed_activity: float | None = None
     activity_source: str | None = None
+    overridden_state_name: str | None = None
+    """Trajectory state bound to this species by the reaction metadata but
+    ignored because the activity is declared fixed. Recorded so the override
+    is explicit in the constraint record and its assumptions."""
 
     @property
     def is_fixed(self) -> bool:
@@ -151,6 +155,16 @@ class DynamicActivityParticipant:
                     f"Fixed-activity participant {self.species_id!r} requires a "
                     "nonblank activity_source."
                 )
+            if self.overridden_state_name is not None and not has_text(self.overridden_state_name):
+                raise ValueError(
+                    f"Fixed-activity participant {self.species_id!r} overridden_state_name "
+                    "must be a nonblank state name or None."
+                )
+        elif self.overridden_state_name is not None:
+            raise ValueError(
+                f"Dynamic thermodynamic participant {self.species_id!r} may record an "
+                "overridden state name only when its activity is fixed."
+            )
         elif not has_text(self.state_name):
             raise ValueError(
                 f"Dynamic thermodynamic participant {self.species_id!r} requires a "
@@ -166,6 +180,7 @@ class DynamicActivityParticipant:
             "activity_basis": ACTIVITY_BASIS_FIXED if self.is_fixed else ACTIVITY_BASIS_STATE,
             "fixed_activity": self.fixed_activity,
             "activity_source": self.activity_source,
+            "overridden_state_name": self.overridden_state_name,
         }
 
 
@@ -748,8 +763,12 @@ class DynamicThermodynamicConstraint:
                         "forward law is not Haldane-consistent near and above "
                         "equilibrium. A forward law that vanishes at zero reactant "
                         "gives r_net = 0 there, so a reactant-free boundary state "
-                        "is a fixed point. Ideal-dilute activities with an "
-                        "explicit floor; no activity coefficients."
+                        "is a fixed point. That fixed point is an artefact of the "
+                        "activity floor (which caps 1/a_reactant in phi) combined "
+                        "with a forward law that vanishes at zero reactant, not "
+                        "physics: the reversible limit would be r_net -> -k B / K. "
+                        "Ideal-dilute activities with an explicit floor; no "
+                        "activity coefficients."
                     ),
                     source="; ".join(DRIVING_FORCE_PROVENANCE),
                 )
@@ -812,6 +831,7 @@ class DynamicThermodynamicConstraint:
                 )
             )
         fixed = [participant for participant in self.participants if participant.is_fixed]
+        overridden = [participant for participant in fixed if participant.overridden_state_name]
         if fixed:
             records.append(
                 Assumption(
@@ -831,6 +851,17 @@ class DynamicThermodynamicConstraint:
                     known_limitations=(
                         "The fixed activity does not respond to the trajectory; "
                         "it is a convention, not a measurement of the run."
+                        + (
+                            " Trajectory states bound to fixed species are still "
+                            "integrated but ignored by this constraint's quotient: "
+                            + ", ".join(
+                                f"{participant.species_id} -> {participant.overridden_state_name}"
+                                for participant in overridden
+                            )
+                            + "."
+                            if overridden
+                            else ""
+                        )
                     ),
                     source="; ".join(
                         str(participant.activity_source) for participant in fixed
