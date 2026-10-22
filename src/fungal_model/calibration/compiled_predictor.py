@@ -23,12 +23,12 @@ from typing import Any
 import numpy as np
 
 from fungal_model.core.kernels import conversion_factor
-from fungal_model.core.numerics import solve_checked
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.provenance import has_text
 from fungal_model.core.units import Q_, assert_compatible
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.solvers.compiled import compile_assembled_model, resolve_state_units
+from fungal_model.solvers.process_ode import integrate_compiled
 from fungal_model.validation.maturity import enforce_run_maturity
 from fungal_model.workflows.configured_inputs import ConfiguredInputLoader
 from fungal_model.workflows.configured_processes import ConfiguredProcessAssembler
@@ -152,9 +152,12 @@ class ConfiguredConditionPredictor:
             [float(assert_compatible(inputs.initial_state[name], units, name=name).magnitude) for name, units in state_units.items()],
             dtype=float,
         )
-        compiled = compile_assembled_model(model, time_units=time_units)
-        options = model.solver_settings.scipy_options(state_units, time_units)
-        solution = solve_checked(compiled.rhs, (start, stop), initial, t_eval=unique_times, **options)
+        compiled = compile_assembled_model(
+            model,
+            time_units=time_units,
+            finite_difference_scales=model.solver_settings.finite_difference_scales(state_units),
+        )
+        solution, _ = integrate_compiled(model.solver_settings, compiled, (start, stop), initial, t_eval=unique_times)
         trajectory = np.asarray(solution.y, dtype=float)
         output = np.empty((requested.size, len(condition.observables)), dtype=float)
         for column, mapping in enumerate(condition.observables):

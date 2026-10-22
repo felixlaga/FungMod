@@ -161,6 +161,7 @@ class ConfiguredProcessAssembler:
                 ),
                 thermodynamic_constraints=thermodynamic_constraints,
                 allow_unsourced_for_testing=config.mode == "toy",
+                **({} if config.solver is None else {"solver_settings": config.solver.to_solver_settings()}),
             ).assemble()
         except ModelAssemblyError as exc:
             details: dict[str, Any] = {"error_type": type(exc).__name__}

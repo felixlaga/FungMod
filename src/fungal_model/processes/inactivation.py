@@ -14,7 +14,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from fungal_model.core.kernels import KernelContext, RateKernel, conversion_factor
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel, conversion_factor
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity, assert_compatible
 from fungal_model.kinetics.inactivation import (
@@ -187,6 +187,32 @@ class ThermalInactivationProcess(Process):
             return (rate_constant * active) * scale
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        """``d(rate)/d(active) = k_d(T)``, the folded first-order constant; zero elsewhere."""
+
+        rate_constant = float(
+            assert_compatible(
+                self.rate_constant(parameters=context.parameters, environment=context.environment),
+                "1 / second",
+                name=self.reference_rate_constant_symbol,
+            ).magnitude
+        )
+        index, to_state = context.state_slot(self.active_state, self.state_units)
+        scale = conversion_factor(f"{self.state_units} / second", self.rate_units, name=f"{self.name} rate")
+        active_name = self.active_state
+        size = len(context.state_index)
+        derivative = rate_constant * to_state * scale
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            if state[index] * to_state < 0:
+                raise ValueError(f"{active_name} must be non-negative.")
+            result = np.zeros(size, dtype=float)
+            result[index] = derivative
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")
