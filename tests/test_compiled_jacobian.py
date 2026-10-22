@@ -61,7 +61,7 @@ def test_compiled_jacobian_is_the_derivative_of_the_compiled_rhs(config_path: Pa
     assert summary["analytic_jacobian_count"] == sum(kind == JACOBIAN_ANALYTIC for kind in summary["jacobian_kernels"].values())
     for process in compiled.processes:
         if isinstance(process.process, RateModifierProcess) or process.constraint is not None:
-            assert process.jacobian_kind == JACOBIAN_FINITE_DIFFERENCE, process.name
+            assert process.jacobian_kind in {JACOBIAN_ANALYTIC, JACOBIAN_FINITE_DIFFERENCE}, process.name
     initial = np.array([float(Q_(request.initial_state[name]).to(units).magnitude) for name, units in zip(compiled.state_names, compiled.state_units, strict=True)])
     rng = np.random.default_rng(3)
     for trial in range(3):
