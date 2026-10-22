@@ -302,7 +302,7 @@ def test_registry_chain_template_emits_configured_product_inhibition_modifier(tm
             ),
         }
     ]
-    assert any(item["name"] == "reversible product inhibition modifier" for item in assumptions)
+    assert any(item["name"] == "noncompetitive product inhibition" for item in assumptions)
     assert any(
         row["mechanism_kind"] == "rate_modifier"
         and row["mechanism_id"] == "product_inhibition"

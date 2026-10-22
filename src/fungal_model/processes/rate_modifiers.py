@@ -8,14 +8,23 @@ from typing import Any
 
 import numpy as np
 
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.assumptions import Assumption
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity
 from fungal_model.modifiers import (
+    CONDITION_OXYGEN,
+    CONDITION_PH,
+    CONDITION_STATE,
+    CONDITION_TEMPERATURE,
+    CONDITION_WATER_ACTIVITY,
+    MODIFIER_CONDITIONS,
     CardinalPHModifier,
     CardinalTemperatureModifier,
     CompetitiveInhibitionModifier,
     CoupledSubstrateProductInhibitionModifier,
+    InhibitorTerm,
+    MixedInhibitionModifier,
     OxygenModifier,
     PHModifier,
     ProductInhibitionModifier,
@@ -23,6 +32,7 @@ from fungal_model.modifiers import (
     SubstrateInhibitionModifier,
     TemperatureModifier,
     WaterActivityModifier,
+    zero_activity_gradient,
 )
 from fungal_model.processes.base import (
     ParameterRequirement,
@@ -32,12 +42,61 @@ from fungal_model.processes.base import (
 )
 
 
+GAMMA_CONCEPT_SOURCE = (
+    "Zwietering M.H., Wijtzes T., de Wit J.C., van 't Riet K. (1992) A decision support system for "
+    "prediction of the microbial spoilage in foods. J. Food Prot. 55:973-979; "
+    "Rosso L., Lobry J.R., Bajard S., Flandrois J.P. (1995) Convenient model to describe the combined "
+    "effects of temperature and pH on microbial growth. Appl. Environ. Microbiol. 61:610-616; "
+    "Akkermans S., Noriega Fernandez E., Logist F., Van Impe J.F. (2017) Introducing a novel interaction "
+    "model structure for the combined effect of temperature and pH on the microbial growth rate. "
+    "Int. J. Food Microbiol. 240:85-96"
+)
+
+# Modifier classes that read only the environment and predate the ``condition``
+# protocol member. The wrapper declares their condition here, explicitly, so a
+# modifier that declares nothing and is not listed is refused rather than guessed.
+_ENVIRONMENT_ONLY_MODIFIER_CONDITIONS: tuple[tuple[type, str], ...] = (
+    (TemperatureModifier, CONDITION_TEMPERATURE),
+    (CardinalTemperatureModifier, CONDITION_TEMPERATURE),
+    (PHModifier, CONDITION_PH),
+    (CardinalPHModifier, CONDITION_PH),
+    (OxygenModifier, CONDITION_OXYGEN),
+    (WaterActivityModifier, CONDITION_WATER_ACTIVITY),
+)
+
+
+def gamma_concept_assumption() -> Assumption:
+    """The multiplicative composition of rate modifiers, named as the hypothesis it is."""
+
+    return Assumption(
+        name="multiplicative gamma-concept composition of rate modifiers",
+        description=(
+            "The base rate is multiplied by one dimensionless factor per configured modifier. Factors for "
+            "different environment conditions (temperature, pH, oxygen, water activity) are treated as "
+            "independent and multiplied, the gamma concept; state-dependent factors (inhibition, conversion "
+            "dependence) multiply the same product."
+        ),
+        justification=(
+            "The independent-factor product is the standard baseline for combined environmental responses "
+            "(Zwietering et al. 1992; Rosso et al. 1995) and keeps every factor explicit and separately "
+            "testable."
+        ),
+        known_limitations=(
+            "No interaction term between conditions: near growth or activity boundaries combined stresses "
+            "deviate from the product (Akkermans et al. 2017). Two laws for one condition double-count it, so "
+            "the wrapper refuses them unless allow_stacked_condition_laws is set explicitly."
+        ),
+        source=GAMMA_CONCEPT_SOURCE,
+    )
+
+
 @dataclass(frozen=True, init=False)
 class RateModifierProcess(Process):
     """Wrap a process and scale its rate with explicit generic modifiers."""
 
     base_process: Process
     rate_modifiers: tuple[Any, ...]
+    allow_stacked_condition_laws: bool
 
     def __init__(
         self,
@@ -45,9 +104,17 @@ class RateModifierProcess(Process):
         base_process: Process,
         rate_modifiers: tuple[Any, ...],
         notes: str = "",
+        allow_stacked_condition_laws: bool = False,
     ) -> None:
         if not rate_modifiers:
             raise ValueError("RateModifierProcess requires at least one modifier.")
+        stacked = _stacked_conditions(rate_modifiers)
+        if stacked and not allow_stacked_condition_laws:
+            raise ValueError(
+                "RateModifierProcess refuses more than one environment law per condition "
+                f"(stacked: {stacked}); two laws for one condition double-count it under the gamma concept. "
+                "Set allow_stacked_condition_laws=True to declare the stacking deliberately."
+            )
         Process.__init__(
             self,
             name=base_process.name,
@@ -56,12 +123,20 @@ class RateModifierProcess(Process):
             changed_state_variables=base_process.changed_state_variables,
             required_parameters=_required_parameters(base_process, rate_modifiers),
             assumptions=_unique_assumptions(
-                [*base_process.assumptions, *(assumption for modifier in rate_modifiers for assumption in modifier.assumptions)]
+                [
+                    *base_process.assumptions,
+                    gamma_concept_assumption(),
+                    *(assumption for modifier in rate_modifiers for assumption in modifier.assumptions),
+                ]
             ),
             validity=ValidityDomain(
                 description=base_process.validity.description,
                 labels=(*base_process.validity.labels, "rate_modified"),
-                limitations=(*base_process.validity.limitations, *_modifier_limitations(rate_modifiers)),
+                limitations=(
+                    *base_process.validity.limitations,
+                    *_modifier_limitations(rate_modifiers),
+                    *_stacking_limitations(stacked),
+                ),
             ),
             failure_modes=(*base_process.failure_modes, *_modifier_failure_modes(rate_modifiers)),
             source=base_process.source,
@@ -69,6 +144,7 @@ class RateModifierProcess(Process):
         )
         object.__setattr__(self, "base_process", base_process)
         object.__setattr__(self, "rate_modifiers", tuple(rate_modifiers))
+        object.__setattr__(self, "allow_stacked_condition_laws", bool(allow_stacked_condition_laws))
 
     def rate(
         self,
@@ -125,6 +201,56 @@ class RateModifierProcess(Process):
 
         return kernel
 
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        """Product rule over the base gradient and every modifier's activity gradient.
+
+        ``d(v prod_k a_k)/dy = (dv/dy) prod_k a_k + v sum_k (da_k/dy) prod_{j != k} a_j``.
+        Returns ``None`` (the caller then records a finite-difference Jacobian)
+        when the base process or any state-reading modifier offers no analytic
+        gradient. Environment-only modifiers contribute a zero gradient.
+        """
+
+        compile_base_jacobian = getattr(self.base_process, "compile_jacobian", None)
+        base_gradient = None if compile_base_jacobian is None else compile_base_jacobian(context)
+        base_rate = self.base_process.compile_rate(context)
+        if base_gradient is None or base_rate is None:
+            return None
+        activities: list[RateKernel] = []
+        gradients: list[JacobianKernel | None] = []
+        for modifier in self.rate_modifiers:
+            compile_activity = getattr(modifier, "compile_activity", None)
+            activity = None if compile_activity is None else compile_activity(context)
+            if activity is None:
+                return None
+            gradient = _activity_gradient(modifier, context)
+            if gradient is None:
+                return None
+            activities.append(activity)
+            gradients.append(None if _reads_no_state(modifier) else gradient)
+        activity_kernels = tuple(activities)
+        gradient_kernels = tuple(gradients)
+        count = len(activity_kernels)
+
+        def jacobian(time: float, state: np.ndarray) -> np.ndarray:
+            values = [activity(time, state) for activity in activity_kernels]
+            product = 1.0
+            for value in values:
+                product *= value
+            result = base_gradient(time, state) * product
+            rate = base_rate(time, state)
+            for k in range(count):
+                gradient = gradient_kernels[k]
+                if gradient is None:
+                    continue
+                others = 1.0
+                for j in range(count):
+                    if j != k:
+                        others *= values[j]
+                result = result + rate * others * gradient(time, state)
+            return result
+
+        return jacobian
+
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update(
@@ -134,6 +260,8 @@ class RateModifierProcess(Process):
                     modifier.to_dict() if hasattr(modifier, "to_dict") else {"name": str(modifier)}
                     for modifier in self.rate_modifiers
                 ],
+                "modifier_conditions": [_modifier_condition(modifier) for modifier in self.rate_modifiers],
+                "allow_stacked_condition_laws": self.allow_stacked_condition_laws,
             }
         )
         return data
@@ -386,6 +514,79 @@ def coupled_substrate_product_inhibition_modifier_from_config(
     )
 
 
+def mixed_inhibition_modifier_from_config(
+    modifier_config: Mapping[str, Any],
+    *,
+    state_units: Mapping[str, str],
+) -> MixedInhibitionModifier:
+    """Build the general reversible-inhibition modifier from explicit config fields.
+
+    ``inhibitors`` is a list of mappings with ``state``, ``mechanism`` and the
+    constant symbols that mechanism needs: ``competitive_constant`` (K_ic),
+    ``uncompetitive_constant`` (K_iu), or ``inhibition_constant`` for a
+    noncompetitive inhibitor (one symbol for both). A constant the mechanism
+    does not use must be absent; a constant it needs is never defaulted.
+    """
+
+    modifier_type = "mixed_inhibition"
+    substrate_state = _required_text(
+        modifier_config, "substrate_state", field_name="substrate_state", modifier_type=modifier_type
+    )
+    _require_state(substrate_state, state_units=state_units, modifier_type=modifier_type)
+    raw_inhibitors = modifier_config.get("inhibitors")
+    if not isinstance(raw_inhibitors, (list, tuple)) or not raw_inhibitors:
+        raise ValueError(f"{modifier_type} modifier requires a nonempty inhibitors list.")
+    inhibitors: list[InhibitorTerm] = []
+    for entry in raw_inhibitors:
+        if not isinstance(entry, Mapping):
+            raise ValueError(f"{modifier_type} modifier inhibitors entries must be mappings.")
+        state = _required_text(entry, "state", "inhibitor_state", field_name="inhibitors[].state",
+                               modifier_type=modifier_type)
+        _require_state(state, state_units=state_units, modifier_type=modifier_type)
+        mechanism = _required_text(entry, "mechanism", field_name="inhibitors[].mechanism",
+                                   modifier_type=modifier_type)
+        competitive = _optional_symbol(entry, "competitive_constant", "competitive_constant_symbol")
+        uncompetitive = _optional_symbol(entry, "uncompetitive_constant", "uncompetitive_constant_symbol")
+        shared = _optional_symbol(entry, "inhibition_constant", "inhibition_constant_symbol")
+        if shared is not None:
+            if mechanism != "noncompetitive":
+                raise ValueError(
+                    f"{modifier_type} inhibitor {state!r}: inhibition_constant is the single noncompetitive "
+                    f"constant; mechanism {mechanism!r} must name competitive_constant and/or "
+                    "uncompetitive_constant instead."
+                )
+            if (competitive is not None and competitive != shared) or (
+                uncompetitive is not None and uncompetitive != shared
+            ):
+                raise ValueError(
+                    f"{modifier_type} inhibitor {state!r}: inhibition_constant conflicts with the declared "
+                    "competitive_constant/uncompetitive_constant."
+                )
+            competitive = uncompetitive = shared
+        inhibitors.append(
+            InhibitorTerm(
+                state=state,
+                units=state_units[state],
+                mechanism=mechanism,
+                competitive_constant_symbol=competitive,
+                uncompetitive_constant_symbol=uncompetitive,
+            )
+        )
+    return MixedInhibitionModifier(
+        substrate_state=substrate_state,
+        michaelis_constant_symbol=_required_symbol(
+            modifier_config, "michaelis_constant", "michaelis_constant_symbol",
+            field_name="michaelis_constant", modifier_type=modifier_type,
+        ),
+        substrate_units=state_units[substrate_state],
+        inhibitors=tuple(inhibitors),
+        primary_source=_required_text(
+            modifier_config, "primary_source", field_name="primary_source", modifier_type=modifier_type
+        ),
+        maturity=_required_text(modifier_config, "maturity", field_name="maturity", modifier_type=modifier_type),
+    )
+
+
 def temperature_modifier_from_config(modifier_config: Mapping[str, Any]) -> TemperatureModifier:
     """Build an Arrhenius temperature modifier from explicit config fields."""
 
@@ -547,55 +748,103 @@ def water_activity_modifier_from_config(modifier_config: Mapping[str, Any]) -> W
     return WaterActivityModifier(minimum_water_activity_symbol=minimum_water_activity)
 
 
+def _modifier_condition(modifier: Any) -> str:
+    """The declared condition of a modifier; environment-only legacy classes are tabled, others refused."""
+
+    condition = getattr(modifier, "condition", None)
+    if condition is None:
+        for modifier_class, tabled in _ENVIRONMENT_ONLY_MODIFIER_CONDITIONS:
+            if isinstance(modifier, modifier_class):
+                return tabled
+        raise ValueError(
+            f"Modifier {getattr(modifier, 'name', modifier)!r} declares no condition; every rate modifier "
+            f"must declare one of {list(MODIFIER_CONDITIONS)}."
+        )
+    if condition not in MODIFIER_CONDITIONS:
+        raise ValueError(
+            f"Modifier {getattr(modifier, 'name', modifier)!r} declares condition {condition!r}; "
+            f"expected one of {list(MODIFIER_CONDITIONS)}."
+        )
+    return str(condition)
+
+
+def _modifier_read_states(modifier: Any) -> tuple[tuple[str, str], ...]:
+    """Every ``(state, units)`` pair a modifier reads; environment-only legacy classes read none."""
+
+    read_states = getattr(modifier, "read_states", None)
+    if read_states is None:
+        if _modifier_condition(modifier) != CONDITION_STATE:
+            return ()
+        raise ValueError(
+            f"Modifier {getattr(modifier, 'name', modifier)!r} declares condition 'state' but no read_states."
+        )
+    return tuple((str(name), str(units)) for name, units in read_states)
+
+
+def _reads_no_state(modifier: Any) -> bool:
+    return not _modifier_read_states(modifier)
+
+
+def _activity_gradient(modifier: Any, context: KernelContext) -> JacobianKernel | None:
+    """A modifier's analytic activity gradient; zero when it reads no state; ``None`` when it offers none."""
+
+    compile_gradient = getattr(modifier, "compile_activity_gradient", None)
+    if compile_gradient is not None:
+        return compile_gradient(context)
+    if _reads_no_state(modifier):
+        return zero_activity_gradient(context)
+    return None
+
+
+def _stacked_conditions(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
+    """Environment conditions declared by more than one modifier, in first-seen order."""
+
+    seen: list[str] = []
+    stacked: list[str] = []
+    for modifier in modifiers:
+        condition = _modifier_condition(modifier)
+        if condition == CONDITION_STATE:
+            continue
+        if condition in seen and condition not in stacked:
+            stacked.append(condition)
+        seen.append(condition)
+    return tuple(stacked)
+
+
+def _stacking_limitations(stacked: tuple[str, ...]) -> tuple[str, ...]:
+    if not stacked:
+        return ()
+    return (
+        "Stacked environment laws were allowed explicitly for "
+        f"{list(stacked)}: their factors multiply and double-count that condition; the combined response "
+        "is the declarer's hypothesis, not a sourced law.",
+    )
+
+
 def _required_state_variables(
     base_process: Process,
     modifiers: tuple[Any, ...],
 ) -> tuple[StateVariableSpec, ...]:
+    """Declare every state a modifier reads so assembly, compilation and the Jacobian see it."""
+
     specs = list(base_process.required_state_variables)
-    existing = {(spec.name, spec.units) for spec in base_process.state_variables}
+    existing = {spec.name for spec in base_process.state_variables}
     for modifier in modifiers:
-        if isinstance(modifier, ProductInhibitionModifier):
-            key = (modifier.product_state, modifier.product_units)
-            if key not in existing:
-                specs.append(
-                    StateVariableSpec(
-                        modifier.product_state,
-                        modifier.product_units,
-                        role="inhibitor_product",
-                        description="Explicit product state used by reversible product inhibition.",
-                    )
+        for name, units in _modifier_read_states(modifier):
+            if name in existing:
+                continue
+            specs.append(
+                StateVariableSpec(
+                    name,
+                    units,
+                    role="modifier_input",
+                    description=(
+                        f"State read by rate modifier {getattr(modifier, 'name', modifier)!r} "
+                        f"({getattr(modifier, 'to_dict', dict)().get('type', type(modifier).__name__)})."
+                    ),
                 )
-                existing.add(key)
-        elif isinstance(modifier, CompetitiveInhibitionModifier):
-            key = (modifier.inhibitor_state, modifier.inhibitor_units)
-            if key not in existing:
-                specs.append(
-                    StateVariableSpec(
-                        modifier.inhibitor_state,
-                        modifier.inhibitor_units,
-                        role="competitive_inhibitor",
-                        description=(
-                            "Explicit inhibitor state for provenance-bound "
-                            "competitive Michaelis-Menten inhibition."
-                        ),
-                    )
-                )
-                existing.add(key)
-        elif isinstance(modifier, CoupledSubstrateProductInhibitionModifier):
-            key = (modifier.product_state, modifier.product_units)
-            if key not in existing:
-                specs.append(
-                    StateVariableSpec(
-                        modifier.product_state,
-                        modifier.product_units,
-                        role="inhibitor_product",
-                        description=(
-                            "Explicit product state for the provenance-bound "
-                            "combined substrate/product-inhibition law."
-                        ),
-                    )
-                )
-                existing.add(key)
+            )
+            existing.add(name)
     return tuple(specs)
 
 
@@ -622,6 +871,17 @@ def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
             "Combined substrate/product inhibition supports one explicitly matched "
             "homogeneous Michaelis-Menten substrate and one product state; its "
             "squared product term is preparation-specific empirical kinetics."
+        )
+    if any(isinstance(modifier, MixedInhibitionModifier) for modifier in modifiers):
+        limitations.append(
+            "General reversible inhibition supports independent competitive, uncompetitive, noncompetitive "
+            "or mixed inhibitors on one explicitly matched homogeneous Michaelis-Menten substrate; no "
+            "cooperative, irreversible or surface-adsorption inhibition."
+        )
+    if any(isinstance(modifier, SubstrateReactivityModifier) for modifier in modifiers):
+        limitations.append(
+            "Conversion dependence (S / S_ref)^n is an empirical factor of unattributed origin; it reads an "
+            "explicit substrate state that the model must carry and initialise."
         )
     if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
         limitations.append(
@@ -698,6 +958,21 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
                 "coupled inhibition attached to a non-Michaelis-Menten process",
             )
         )
+    if any(isinstance(modifier, MixedInhibitionModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing or negative mixed-inhibition substrate or inhibitor state",
+                "missing, non-positive, or unit-incompatible K_ic or K_iu inhibition constant",
+                "mixed inhibition attached to a non-Michaelis-Menten process",
+            )
+        )
+    if any(isinstance(modifier, SubstrateReactivityModifier) for modifier in modifiers):
+        modes.extend(
+            (
+                "missing, negative, or non-finite conversion-dependence substrate state",
+                "missing, non-positive, or unit-incompatible reference concentration or negative exponent",
+            )
+        )
     if any(isinstance(modifier, TemperatureModifier) for modifier in modifiers):
         modes.extend(
             (
@@ -730,20 +1005,7 @@ def _modifier_failure_modes(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
 
 
 def _requires_environment(modifiers: tuple[Any, ...]) -> bool:
-    return any(
-        isinstance(
-            modifier,
-            (
-                TemperatureModifier,
-                PHModifier,
-                OxygenModifier,
-                WaterActivityModifier,
-                CardinalTemperatureModifier,
-                CardinalPHModifier,
-            ),
-        )
-        for modifier in modifiers
-    )
+    return any(_modifier_condition(modifier) != CONDITION_STATE for modifier in modifiers)
 
 
 def _required_parameters(
@@ -806,6 +1068,43 @@ def _required_parameters(
                     "Positive K_p for the squared product term in the explicit "
                     "combined inhibition law."
                 ),
+            )
+        elif isinstance(modifier, MixedInhibitionModifier):
+            for term in modifier.inhibitors:
+                if term.competitive_constant_symbol is not None:
+                    _add_requirement(
+                        requirements,
+                        existing_units,
+                        symbol=term.competitive_constant_symbol,
+                        units=term.units,
+                        name=f"competitive inhibition constant K_ic for {term.state}",
+                        description="Positive K_ic (alpha term) of the general reversible-inhibition law.",
+                    )
+                if term.uncompetitive_constant_symbol is not None:
+                    _add_requirement(
+                        requirements,
+                        existing_units,
+                        symbol=term.uncompetitive_constant_symbol,
+                        units=term.units,
+                        name=f"uncompetitive inhibition constant K_iu for {term.state}",
+                        description="Positive K_iu (beta term) of the general reversible-inhibition law.",
+                    )
+        elif isinstance(modifier, SubstrateReactivityModifier):
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.reference_concentration_symbol,
+                units=modifier.substrate_units,
+                name="conversion-dependence reference concentration",
+                description="Positive S_ref (the loading of the same state) for the (S / S_ref)^n factor.",
+            )
+            _add_requirement(
+                requirements,
+                existing_units,
+                symbol=modifier.exponent_symbol,
+                units="dimensionless",
+                name="conversion-dependence exponent",
+                description="Non-negative exponent n of the empirical (S / S_ref)^n factor.",
             )
         elif isinstance(modifier, TemperatureModifier):
             _add_requirement(
@@ -1001,9 +1300,12 @@ def _unique_assumptions(assumptions: list[Any]) -> tuple[Any, ...]:
 
 
 __all__ = [
+    "GAMMA_CONCEPT_SOURCE",
     "RateModifierProcess",
     "competitive_inhibition_modifier_from_config",
     "coupled_substrate_product_inhibition_modifier_from_config",
+    "gamma_concept_assumption",
+    "mixed_inhibition_modifier_from_config",
     "oxygen_modifier_from_config",
     "ph_modifier_from_config",
     "product_inhibition_modifier_from_config",
