@@ -57,10 +57,16 @@ from fungal_model.processes.rate_modifiers import (
     water_activity_modifier_from_config,
 )
 from fungal_model.processes.surface import (
+    AREA_MODELS,
+    CONSTANT_UNTIL_DEPLETION,
+    MASS_SCALED,
+    SITE_BINDING_MATURITY,
+    SITE_BINDING_SURFACE_CATALYSIS_PROCESS_TYPE,
     AccessibleSitePool,
     AccessibleSurfaceAreaModel,
     LangmuirAdsorptionModel,
     ProductReleaseMap,
+    SiteBindingSurfaceCatalysisProcess,
     SurfaceCatalysisModel,
     SurfaceCatalysisProcess,
 )
@@ -587,7 +593,15 @@ class SurfaceCatalysisFactory:
             missing += (f"product_maps.{product_map_id}",)
         elif product_map_id is None:
             missing += ("product_map",)
-        return _decision(self, missing_fields=missing)
+        incompatible: list[str] = []
+        area_model = parameters.get("area_model", CONSTANT_UNTIL_DEPLETION)
+        if area_model not in AREA_MODELS:
+            incompatible.append("parameters.area_model")
+        elif area_model == MASS_SCALED:
+            missing += _missing_mapping_fields(parameters, ("reference_mass", "area_exponent"), prefix="parameters")
+        elif "reference_mass" in parameters or "area_exponent" in parameters:
+            incompatible.append("parameters.area_model")
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
 
     def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
         _require_buildable(self.can_build(context, process_config))
@@ -597,6 +611,20 @@ class SurfaceCatalysisFactory:
         catalyst_state = str(states["catalyst"])
         product_map = context.product_maps[str(process_config.product_map)]
         substrate_units = context.state_units[substrate_state]
+        area_model = str(parameters.get("area_model", CONSTANT_UNTIL_DEPLETION))
+        if area_model == MASS_SCALED:
+            surface_model = AccessibleSurfaceAreaModel.mass_scaled(
+                name="configured accessible surface",
+                parameter_symbol=str(parameters["accessible_surface_area"]),
+                reference_mass_symbol=str(parameters["reference_mass"]),
+                exponent_symbol=str(parameters["area_exponent"]),
+                reference_mass_units=substrate_units,
+            )
+        else:
+            surface_model = AccessibleSurfaceAreaModel.from_parameter(
+                name="configured accessible surface",
+                parameter_symbol=str(parameters["accessible_surface_area"]),
+            )
         process = SurfaceCatalysisProcess(
             name=process_config.id,
             substrate_state=substrate_state,
@@ -607,10 +635,7 @@ class SurfaceCatalysisFactory:
                 name=str(states.get("accessible_site_pool", "configured accessible site pool")),
                 bond_type=str(states.get("bond_type", "configured_bond")),
             ),
-            accessible_surface_model=AccessibleSurfaceAreaModel.from_parameter(
-                name="configured accessible surface",
-                parameter_symbol=str(parameters["accessible_surface_area"]),
-            ),
+            accessible_surface_model=surface_model,
             adsorption_model=LangmuirAdsorptionModel(
                 adsorption_symbol=str(parameters["adsorption_constant"]),
                 enzyme_units=context.state_units[catalyst_state],
@@ -625,6 +650,88 @@ class SurfaceCatalysisFactory:
             state_units=context.state_units,
             source=context.source,
             notes="Built from generic surface-catalysis process config.",
+        )
+        return _apply_rate_modifiers(context, process_config, process)
+
+
+@dataclass(frozen=True)
+class SiteBindingSurfaceCatalysisFactory:
+    """Build the enzyme-site binding surface-catalysis process from config.
+
+    Config keys: ``states: {enzyme, substrate}``, ``parameters: {sites_per_mass,
+    dissociation_constant, site_turnover, volume, rate_units}``, ``product_map``,
+    and the law's ``primary_source`` and ``maturity`` on the process entry.
+    """
+
+    process_type: str = SITE_BINDING_SURFACE_CATALYSIS_PROCESS_TYPE
+
+    def can_build(self, context: ProcessBuildContext, process_config: Any) -> BuildDecision:
+        missing = _missing_config_fields(process_config, ("id", "states", "parameters", "product_map"))
+        states = _mapping(getattr(process_config, "states", {}))
+        parameters = _mapping(getattr(process_config, "parameters", {}))
+        raw = _mapping(getattr(process_config, "raw", {}))
+        missing += _missing_mapping_fields(states, ("enzyme", "substrate"), prefix="states")
+        missing += _missing_mapping_fields(
+            parameters,
+            ("sites_per_mass", "dissociation_constant", "site_turnover", "volume", "rate_units"),
+            prefix="parameters",
+        )
+        missing += _missing_mapping_fields(raw, ("primary_source", "maturity"), prefix="process")
+        missing += tuple(
+            f"state_units.{state}"
+            for state in (states.get("substrate"), states.get("enzyme"))
+            if state is not None and state not in context.state_units
+        )
+        product_map_id = getattr(process_config, "product_map", None)
+        if not isinstance(product_map_id, str) or not product_map_id:
+            missing += ("product_map",)
+        elif product_map_id not in context.product_maps:
+            missing += (f"product_maps.{product_map_id}",)
+        else:
+            missing += tuple(
+                f"state_units.{state}"
+                for state in sorted(context.product_maps[product_map_id].species)
+                if state not in context.state_units
+            )
+        incompatible: list[str] = []
+        source = raw.get("primary_source")
+        if source is not None and not str(source).strip():
+            incompatible.append("process.primary_source")
+        maturity = raw.get("maturity")
+        if maturity is not None and maturity != SITE_BINDING_MATURITY:
+            incompatible.append("process.maturity")
+        if isinstance(product_map_id, str) and product_map_id in context.product_maps:
+            product_map = context.product_maps[product_map_id]
+            if states.get("substrate") is not None and str(states["substrate"]) not in product_map.reactants:
+                incompatible.append("product_map.reactants")
+            if states.get("enzyme") is not None and str(states["enzyme"]) in product_map.species:
+                incompatible.append("product_map.enzyme_state")
+        return _decision(self, missing_fields=missing, incompatible_entities=incompatible)
+
+    def build(self, context: ProcessBuildContext, process_config: Any) -> Process:
+        _require_buildable(self.can_build(context, process_config))
+        states = _mapping(process_config.states)
+        parameters = _mapping(process_config.parameters)
+        raw = _mapping(process_config.raw)
+        substrate_state = str(states["substrate"])
+        enzyme_state = str(states["enzyme"])
+        process = SiteBindingSurfaceCatalysisProcess(
+            name=process_config.id,
+            substrate_state=substrate_state,
+            enzyme_state=enzyme_state,
+            substrate_units=context.state_units[substrate_state],
+            enzyme_units=context.state_units[enzyme_state],
+            rate_units=str(parameters["rate_units"]),
+            sites_per_mass_symbol=str(parameters["sites_per_mass"]),
+            dissociation_constant_symbol=str(parameters["dissociation_constant"]),
+            site_turnover_symbol=str(parameters["site_turnover"]),
+            volume_symbol=str(parameters["volume"]),
+            product_release_map=context.product_maps[str(process_config.product_map)],
+            primary_source=str(raw["primary_source"]),
+            maturity=str(raw["maturity"]),
+            state_units=context.state_units,
+            source=context.source,
+            notes="Built from generic enzyme-site binding surface-catalysis process config.",
         )
         return _apply_rate_modifiers(context, process_config, process)
 
@@ -820,6 +927,7 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         ProportionalSynthesisFactory(),
         SubstrateTransglycosylationFactory(),
         SurfaceCatalysisFactory(),
+        SiteBindingSurfaceCatalysisFactory(),
         ThermalInactivationFactory(),
         ResourceLimitedGrowthFactory(),
         ResourceLimitedMaintenanceFactory(),
@@ -1007,6 +1115,7 @@ __all__ = [
     "SubstrateTransglycosylationFactory",
     "ProcessBuildContext",
     "ProcessFactory",
+    "SiteBindingSurfaceCatalysisFactory",
     "SurfaceCatalysisFactory",
     "default_foundation_factories",
 ]

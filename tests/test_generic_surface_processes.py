@@ -263,3 +263,69 @@ def test_pet_generic_surface_process_can_drive_reaction_engine() -> None:
 
     assert result.success
     assert validate_mass_balance(result, conserved_weights={"PET": 1.0, "hydrolysate": 1.0}).passed
+
+
+def test_dummy_surface_process_records_the_constant_area_law_by_default() -> None:
+    process = dummy_surface_process()
+    data = process.to_dict()
+
+    assert process.area_model == "constant_until_depletion"
+    assert data["area_model"] == "constant_until_depletion"
+    assert data["accessible_surface_model"]["area_model"] == "constant_until_depletion"
+    assert data["accessible_surface_model"]["reference_mass_symbol"] is None
+    assert any("constant_until_depletion" in item for item in data["validity"]["limitations"])
+
+
+def test_dummy_surface_process_with_mass_scaled_area_decays_to_zero_continuously() -> None:
+    process = SurfaceCatalysisProcess(
+        name="dummy non-PET mass-scaled surface cleavage",
+        substrate_state="cellulose_mass",
+        enzyme_state="E",
+        substrate_units="kilogram",
+        enzyme_units="mole / liter",
+        accessible_site_pool=AccessibleSitePool(name="dummy accessible surface", bond_type="beta-1,4-glycosidic"),
+        accessible_surface_model=AccessibleSurfaceAreaModel.mass_scaled(
+            name="dummy accessible surface",
+            area=Q_(0.5, "meter ** 2"),
+            reference_mass_symbol="m_0",
+            exponent_symbol="n_area",
+        ),
+        adsorption_model=LangmuirAdsorptionModel(adsorption_symbol="K_ads", enzyme_units="mole / liter", source="benchmark"),
+        catalytic_model=SurfaceCatalysisModel(surface_rate_symbol="k_surface", rate_units="kilogram / second", source="benchmark"),
+        product_release_map=ProductReleaseMap.one_to_one(substrate_state="cellulose_mass", product_state="soluble_product"),
+        state_units={"cellulose_mass": "kilogram", "soluble_product": "kilogram", "E": "mole / liter"},
+    )
+    parameters = ParameterSet(
+        [
+            *surface_parameters(),
+            parameter(name="reference loading", symbol="m_0", value=1.0e-4, units="kilogram"),
+            parameter(name="area exponent", symbol="n_area", value=1.0, units="dimensionless"),
+        ]
+    )
+    model = ModelBuilder(
+        process_library=ProcessRegistry([process]),
+        requested_processes=("surface_catalysis",),
+        parameters=parameters,
+        validators=[
+            validate_non_negative,
+            lambda result: validate_mass_balance(result, conserved_weights={"cellulose_mass": 1.0, "soluble_product": 1.0}),
+        ],
+    ).assemble()
+    result = model.run(
+        initial_state={
+            "cellulose_mass": Q_(1.0e-4, "kilogram"),
+            "soluble_product": Q_(0.0, "kilogram"),
+            "E": Q_(1.0, "mole / liter"),
+        },
+        t_span=(Q_(0.0, "second"), Q_(4000.0, "second")),
+        t_eval=Q_(np.linspace(0.0, 4000.0, 11), "second"),
+    )
+    mass = result.state("cellulose_mass").magnitude
+    rate = result.rate("dummy non-PET mass-scaled surface cleavage").magnitude
+
+    assert process.area_model == "mass_scaled"
+    assert np.all(np.diff(mass) <= 0.0)
+    assert np.all(np.diff(rate) <= 0.0)
+    assert rate[-1] < 1.0e-3 * rate[0]
+    assert mass.min() >= 0.0
+    assert all(validation.passed for validation in result.validation_results)

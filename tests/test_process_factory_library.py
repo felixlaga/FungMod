@@ -58,6 +58,7 @@ def test_default_foundation_library_registers_expected_factories() -> None:
         "homogeneous_michaelis_menten",
         "ph_ionization_michaelis_menten",
         "proportional_synthesis",
+        "site_binding_surface_catalysis",
         "substrate_transglycosylation",
         "surface_catalysis",
         "thermal_inactivation",
