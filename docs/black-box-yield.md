@@ -135,6 +135,18 @@ prediction.
   yields, maintenance, growth rate, product formation and nitrogen sources
   other than ammonium.
 - Only the ammonia nitrogen reference is tabulated for the degree of reduction.
+- The degree of reduction refuses every element outside C, H, O, N, P and S.
+  A biomass formula that lists ash elements such as K or Mg is refused; drop
+  the ash fraction explicitly before calling it.
+- The condition number is the raw SVD ratio of the free-column matrix. It
+  depends on row scaling, so a charge row next to large atom counts can raise
+  it without a real loss of identifiability. No row equilibration is applied.
+- The residual scale `max(1, max_j |nu_j| max_e a_ej)` grows with the largest
+  atom count, so species with large atom counts (polymers) are accepted with a
+  proportionally larger absolute residual than under the old
+  `max(1, max|nu|)` scale.
+- `ElementalComposition.from_formula` refuses symbols that are not IUPAC
+  element symbols, so placeholder formulas such as `X2` are rejected.
 - `OxygenDemand` on the `"amount"` or `"carbon_amount"` basis cannot be consumed by
   `validate_oxygen_limitation`, which works in kilograms; no molar mass is
   inferred.
