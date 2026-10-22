@@ -109,12 +109,14 @@ def validate_elemental_balance(
     """Validate explicit elemental stoichiometry metadata without inferring missing chemistry."""
 
     tolerance = _stoichiometric_tolerance_value(absolute_tolerance)
+    scale = _element_balance_scale(reaction)
     base_details = _static_balance_details(
         reaction,
         residual_name="element_balance",
         residual_units="atom equivalents per reaction event",
         absolute_tolerance=tolerance,
         absolute_tolerance_units="atom equivalents per reaction event",
+        scale_value=scale,
         required=required,
     )
     provenance_failure = _reaction_provenance_failure(
@@ -140,7 +142,7 @@ def validate_elemental_balance(
         )
     residuals = element_balance_residual(reaction)
     max_abs_residual = max((abs(value) for value in residuals.values()), default=0.0)
-    passed = max_abs_residual <= tolerance
+    passed = max_abs_residual <= tolerance * scale
     return _status_result(
         name="elemental_balance",
         status="passed" if passed else "failed",
@@ -160,7 +162,7 @@ def validate_elemental_balance(
                 for element, residual in sorted(residuals.items())
             },
             "max_abs_residual": max_abs_residual,
-            "max_relative_residual": None,
+            "max_relative_residual": max_abs_residual / scale,
         },
     )
 
@@ -175,12 +177,14 @@ def validate_charge_balance(
     """Validate explicit charge stoichiometry metadata without inferring charges."""
 
     tolerance = _stoichiometric_tolerance_value(absolute_tolerance)
+    scale = _scalar_balance_scale(reaction, field_name="charge")
     base_details = _static_balance_details(
         reaction,
         residual_name="charge_balance",
         residual_units="elementary-charge equivalents per reaction event",
         absolute_tolerance=tolerance,
         absolute_tolerance_units="elementary-charge equivalents per reaction event",
+        scale_value=scale,
         required=required,
     )
     provenance_failure = _reaction_provenance_failure(
@@ -214,7 +218,7 @@ def validate_charge_balance(
             details={**base_details, "missing_metadata": missing_sources},
         )
     residual = charge_balance_residual(reaction)
-    passed = abs(residual) <= tolerance
+    passed = abs(residual) <= tolerance * scale
     return _status_result(
         name="charge_balance",
         status="passed" if passed else "failed",
@@ -228,7 +232,7 @@ def validate_charge_balance(
             **base_details,
             "residual_value": residual,
             "max_abs_residual": abs(residual),
-            "max_relative_residual": None,
+            "max_relative_residual": abs(residual) / scale,
         },
     )
 
@@ -243,12 +247,14 @@ def validate_electron_balance(
     """Validate explicit electron-equivalent metadata without inferring redox chemistry."""
 
     tolerance = _stoichiometric_tolerance_value(absolute_tolerance)
+    scale = _scalar_balance_scale(reaction, field_name="electron_equivalents")
     base_details = _static_balance_details(
         reaction,
         residual_name="electron_balance",
         residual_units="electron equivalents per reaction event",
         absolute_tolerance=tolerance,
         absolute_tolerance_units="electron equivalents per reaction event",
+        scale_value=scale,
         required=required,
     )
     provenance_failure = _reaction_provenance_failure(
@@ -289,7 +295,7 @@ def validate_electron_balance(
             details={**base_details, "missing_metadata": missing_sources},
         )
     residual = electron_balance_residual(reaction)
-    passed = abs(residual) <= tolerance
+    passed = abs(residual) <= tolerance * scale
     return _status_result(
         name="electron_balance",
         status="passed" if passed else "failed",
@@ -303,7 +309,7 @@ def validate_electron_balance(
             **base_details,
             "residual_value": residual,
             "max_abs_residual": abs(residual),
-            "max_relative_residual": None,
+            "max_relative_residual": abs(residual) / scale,
         },
     )
 
@@ -911,7 +917,13 @@ def validate_biomass_yield_limit(
     yield_parameter: Parameter,
     maximum_yield_parameter: Parameter,
 ) -> ValidationResult:
-    """Check that biomass yield does not exceed a configured maximum."""
+    """Check that biomass yield does not exceed a configured maximum.
+
+    Yields are compared as dimensionless ratios on whatever basis the caller
+    declares (mass per mass, C-mol per C-mol, formula units per mole). No
+    basis-free cap such as ``<= 1`` is applied: a C-mol-per-mole yield or a
+    mass yield on a lighter substrate legitimately exceeds one.
+    """
 
     if yield_parameter.quantity is None:
         raise UnknownParameterError(f"Biomass yield {yield_parameter.symbol} is unknown.")
@@ -928,11 +940,11 @@ def validate_biomass_yield_limit(
             message="Biomass yield is negative.",
             details={"yield": y, "maximum_yield": y_max},
         )
-    if y_max < 0.0 or y_max > 1.0:
+    if not np.isfinite(y_max) or y_max < 0.0:
         return ValidationResult(
             name="biomass_yield_limit",
             passed=False,
-            message="Configured maximum biomass yield must be between 0 and 1.",
+            message="Configured maximum biomass yield must be finite and non-negative.",
             details={"yield": y, "maximum_yield": y_max},
         )
     passed = y <= y_max
@@ -985,6 +997,31 @@ def _severity_for_status(*, status: str, required: bool) -> str:
     return "info"
 
 
+def _element_balance_scale(reaction: StoichiometricReactionMetadata) -> float:
+    """Largest coefficient-weighted atom count over all terms, at least one."""
+
+    largest = 1.0
+    for term in [*reaction.reactants, *reaction.products]:
+        if term.composition is None:
+            continue
+        counts = [abs(float(count)) for count in term.composition.elements.values()]
+        if counts:
+            largest = max(largest, abs(float(term.coefficient)) * max(counts))
+    return largest
+
+
+def _scalar_balance_scale(reaction: StoichiometricReactionMetadata, *, field_name: str) -> float:
+    """Largest coefficient-weighted scalar metadata magnitude, at least one."""
+
+    largest = 1.0
+    for term in [*reaction.reactants, *reaction.products]:
+        value = getattr(term, field_name)
+        if value is None:
+            continue
+        largest = max(largest, abs(float(term.coefficient)) * abs(float(value)))
+    return largest
+
+
 def _stoichiometric_tolerance_value(absolute_tolerance: float | None) -> float:
     if absolute_tolerance is None:
         return float(cast(Quantity, DEFAULT_STOICHIOMETRIC_ABSOLUTE_TOLERANCE.quantity).magnitude)
@@ -1001,6 +1038,7 @@ def _static_balance_details(
     residual_units: str,
     absolute_tolerance: float,
     absolute_tolerance_units: str,
+    scale_value: float,
     required: bool,
 ) -> dict[str, Any]:
     return {
@@ -1010,8 +1048,10 @@ def _static_balance_details(
         "absolute_tolerance": absolute_tolerance,
         "absolute_tolerance_units": absolute_tolerance_units,
         "relative_tolerance": None,
-        "scale_value": 1.0,
+        "scale_value": scale_value,
         "scale_units": residual_units,
+        "effective_tolerance": absolute_tolerance * scale_value,
+        "scale_rule": "max(1, max_j |nu_j| max_e a_ej): the largest single term in any conservation sum",
         "time_of_max_residual": None,
         "required": required,
         "missing_metadata": [],

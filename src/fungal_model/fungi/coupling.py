@@ -206,9 +206,14 @@ class FungalCouplingModel:
             assimilation=assimilation,
             rate_units="kilogram / second",
         )
+        # The uptake reaction below is {product: 1} -> {active_biomass: Y_B} in
+        # kilogram / second with a single mass input and no co-substrate, so
+        # Y_B > 1 would create mass; the cap is this reaction's closure, not a
+        # general yield rule.
         yield_value = biomass_yield_coefficient(
             parameters=self.parameters,
             yield_symbol="Y_B",
+            maximum=1.0,
         )
         coupled = (
             Reaction(
@@ -297,7 +302,8 @@ class FungalCouplingModel:
                 f"substrate and product states; missing {sorted(missing)}."
             )
         biomass_units = {self.active_biomass_state: BIOMASS_UNITS, self.inactive_biomass_state: BIOMASS_UNITS}
-        yield_value = biomass_yield_coefficient(parameters=self.parameters, yield_symbol="Y_B")
+        # Same single-mass-input uptake reaction as in ``reactions``; see the note there.
+        yield_value = biomass_yield_coefficient(parameters=self.parameters, yield_symbol="Y_B", maximum=1.0)
         coupled: tuple[Process, ...] = (
             ProportionalSynthesisProcess(
                 name="fungal extracellular enzyme secretion",

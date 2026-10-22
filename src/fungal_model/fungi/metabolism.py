@@ -72,13 +72,33 @@ def biomass_yield_coefficient(
     *,
     parameters: ParameterSet,
     yield_symbol: str,
+    maximum: float | None = None,
 ) -> float:
-    """Return a dimensionless biomass yield coefficient between 0 and 1."""
+    """Return a finite, non-negative dimensionless biomass yield coefficient.
+
+    The yield basis (mass per mass, C-mol per C-mol, formula units per mole) is
+    the caller's declaration; no basis-free ``<= 1`` cap is applied by default.
+    Whether a yield is physically admissible is the job of a conservation or
+    energetics check (``GibbsEnergyYieldBound.validate_yield`` with a carbon
+    limit), not of this accessor.
+
+    ``maximum`` is the caller's own closure statement: a caller whose yield
+    reaction has a single mass input and no co-substrate passes ``maximum=1.0``
+    because a mass yield above one on that basis would create mass. Callers on
+    other bases leave it ``None``.
+    """
 
     yield_quantity = parameters.require_quantity(yield_symbol, "dimensionless")
     value = float(yield_quantity.magnitude)
-    if value < 0.0 or value > 1.0:
-        raise ValueError(f"{yield_symbol} must be between 0 and 1 for Stage 6 growth.")
+    if not np.isfinite(value) or value < 0.0:
+        raise ValueError(f"{yield_symbol} must be finite and non-negative.")
+    if maximum is not None:
+        if not np.isfinite(maximum) or maximum <= 0.0:
+            raise ValueError(f"maximum for {yield_symbol} must be finite and positive; got {maximum!r}.")
+        if value > maximum:
+            raise ValueError(
+                f"{yield_symbol} = {value!r} exceeds the caller's mass-closure maximum {maximum!r}."
+            )
     return value
 
 
