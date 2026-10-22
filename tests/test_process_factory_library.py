@@ -65,6 +65,7 @@ def test_default_foundation_library_registers_expected_factories() -> None:
         "resource_limited_growth",
         "resource_limited_maintenance",
         "costed_secretion",
+        "endogenous_maintenance",
         "dilution_exchange",
         "gas_transfer",
     }

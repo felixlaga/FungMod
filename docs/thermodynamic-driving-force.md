@@ -112,10 +112,13 @@ Maturity of the driving-force law: `literature_backed_software_tested`.
 - Activities are ideal-dilute ratios with an explicit floor; no activity
   coefficients, no pH or ionic-strength transform, no pMg.
 - `dG / (R T) > 700` is refused (`ValueError`) rather than overflowing.
-- In the compiled core, driving-force mode currently runs through the
-  unit-aware `enforce` path with finite-difference gradients; the numeric
-  kernel with the analytic gradient from `compile_rate_factor` is integrator
-  wiring for the compiled-core package.
+- In the compiled core, a process with a numeric kernel runs driving-force
+  mode as `numeric_thermodynamic`: the forward kernel times the factor from
+  `compile_rate_factor`, with the gradient
+  `phi * grad r_fwd + r_fwd * grad phi` (see [Solver controls](solver-controls.md)).
+  The result records the per-time-point series
+  `dynamic_thermodynamics.<id>.driving_force_factor`; block mode emits no such
+  series. Integrator cost at tight tolerances is not yet measured for this mode.
 
 ## Detailed-balance equilibrium
 

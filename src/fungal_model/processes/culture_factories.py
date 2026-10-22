@@ -3,8 +3,8 @@
 The factory reads the same closure fields as ``resource_limited_growth`` and
 ``resource_limited_maintenance`` (``states``, ``parameters``, ``stoichiometry``)
 plus ``parameters.endogenous_yield``, the symbol of the caller's ``Y_e``. It is
-not registered with ``default_foundation_factories`` here; the integrator
-registers it (integrator wiring).
+registered in ``default_foundation_factories`` (imported there lazily because
+this module reuses that module's private closure builders).
 """
 
 from __future__ import annotations

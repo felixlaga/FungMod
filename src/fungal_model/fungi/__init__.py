@@ -25,6 +25,13 @@ from .enzyme_profile import (
     enzyme_secretion_rate,
 )
 from .growth import BiomassMaintenanceRateLaw, biomass_maintenance_rate
+from .maintenance_correlation import (
+    MAINTENANCE_CORRELATION_MATURITY,
+    maintenance_correlation_record,
+    substrate_maintenance_from_gibbs,
+    tijhuis_maintenance_assumption,
+    tijhuis_maintenance_gibbs,
+)
 from .degradation import DegradingCulture, DegradingCultureTrajectory, DEGRADING_CULTURE_MATURITY, secretion_allocation
 from .respiration import CultureTrajectory, ResourceLimitedCulture, RespiratoryGrowthModel, RESPIRATION_MATURITY
 from .metabolism import (
@@ -64,6 +71,11 @@ __all__ = [
     "Fungus",
     "ProductAssimilation",
     "ProductUptakeRateLaw",
+    "MAINTENANCE_CORRELATION_MATURITY",
+    "maintenance_correlation_record",
+    "substrate_maintenance_from_gibbs",
+    "tijhuis_maintenance_assumption",
+    "tijhuis_maintenance_gibbs",
     "biomass_maintenance_rate",
     "biomass_yield_coefficient",
     "enzyme_decay_rate",

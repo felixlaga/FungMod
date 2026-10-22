@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from fungal_model.core.numerics import solve_checked
 
 from fungal_model.chemistry.thermodynamics import (
+    ENFORCEMENT_DRIVING_FORCE,
     DynamicThermodynamicConstraint,
     DynamicThermodynamicEvaluation,
 )
@@ -156,7 +157,12 @@ class ProcessODESolver:
             time=time,
             states=states,
             parameters=self.model.parameters,
-            assumptions=tuple(self.model.assumptions),
+            assumptions=tuple(self.model.assumptions)
+            + tuple(
+                assumption
+                for constraint in self.model.thermodynamic_constraints
+                for assumption in constraint.assumptions()
+            ),
             solver_settings=settings,
             process_rates=process_rates,
             derived_quantities=_thermodynamic_derived_quantities(
@@ -403,6 +409,13 @@ def _thermodynamic_derived_quantities(
             np.asarray([float(row.rate_blocked) for row in rows], dtype=float),
             "dimensionless",
         )
+        # Driving-force mode records phi = 1 - exp(dG / (R T)) at every
+        # evaluation; block mode leaves it unset and no series is emitted.
+        if all(row.driving_force_factor is not None for row in rows):
+            derived[f"{prefix}.driving_force_factor"] = Q_(
+                np.asarray([float(cast(float, row.driving_force_factor)) for row in rows], dtype=float),
+                "dimensionless",
+            )
         for state_name in rows[0].activities:
             derived[f"{prefix}.activity.{state_name}"] = Q_(
                 np.asarray(
@@ -470,6 +483,7 @@ def _thermodynamic_validations(
         rows = tuple(evaluations.get(constraint.constraint_id, ()))
         blocked_count = sum(1 for row in rows if row.rate_blocked)
         unfavorable_count = sum(1 for row in rows if not row.favorable)
+        driving_force = constraint.enforcement_mode == ENFORCEMENT_DRIVING_FORCE
         validations.append(
             ValidationResult(
                 name="dynamic_thermodynamic_feasibility",
@@ -478,8 +492,14 @@ def _thermodynamic_validations(
                 severity="info" if rows else "error",
                 required=True,
                 message=(
-                    "Dynamic activities and reaction quotient were evaluated and "
-                    "unfavorable forward rates were blocked at solver time."
+                    (
+                        "Dynamic activities and reaction quotient were evaluated and "
+                        "forward rates were scaled by the driving-force factor "
+                        "1 - exp(dG / (R T)) at solver time."
+                        if driving_force
+                        else "Dynamic activities and reaction quotient were evaluated and "
+                        "unfavorable forward rates were blocked at solver time."
+                    )
                     if rows
                     else "Dynamic thermodynamic feasibility had no returned "
                     "time-point evaluations."
@@ -522,15 +542,33 @@ def _thermodynamic_validations(
                     ),
                     "provenance_refs": list(constraint.provenance_refs),
                     "supported_scope": (
-                        "Forward-rate feasibility for one explicitly bound "
-                        "reaction using configured ideal-dilute concentration "
-                        "activities, explicit floors, and a passing static "
-                        "electron/redox balance check."
+                        (
+                            "Net rate r_fwd * (1 - exp(dG / (R T))) for one explicitly "
+                            "bound reaction using configured ideal-dilute concentration "
+                            "activities, explicit floors, declared fixed activities, and "
+                            "a passing static electron/redox balance check."
+                        )
+                        if driving_force
+                        else (
+                            "Forward-rate feasibility for one explicitly bound "
+                            "reaction using configured ideal-dilute concentration "
+                            "activities, explicit floors, and a passing static "
+                            "electron/redox balance check."
+                        )
                     ),
                     "unsupported_scope": (
-                        "No inferred species chemistry, activity coefficients, "
-                        "reverse rate, coupled reaction network thermodynamics, "
-                        "electrochemical gradients, or empirical validation."
+                        (
+                            "No inferred species chemistry, activity coefficients, "
+                            "reverse saturation (the forward law is not Haldane-"
+                            "consistent), coupled reaction network thermodynamics, "
+                            "electrochemical gradients, or empirical validation."
+                        )
+                        if driving_force
+                        else (
+                            "No inferred species chemistry, activity coefficients, "
+                            "reverse rate, coupled reaction network thermodynamics, "
+                            "electrochemical gradients, or empirical validation."
+                        )
                     ),
                     "missing_metadata": [],
                 },

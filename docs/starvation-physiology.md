@@ -61,8 +61,9 @@ and zero otherwise. Growth and secretion take the other side of the same kink
 
 The process is `fungal_model.processes.culture.EndogenousMaintenanceProcess`
 (type `endogenous_maintenance`, maturity `literature_backed_software_tested`)
-with the factory `fungal_model.processes.culture_factories.EndogenousMaintenanceFactory`.
-The factory reads the closure fields of the other three processes plus
+with the factory `fungal_model.processes.culture_factories.EndogenousMaintenanceFactory`,
+registered in `default_foundation_factories()`, so configs reach it through the
+default process library. The factory reads the closure fields of the other three processes plus
 `parameters.endogenous_yield`.
 
 ```yaml

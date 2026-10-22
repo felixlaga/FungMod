@@ -41,7 +41,17 @@ from .reactivity import (
     substrate_reactivity_assumption,
 )
 from .temperature import TemperatureModifier
+from .temperature_optimum import (
+    EquilibriumModelModifier,
+    SharpeSchoolfieldModifier,
+    equilibrium_model_modifier_from_config,
+    sharpe_schoolfield_modifier_from_config,
+)
 from .water_activity import WaterActivityModifier, water_activity_threshold_assumption
+from .water_activity_cardinal import (
+    CardinalWaterActivityModifier,
+    cardinal_water_activity_modifier_from_config,
+)
 
 __all__ = [
     "ANDREWS_1968_SOURCE",
@@ -54,6 +64,12 @@ __all__ = [
     "CONDITION_WATER_ACTIVITY",
     "CORNISH_BOWDEN_2012_SOURCE",
     "CardinalPHModifier",
+    "CardinalWaterActivityModifier",
+    "EquilibriumModelModifier",
+    "SharpeSchoolfieldModifier",
+    "cardinal_water_activity_modifier_from_config",
+    "equilibrium_model_modifier_from_config",
+    "sharpe_schoolfield_modifier_from_config",
     "CardinalTemperatureModifier",
     "EnvironmentalModifier",
     "CompetitiveInhibitionModifier",

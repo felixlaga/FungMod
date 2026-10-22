@@ -93,7 +93,7 @@ def langmuir_coverage_derivative(
         name="K_ads * free_enzyme",
     )
     denominator = LANGMUIR_DENOMINATOR_OFFSET.quantity + adsorption_strength
-    return adsorption_constant / (denominator * denominator)
+    return adsorption_constant / denominator / denominator
 
 
 __all__ = [

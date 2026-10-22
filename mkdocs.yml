@@ -72,8 +72,15 @@ nav:
       - Virtual experiments: concepts/virtual-experiments.md
       - Outputs and artifacts: concepts/outputs.md
       - Compiled model core: compiled-core.md
+      - Solver controls: solver-controls.md
+      - Thermodynamic driving force: thermodynamic-driving-force.md
       - Organism physiology in the registry: organism-physiology.md
+      - Starvation physiology: starvation-physiology.md
+      - Black-box growth yield: black-box-yield.md
       - Environment response laws: environment-response.md
+      - Extended environment laws: environment-laws-extended.md
+      - Inhibition laws: inhibition-laws.md
+      - Surface area and site balance: surface-site-balance.md
   - Tutorials:
       - Full example notebooks: notebooks.md
       - Configured models: configured-models.md

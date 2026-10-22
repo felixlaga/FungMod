@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import math
 
-from fungal_model.core.units import Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 
 SITE_BINDING_MATURITY = "literature_backed_software_tested"
 SITE_BINDING_PRIMARY_SOURCES = (
@@ -113,7 +113,7 @@ def site_binding_bound_enzyme(
         name="dissociation_constant",
     )
     bound = bound_enzyme_magnitude(float(total.magnitude), float(sites.magnitude), float(dissociation.magnitude))
-    return bound * total.units
+    return Q_(bound, total.units)
 
 
 def site_binding_bound_enzyme_derivatives(
@@ -142,7 +142,7 @@ def site_binding_bound_enzyme_derivatives(
         float(sites.magnitude),
         float(dissociation.magnitude),
     )
-    return by_total * (total.units / total.units), by_sites * (total.units / total.units)
+    return Q_(by_total, "dimensionless"), Q_(by_sites, "dimensionless")
 
 
 __all__ = [

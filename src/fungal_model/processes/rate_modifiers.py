@@ -903,6 +903,12 @@ def _modifier_limitations(modifiers: tuple[Any, ...]) -> tuple[str, ...]:
             "Water-activity scaling uses the existing threshold modifier and requires "
             "explicit environment water activity plus a configured threshold parameter."
         )
+    for modifier in modifiers:
+        # Modifiers that state their own limitation text (the cardinal
+        # water-activity and temperature-optimum laws) contribute it here.
+        limitation = getattr(modifier, "limitation", None)
+        if isinstance(limitation, str) and limitation and limitation not in limitations:
+            limitations.append(limitation)
     return tuple(limitations)
 
 
@@ -1206,6 +1212,19 @@ def _required_parameters(
                 name="minimum water activity threshold",
                 description="Minimum water activity for explicit configured threshold scaling.",
             )
+        else:
+            # Modifiers that declare their own requirements (the cardinal
+            # water-activity and temperature-optimum laws) list them as
+            # ``{symbol, units, name, description}`` records.
+            for entry in getattr(modifier, "parameter_requirements", ()) or ():
+                _add_requirement(
+                    requirements,
+                    existing_units,
+                    symbol=str(entry["symbol"]),
+                    units=str(entry["units"]),
+                    name=str(entry["name"]),
+                    description=str(entry["description"]),
+                )
     return tuple(requirements)
 
 

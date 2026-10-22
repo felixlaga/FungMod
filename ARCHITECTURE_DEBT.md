@@ -57,7 +57,7 @@ Tests protecting it:
 
 ## FD-009 Model representations and engines outside the compiled core
 
-Status: active, contained since 2026-10-04 (CORE-001); narrowed 2026-10-05 (ORG-001, UNIFY-001)
+Status: active, contained since 2026-10-04 (CORE-001); narrowed 2026-10-05 (ORG-001, UNIFY-001); Jacobian item extended 2026-10-22 (AUDIT-001)
 
 Reason: `ProcessODESolver` now compiles `Process` models to a numeric
 stoichiometric right-hand side with build-time unit resolution. Other
@@ -120,7 +120,14 @@ opt-in, CORE-002: `CompiledModel.jacobian` from per-process gradients,
 analytic for the simple laws and the closure, finite differences otherwise,
 every kind recorded; the default stays the backend's differences so recorded
 results do not move, which is also why the culture classes keep their native
-path for now).
+path for now). Extended 2026-10-22 (AUDIT-001): a config `solver:` block now
+selects `jacobian: compiled` and unit-bearing per-state tolerances; the
+finite-difference step follows `atol_i / rtol`; thermodynamically constrained
+processes use `phi * grad v + v * grad phi` and never differentiate the block
+indicator; modifier-wrapped, surface, inactivation, ionization,
+transglycosylation and endogenous-maintenance processes gain analytic
+gradients. The default is still the backend's differences, so the native
+culture `simulate` stays until a recorded study switches its default.
 
 Removal milestone: completion of step 1 in
 `foundation_progress/FUNGMOD_STATE_AND_NEXT_STEPS_2026-10-04.md`; step 2

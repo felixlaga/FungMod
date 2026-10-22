@@ -113,7 +113,9 @@ different conditions are treated as independent and multiplied. Two laws for
 one condition (an Arrhenius and a cardinal temperature law on one process)
 double-count that condition. `RateModifierProcess` refuses that unless
 `allow_stacked_condition_laws=True` is set explicitly; the opt-in is recorded
-in `to_dict()` and as a validity limitation. The process carries the
+in `to_dict()` and as a validity limitation. In a model config the opt-in is
+the process-level key `allow_stacked_condition_laws: true`; it must be a YAML
+boolean, and a quoted string is refused. The process carries the
 gamma-concept assumption, including its known limitation: no interaction term
 between conditions, so combined stresses near growth boundaries deviate from
 the product (Akkermans et al. 2017 Int. J. Food Microbiol. 240:85).

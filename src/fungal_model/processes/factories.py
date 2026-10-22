@@ -9,8 +9,12 @@ from typing import Any, Protocol, cast
 from fungal_model.modifiers import (
     CompetitiveInhibitionModifier,
     CoupledSubstrateProductInhibitionModifier,
+    MixedInhibitionModifier,
     ProductInhibitionModifier,
     SubstrateInhibitionModifier,
+    cardinal_water_activity_modifier_from_config,
+    equilibrium_model_modifier_from_config,
+    sharpe_schoolfield_modifier_from_config,
 )
 from fungal_model.processes.base import Process
 from fungal_model.processes.homogeneous import (
@@ -48,6 +52,7 @@ from fungal_model.processes.rate_modifiers import (
     cardinal_temperature_modifier_from_config,
     competitive_inhibition_modifier_from_config,
     coupled_substrate_product_inhibition_modifier_from_config,
+    mixed_inhibition_modifier_from_config,
     oxygen_modifier_from_config,
     ph_modifier_from_config,
     product_inhibition_modifier_from_config,
@@ -919,6 +924,10 @@ class GasTransferFactory:
 
 
 def default_foundation_factories() -> tuple[ProcessFactory, ...]:
+    # culture_factories imports this module's private builders, so the
+    # endogenous-maintenance factory is imported here, not at module level.
+    from fungal_model.processes.culture_factories import EndogenousMaintenanceFactory
+
     return (
         FirstOrderFactory(),
         MassActionFactory(),
@@ -932,6 +941,7 @@ def default_foundation_factories() -> tuple[ProcessFactory, ...]:
         ResourceLimitedGrowthFactory(),
         ResourceLimitedMaintenanceFactory(),
         CostedSecretionFactory(),
+        EndogenousMaintenanceFactory(),
         DilutionExchangeFactory(),
         GasTransferFactory(),
     )
@@ -983,7 +993,33 @@ def _apply_rate_modifiers(
         base_process=process,
         rate_modifiers=modifiers,
         notes=f"{process.notes} Explicit generic rate modifiers configured.".strip(),
+        allow_stacked_condition_laws=_allow_stacked_condition_laws(process_config),
     )
+
+
+def _allow_stacked_condition_laws(process_config: Any) -> bool:
+    """Read the explicit opt-in for two environment laws on one condition.
+
+    The key sits at the process level (``allow_stacked_condition_laws: true``).
+    Absent means ``False``; any value other than a YAML boolean is refused so a
+    quoted ``"false"`` cannot switch stacking on.
+    """
+
+    if isinstance(process_config, Mapping):
+        value = process_config.get("allow_stacked_condition_laws", False)
+    else:
+        raw = getattr(process_config, "raw", None)
+        value = (
+            raw.get("allow_stacked_condition_laws", False)
+            if isinstance(raw, Mapping)
+            else getattr(process_config, "allow_stacked_condition_laws", False)
+        )
+    if not isinstance(value, bool):
+        raise ValueError(
+            "allow_stacked_condition_laws must be a boolean (true or false); "
+            f"got {value!r}."
+        )
+    return value
 
 
 def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> Any:
@@ -1008,6 +1044,11 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
             mapping,
             state_units=context.state_units,
         )
+    if modifier_type == "mixed_inhibition":
+        return mixed_inhibition_modifier_from_config(
+            mapping,
+            state_units=context.state_units,
+        )
     if modifier_type == "temperature_arrhenius_reference":
         return temperature_modifier_from_config(mapping)
     if modifier_type == "ph_gaussian":
@@ -1020,6 +1061,12 @@ def _build_rate_modifier(context: ProcessBuildContext, modifier_config: Any) -> 
         return oxygen_modifier_from_config(mapping)
     if modifier_type == "water_activity_threshold":
         return water_activity_modifier_from_config(mapping)
+    if modifier_type == "water_activity_cardinal_rosso":
+        return cardinal_water_activity_modifier_from_config(mapping)
+    if modifier_type == "temperature_sharpe_schoolfield":
+        return sharpe_schoolfield_modifier_from_config(mapping)
+    if modifier_type == "temperature_equilibrium_model":
+        return equilibrium_model_modifier_from_config(mapping)
     raise ValueError(f"Unsupported rate modifier type: {modifier_type!r}.")
 
 
@@ -1030,6 +1077,7 @@ def _validate_inhibition_modifier_compatibility(
     mechanistic: list[
         CompetitiveInhibitionModifier
         | CoupledSubstrateProductInhibitionModifier
+        | MixedInhibitionModifier
         | SubstrateInhibitionModifier
     ] = [
         modifier
@@ -1039,6 +1087,7 @@ def _validate_inhibition_modifier_compatibility(
             (
                 CompetitiveInhibitionModifier,
                 CoupledSubstrateProductInhibitionModifier,
+                MixedInhibitionModifier,
                 SubstrateInhibitionModifier,
             ),
         )
