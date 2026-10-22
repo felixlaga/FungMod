@@ -10,7 +10,7 @@ import numpy as np
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.errors import InvalidMechanismError
-from fungal_model.core.kernels import KernelContext, RateKernel
+from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.processes.base import ParameterRequirement, Process, StateVariableSpec, ValidityDomain
@@ -256,6 +256,62 @@ class SubstrateTransglycosylationProcess(Process):
             return (enzyme * kcat_t * acceptor_term / denominator) * scale
 
         return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        """Quotient-rule gradient of the branch rate over ``D = Km_h + S + S^2/Km_t``.
+
+        Hydrolysis: ``dr_h/dS = E kcat_h (Km_h - S^2/Km_t) / D^2``;
+        transglycosylation: ``dr_t/dS = E kcat_t (S/Km_t)(2 Km_h + S) / D^2``;
+        both: ``dr/dE = kcat_x (branch numerator) / D``, each times its unit factors.
+        """
+
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
+        turnover_units = f"({self.rate_units}) / ({self.enzyme_units})"
+        km_h = context.parameter(self.hydrolysis_km_symbol, self.substrate_units)
+        km_t = context.parameter(self.transglycosylation_km_symbol, self.substrate_units)
+        kcat_h = context.parameter(self.hydrolysis_kcat_symbol, turnover_units)
+        kcat_t = context.parameter(self.transglycosylation_kcat_symbol, turnover_units)
+        for value, symbol in ((km_h, self.hydrolysis_km_symbol), (km_t, self.transglycosylation_km_symbol)):
+            if not np.isfinite(value) or value <= 0.0:
+                raise ValueError(f"{symbol} must be finite and positive.")
+        for value, symbol in ((kcat_h, self.hydrolysis_kcat_symbol), (kcat_t, self.transglycosylation_kcat_symbol)):
+            if not np.isfinite(value) or value < 0.0:
+                raise ValueError(f"{symbol} must be finite and non-negative.")
+        scale = float(
+            assert_compatible(
+                Q_(1.0, self.enzyme_units) * Q_(1.0, turnover_units) * Q_(1.0, self.substrate_units)
+                / Q_(1.0, self.substrate_units),
+                self.rate_units,
+                name=f"{self.name} rate",
+            ).magnitude
+        )
+        hydrolysis = self.branch == "hydrolysis"
+        substrate_name, enzyme_name = self.substrate_state, self.enzyme_state
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            substrate = state[substrate_index] * to_substrate
+            enzyme = state[enzyme_index] * to_enzyme
+            if not np.isfinite(substrate) or substrate < 0.0:
+                raise ValueError(f"{substrate_name} must be finite and non-negative.")
+            if not np.isfinite(enzyme) or enzyme < 0.0:
+                raise ValueError(f"{enzyme_name} must be finite and non-negative.")
+            acceptor_term = substrate**2 / km_t
+            denominator = km_h + substrate + acceptor_term
+            result = np.zeros(size, dtype=float)
+            if hydrolysis:
+                d_substrate = enzyme * kcat_h * (km_h - acceptor_term) / denominator**2
+                d_enzyme = kcat_h * substrate / denominator
+            else:
+                d_substrate = enzyme * kcat_t * (substrate / km_t) * (2.0 * km_h + substrate) / denominator**2
+                d_enzyme = kcat_t * acceptor_term / denominator
+            result[substrate_index] = d_substrate * scale * to_substrate
+            result[enzyme_index] += d_enzyme * scale * to_enzyme
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")

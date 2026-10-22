@@ -16,8 +16,9 @@ from fungal_model.chemistry.thermodynamics import (
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.core.validators import ValidationResult
 from fungal_model.results import SimulationResult
-from fungal_model.core.numerics import JACOBIAN_COMPILED
+from fungal_model.core.numerics import JACOBIAN_COMPILED, SolverSettings
 from fungal_model.solvers.compiled import (
+    JACOBIAN_BY_BACKEND,
     JACOBIAN_COMPILED_LABEL,
     CompiledModel,
     compile_assembled_model,
@@ -27,6 +28,44 @@ from fungal_model.solvers.compiled import (
 
 if TYPE_CHECKING:
     from fungal_model.processes.assembly import AssembledModel
+
+
+def jacobian_label(settings: SolverSettings) -> str:
+    """How the integrator obtains the Jacobian under ``settings``.
+
+    :data:`JACOBIAN_COMPILED_LABEL` only when the settings request the
+    compiled Jacobian and the method consumes one; explicit methods and the
+    default setting give :data:`JACOBIAN_BY_BACKEND`.
+    """
+
+    if settings.jacobian == JACOBIAN_COMPILED and settings.uses_jacobian:
+        return JACOBIAN_COMPILED_LABEL
+    return JACOBIAN_BY_BACKEND
+
+
+def integrate_compiled(
+    settings: SolverSettings,
+    compiled: CompiledModel,
+    t_span: tuple[float, float],
+    y0: Sequence[float] | np.ndarray,
+    *,
+    t_eval: np.ndarray | None = None,
+) -> tuple[Any, str]:
+    """Integrate a compiled model under ``settings`` and return ``(solution, jacobian_label)``.
+
+    The one place that turns :class:`SolverSettings` into ``solve_ivp``
+    options for the compiled core: tolerances in the compiled state order,
+    step limits in the compiled time unit, and ``jac=compiled.jacobian``
+    whenever :func:`jacobian_label` says the compiled Jacobian applies.
+    """
+
+    state_units = dict(zip(compiled.state_names, compiled.state_units, strict=True))
+    options = settings.scipy_options(state_units, compiled.time_units)
+    label = jacobian_label(settings)
+    if label == JACOBIAN_COMPILED_LABEL:
+        options["jac"] = compiled.jacobian
+    solution = solve_checked(compiled.rhs, t_span, y0, t_eval=t_eval, **options)
+    return solution, label
 
 
 @dataclass(frozen=True)
@@ -68,7 +107,13 @@ class ProcessODESolver:
             initial_state=np.asarray(y0, dtype=float),
             initial_time=_numeric_t_span(request.t_span, time_units)[0],
             constraints_by_process=_constraints_by_process(self.model),
+            finite_difference_scales=self.model.solver_settings.finite_difference_scales(state_units),
         )
+
+    def kernel_summary(self, request: RunRequest) -> dict[str, Any]:
+        """The kernel summary a run of ``request`` would record, including the Jacobian label."""
+
+        return self.compile(request).summary(jacobian=jacobian_label(self.model.solver_settings))
 
     def run(self, request: RunRequest) -> SimulationResult:
         self._validate_geometry_supported()
@@ -86,16 +131,11 @@ class ProcessODESolver:
             initial_state=np.asarray(y0, dtype=float),
             initial_time=t_span_numeric[0],
             constraints_by_process=constraints_by_process,
+            finite_difference_scales=settings.finite_difference_scales(state_units),
         )
 
-        options = settings.scipy_options(state_units, time_units)
-        use_compiled_jacobian = settings.jacobian == JACOBIAN_COMPILED and settings.uses_jacobian
-        if use_compiled_jacobian:
-            options["jac"] = compiled.jacobian
-        solution = solve_checked(compiled.rhs, t_span_numeric, y0, t_eval=t_eval_numeric, **options)
-        kernel_summary = compiled.summary()
-        if use_compiled_jacobian:
-            kernel_summary["jacobian"] = JACOBIAN_COMPILED_LABEL
+        solution, label = integrate_compiled(settings, compiled, t_span_numeric, y0, t_eval=t_eval_numeric)
+        kernel_summary = compiled.summary(jacobian=label)
         states = {
             name: Q_(solution.y[index], state_units[name])
             for index, name in enumerate(state_names)
@@ -499,4 +539,4 @@ def _thermodynamic_validations(
     return tuple(validations)
 
 
-__all__ = ["ProcessODESolver", "RunRequest"]
+__all__ = ["ProcessODESolver", "RunRequest", "integrate_compiled", "jacobian_label"]

@@ -24,7 +24,7 @@ constants, no tolerance changes, and no rate law of its own.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -32,6 +32,7 @@ import numpy as np
 
 from fungal_model.chemistry.thermodynamics import DynamicThermodynamicConstraint
 from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
+from fungal_model.core.numerics import SolverSettings
 from fungal_model.core.units import Q_, Quantity, assert_compatible
 
 if TYPE_CHECKING:
@@ -47,12 +48,29 @@ STOICHIOMETRY_PROBE_VALUES = (0.0, 1.0, 2.0)
 MODEL_REPRESENTATION = "compiled_stoichiometric_rhs"
 JACOBIAN_ANALYTIC = "analytic"
 JACOBIAN_FINITE_DIFFERENCE = "finite_difference"
+# A constrained process whose constraint offers neither a rate factor nor a
+# feasibility kernel has no gradient the compiler can assemble without
+# differentiating the constraint; its gradient kernel raises when evaluated.
+JACOBIAN_REFUSED = "refused_constraint_without_numeric_factor"
 JACOBIAN_BY_BACKEND = "finite_difference_by_backend"
 JACOBIAN_COMPILED_LABEL = "compiled_process_gradients"
+JACOBIAN_SUMMARY_LABELS = frozenset({JACOBIAN_BY_BACKEND, JACOBIAN_COMPILED_LABEL})
 # Relative step of the central finite differences that stand in for a missing
-# analytic gradient; the absolute step never drops below the relative step
-# itself, so states near zero are perturbed by at least that much.
-FINITE_DIFFERENCE_RELATIVE_STEP = 1e-6
+# analytic gradient: the cube root of machine epsilon, which balances the
+# O(h^2) truncation error of a central difference against the O(eps/h)
+# roundoff error (Nocedal and Wright, "Numerical Optimization", 2nd ed.,
+# Springer 2006, section 8.1). The absolute step of state ``i`` is
+# ``FINITE_DIFFERENCE_RELATIVE_STEP * max(|y_i|, sigma_i)`` with a per-state
+# scale ``sigma_i = atol_i / rtol`` in state units taken from the solver
+# settings, the same threshold scipy's own ``num_jac`` uses, so the step is
+# tied to the tolerance a state is integrated with instead of to its unit.
+FINITE_DIFFERENCE_RELATIVE_STEP = float(np.finfo(float).eps ** (1.0 / 3.0))
+# How the gradient of a thermodynamically constrained rate ``v = v_num * phi``
+# is assembled: ``grad v = phi * grad v_num + v_num * grad phi`` where the
+# constraint offers a factor gradient, and ``grad v = phi * grad v_num`` where
+# it offers none (the block-mode indicator). The indicator itself is never
+# differentiated, so the Jacobian has no spike on the switching surface.
+CONSTRAINT_GRADIENT_RULE = "factor_times_numeric_gradient_plus_rate_times_factor_gradient; indicator_never_differentiated"
 # Constitutive rate laws are defined on the non-negative orthant. Solver trial
 # iterates can step slightly outside it near depletion, so rates are evaluated
 # at the projection ``max(state, 0)`` (Shampine, Thompson, Kierzenka and Byrne,
@@ -117,12 +135,17 @@ class CompiledModel:
     processes: tuple[CompiledProcess, ...]
     stoichiometry: np.ndarray
     context: KernelContext
+    #: Per-state scale ``sigma_i`` (state units) below which the finite-difference
+    #: step of a numerically differentiated process stops shrinking with the state.
+    finite_difference_scales: tuple[float, ...]
     _columns: tuple[np.ndarray, ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         expected = (len(self.state_names), len(self.processes))
         if self.stoichiometry.shape != expected:
             raise ValueError(f"Stoichiometry shape {self.stoichiometry.shape} does not match {expected}.")
+        if len(self.finite_difference_scales) != len(self.state_names):
+            raise ValueError("One finite-difference scale per state is required.")
         object.__setattr__(
             self,
             "_columns",
@@ -191,9 +214,18 @@ class CompiledModel:
             for index, process in enumerate(self.processes)
         }
 
-    def summary(self) -> dict[str, Any]:
-        """Inspectable record of how every process is evaluated."""
+    def summary(self, *, jacobian: str = JACOBIAN_BY_BACKEND) -> dict[str, Any]:
+        """Inspectable record of how every process is evaluated.
 
+        ``jacobian`` names how the integrator obtains the Jacobian for this
+        run: :data:`JACOBIAN_BY_BACKEND` (scipy differentiates the right-hand
+        side) or :data:`JACOBIAN_COMPILED_LABEL` (this model's
+        :meth:`jacobian`). The per-process gradient kinds are recorded either
+        way, because they describe what :meth:`jacobian` would assemble.
+        """
+
+        if jacobian not in JACOBIAN_SUMMARY_LABELS:
+            raise ValueError(f"Unknown jacobian label {jacobian!r}; choose one of {sorted(JACOBIAN_SUMMARY_LABELS)}.")
         kinds = {process.name: process.kernel_kind for process in self.processes}
         jacobian_kinds = {process.name: process.jacobian_kind for process in self.processes}
         return {
@@ -205,9 +237,14 @@ class CompiledModel:
             "quantity_wrapped_kernel_count": sum(kind in WRAPPED_KERNEL_KINDS for kind in kinds.values()),
             "unit_resolution": "build_time",
             "stoichiometry_probe": "contributions_linear_in_rate",
-            "jacobian": JACOBIAN_BY_BACKEND,
+            "jacobian": jacobian,
             "jacobian_kernels": jacobian_kinds,
             "analytic_jacobian_count": sum(kind == JACOBIAN_ANALYTIC for kind in jacobian_kinds.values()),
+            "finite_difference_scales": {
+                name: scale for name, scale in zip(self.state_names, self.finite_difference_scales, strict=True)
+            },
+            "finite_difference_relative_step": FINITE_DIFFERENCE_RELATIVE_STEP,
+            "constraint_gradient_rule": CONSTRAINT_GRADIENT_RULE,
             "negative_state_policy": NEGATIVE_STATE_POLICY,
         }
 
@@ -219,11 +256,18 @@ def compile_assembled_model(
     initial_state: np.ndarray | None = None,
     initial_time: float = 0.0,
     constraints_by_process: Mapping[str, DynamicThermodynamicConstraint] | None = None,
+    finite_difference_scales: Mapping[str, float] | Sequence[float] | np.ndarray | None = None,
 ) -> CompiledModel:
     """Compile an assembled well-mixed model for integration in ``time_units``.
 
     ``initial_state`` is only needed to discover the rate units of a process
     that declares none; every shipped process declares ``rate_units``.
+
+    ``finite_difference_scales`` gives the per-state scale ``sigma_i`` (in the
+    state's own units) of the finite-difference step used for processes
+    without an analytic gradient, by name or in state order. It is normally
+    :meth:`SolverSettings.finite_difference_scales`, ``atol_i / rtol``; when
+    omitted the scales of the default :class:`SolverSettings` are used.
     """
 
     state_units = resolve_state_units(model)
@@ -236,6 +280,7 @@ def compile_assembled_model(
         environment=model.context.environment,
         geometry=model.context.geometry,
     )
+    scales = _finite_difference_scales(finite_difference_scales, state_units)
     constraints = dict(constraints_by_process or {})
     unknown = sorted(set(constraints).difference(process.name for process in model.processes))
     if unknown:
@@ -246,15 +291,15 @@ def compile_assembled_model(
         rate_units = _rate_units(process, context, initial_state=initial_state, initial_time=initial_time)
         column = _stoichiometry_column(process, rate_units=rate_units, context=context)
         constraint = constraints.get(process.name)
-        kernel, kind = _rate_kernel(process, context, rate_units=rate_units, constraint=constraint)
-        gradient, jacobian_kind = _gradient_kernel(process, context, rate_kernel=kernel, kernel_kind=kind)
+        parts = _rate_kernel(process, context, rate_units=rate_units, constraint=constraint)
+        gradient, jacobian_kind = _gradient_kernel(process, context, parts=parts, scales=scales)
         compiled.append(
             CompiledProcess(
                 name=process.name,
                 process_type=process.process_type,
                 rate_units=rate_units,
-                kernel_kind=kind,
-                rate=kernel,
+                kernel_kind=parts.kind,
+                rate=parts.rate,
                 stoichiometry=column,
                 process=process,
                 constraint=constraint,
@@ -273,7 +318,29 @@ def compile_assembled_model(
         processes=tuple(compiled),
         stoichiometry=stoichiometry,
         context=context,
+        finite_difference_scales=tuple(float(value) for value in scales),
     )
+
+
+def _finite_difference_scales(
+    scales: Mapping[str, float] | Sequence[float] | np.ndarray | None,
+    state_units: Mapping[str, str],
+) -> np.ndarray:
+    """Per-state finite-difference scales in state order; positive and finite or refused."""
+
+    if scales is None:
+        values = SolverSettings().finite_difference_scales(state_units)
+    elif isinstance(scales, Mapping):
+        if set(scales) != set(state_units):
+            raise ValueError("finite_difference_scales must name every compiled state exactly once.")
+        values = np.asarray([scales[name] for name in state_units], dtype=float)
+    else:
+        values = np.asarray(scales, dtype=float)
+    if values.shape != (len(state_units),):
+        raise ValueError(f"finite_difference_scales must have one entry per state ({len(state_units)}).")
+    if not np.all(np.isfinite(values)) or np.any(values <= 0.0):
+        raise ValueError("finite_difference_scales must be finite and positive.")
+    return values
 
 
 def _rate_units(
@@ -335,26 +402,87 @@ def _stoichiometry_column(process: Any, *, rate_units: str, context: KernelConte
     return unit_column
 
 
+@dataclass(frozen=True)
+class _KernelParts:
+    """What the compiler knows about one process's rate before assembling its gradient.
+
+    ``rate`` is the kernel the right-hand side evaluates and ``kind`` its
+    recorded label. ``unconstrained`` is the same rate without any constraint
+    factor (the numeric kernel when the process offers one, its wrapped
+    unit-aware ``rate`` otherwise) and ``numeric`` says which of the two it
+    is. ``factor`` and ``factor_gradient`` are the constraint's ``phi`` and
+    ``grad phi`` closures over the state vector, or ``None``.
+    """
+
+    rate: RateKernel
+    kind: str
+    unconstrained: RateKernel
+    numeric: bool
+    factor: Callable[[np.ndarray], Any] | None = None
+    factor_gradient: Callable[[np.ndarray], np.ndarray] | None = None
+
+
 def _rate_kernel(
     process: Any,
     context: KernelContext,
     *,
     rate_units: str,
     constraint: DynamicThermodynamicConstraint | None,
-) -> tuple[RateKernel, str]:
+) -> _KernelParts:
     numeric = process.compile_rate(context)
-    if numeric is None:
-        kind = KERNEL_QUANTITY_WRAPPED if constraint is None else KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC
-        return _wrapped_kernel(process, context, rate_units=rate_units, constraint=constraint), kind
     if constraint is None:
-        return numeric, KERNEL_NUMERIC
+        if numeric is None:
+            wrapped = _wrapped_kernel(process, context, rate_units=rate_units, constraint=None)
+            return _KernelParts(rate=wrapped, kind=KERNEL_QUANTITY_WRAPPED, unconstrained=wrapped, numeric=False)
+        return _KernelParts(rate=numeric, kind=KERNEL_NUMERIC, unconstrained=numeric, numeric=True)
+    factor, factor_gradient = _constraint_factor(constraint, context)
+    if numeric is None or factor is None:
+        enforced = _wrapped_kernel(process, context, rate_units=rate_units, constraint=constraint)
+        unconstrained = (
+            numeric if numeric is not None
+            else _wrapped_kernel(process, context, rate_units=rate_units, constraint=None)
+        )
+        return _KernelParts(
+            rate=enforced,
+            kind=KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC,
+            unconstrained=unconstrained,
+            numeric=numeric is not None,
+            factor=factor,
+            factor_gradient=factor_gradient,
+        )
+    return _KernelParts(
+        rate=_factored_kernel(numeric, factor),
+        kind=KERNEL_NUMERIC_THERMODYNAMIC,
+        unconstrained=numeric,
+        numeric=True,
+        factor=factor,
+        factor_gradient=factor_gradient,
+    )
+
+
+def _constraint_factor(
+    constraint: DynamicThermodynamicConstraint,
+    context: KernelContext,
+) -> tuple[Callable[[np.ndarray], Any] | None, Callable[[np.ndarray], np.ndarray] | None]:
+    """The constraint's numeric rate factor ``phi`` and its gradient, if it offers them.
+
+    A constraint that compiles a rate factor (``compile_rate_factor``) returns
+    ``(phi, grad phi)`` with ``grad phi`` possibly ``None``; one that only
+    compiles a feasibility test returns the blocking indicator with no
+    gradient. ``(None, None)`` means the constraint offers no numeric form and
+    only its unit-aware ``enforce`` can evaluate it.
+    """
+
+    compile_rate_factor = getattr(constraint, "compile_rate_factor", None)
+    if compile_rate_factor is not None:
+        compiled = compile_rate_factor(context)
+        if compiled is not None:
+            factor, factor_gradient = compiled
+            return factor, factor_gradient
     feasible = constraint.compile_feasibility(context)
     if feasible is None:
-        return (
-            _wrapped_kernel(process, context, rate_units=rate_units, constraint=constraint),
-            KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC,
-        )
-    return _blocking_kernel(numeric, feasible), KERNEL_NUMERIC_THERMODYNAMIC
+        return None, None
+    return feasible, None
 
 
 def _wrapped_kernel(
@@ -384,44 +512,103 @@ def _gradient_kernel(
     process: Any,
     context: KernelContext,
     *,
-    rate_kernel: RateKernel,
-    kernel_kind: str,
+    parts: _KernelParts,
+    scales: np.ndarray,
 ) -> tuple[JacobianKernel, str]:
-    """The process's analytic gradient when it offers one and nothing blocks it; central differences otherwise.
+    """Gradient of the process rate: analytic where offered, finite differences otherwise.
 
-    A thermodynamically constrained or quantity-wrapped rate is differentiated
-    numerically, because the blocking test is not differentiable and a wrapped
-    rate has no kernel to differentiate analytically.
+    The unconstrained rate ``v_num`` is differentiated by the process's own
+    ``compile_jacobian`` when it offers one and its kernel is numeric, and by
+    central finite differences of the unconstrained kernel otherwise. A
+    constraint factor ``phi`` enters by the product rule
+    (:data:`CONSTRAINT_GRADIENT_RULE`): the blocking indicator and the
+    driving-force factor multiply the gradient of ``v_num``, never the other
+    way round, so the switch surface carries no spurious derivative.
     """
 
-    if kernel_kind == KERNEL_NUMERIC:
+    base: JacobianKernel | None = None
+    kind = JACOBIAN_FINITE_DIFFERENCE
+    if parts.numeric:
         compile_jacobian = getattr(process, "compile_jacobian", None)
-        analytic = None if compile_jacobian is None else compile_jacobian(context)
-        if analytic is not None:
-            return analytic, JACOBIAN_ANALYTIC
-    indices = sorted({context.state_index[spec.name] for spec in process.state_variables if spec.name in context.state_index})
-    return _finite_difference_gradient(rate_kernel, indices, len(context.state_index)), JACOBIAN_FINITE_DIFFERENCE
+        base = None if compile_jacobian is None else compile_jacobian(context)
+        if base is not None:
+            kind = JACOBIAN_ANALYTIC
+    if base is None:
+        indices = sorted({context.state_index[spec.name] for spec in process.state_variables if spec.name in context.state_index})
+        base = _finite_difference_gradient(parts.unconstrained, indices, len(context.state_index), scales)
+    if parts.kind not in (KERNEL_NUMERIC_THERMODYNAMIC, KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC):
+        return base, kind
+    if parts.factor is None:
+        name = process.name
+
+        def refused(time: float, state: np.ndarray) -> np.ndarray:
+            del time, state
+            raise ValueError(
+                f"Process {name!r} is bound to a dynamic thermodynamic constraint that offers no numeric rate "
+                "factor; its compiled gradient would have to differentiate the constraint itself and is refused."
+            )
+
+        return refused, JACOBIAN_REFUSED
+    return _factored_gradient(parts.unconstrained, base, parts.factor, parts.factor_gradient, len(context.state_index)), kind
 
 
-def _finite_difference_gradient(rate_kernel: RateKernel, indices: list[int], size: int) -> JacobianKernel:
-    """Central differences of ``rate_kernel`` over ``indices``; one-sided at the non-negative boundary."""
+def _factored_gradient(
+    unconstrained: RateKernel,
+    base: JacobianKernel,
+    factor: Callable[[np.ndarray], Any],
+    factor_gradient: Callable[[np.ndarray], np.ndarray] | None,
+    size: int,
+) -> JacobianKernel:
+    """``grad (v_num phi) = phi grad v_num + v_num grad phi`` with ``grad phi = 0`` when not offered."""
+
+    def gradient(time: float, state: np.ndarray) -> np.ndarray:
+        phi = float(factor(state))
+        if factor_gradient is None:
+            if phi == 0.0:
+                return np.zeros(size, dtype=float)
+            return phi * np.asarray(base(time, state), dtype=float)
+        result = phi * np.asarray(base(time, state), dtype=float)
+        result += unconstrained(time, state) * np.asarray(factor_gradient(state), dtype=float)
+        return result
+
+    return gradient
+
+
+def _finite_difference_gradient(
+    rate_kernel: RateKernel,
+    indices: list[int],
+    size: int,
+    scales: np.ndarray,
+) -> JacobianKernel:
+    """Central differences of ``rate_kernel`` over ``indices``; one-sided at the non-negative boundary.
+
+    The step of state ``i`` is ``FINITE_DIFFERENCE_RELATIVE_STEP * max(|y_i|, sigma_i)``
+    with ``sigma_i = scales[i]`` in state units. Where ``y_i - h_i < 0`` the
+    second-order one-sided stencil ``(-3 f(y) + 4 f(y + h) - f(y + 2h)) / 2h``
+    keeps every evaluation in the non-negative orthant at the same O(h^2)
+    truncation order as the central stencil (Fornberg, Math. Comp. 51 (1988)
+    699-706, weights for the three-point forward difference).
+    """
 
     relative_step = FINITE_DIFFERENCE_RELATIVE_STEP
+    step_floors = np.asarray(scales, dtype=float)
 
     def gradient(time: float, state: np.ndarray) -> np.ndarray:
         result = np.zeros(size, dtype=float)
         work = np.array(state, dtype=float)
         for index in indices:
             value = work[index]
-            step = relative_step * max(abs(value), 1.0)
+            step = relative_step * max(abs(value), step_floors[index])
             lower = value - step
             if lower < 0.0:
-                # Keep both evaluations in the non-negative orthant the rate is defined on.
+                # Keep every evaluation in the non-negative orthant the rate is defined on.
                 work[index] = value + step
                 upper_rate = rate_kernel(time, work)
+                work[index] = value + 2.0 * step
+                far_rate = rate_kernel(time, work)
                 work[index] = value
                 base_rate = rate_kernel(time, work)
-                result[index] = (upper_rate - base_rate) / step
+                result[index] = (-3.0 * base_rate + 4.0 * upper_rate - far_rate) / (2.0 * step)
             else:
                 work[index] = value + step
                 upper_rate = rate_kernel(time, work)
@@ -434,8 +621,13 @@ def _finite_difference_gradient(rate_kernel: RateKernel, indices: list[int], siz
     return gradient
 
 
-def _blocking_kernel(numeric: RateKernel, feasible: Callable[[np.ndarray], bool]) -> RateKernel:
-    """Apply ``block_unfavorable_forward_rate`` semantics to a numeric kernel."""
+def _factored_kernel(numeric: RateKernel, factor: Callable[[np.ndarray], Any]) -> RateKernel:
+    """``v = v_num * phi``: the blocking indicator or the constraint's driving-force factor.
+
+    The forward rate ``v_num`` must be finite and non-negative, as
+    ``block_unfavorable_forward_rate`` requires; the product may be negative
+    only through a factor that represents reverse flux.
+    """
 
     def kernel(time: float, state: np.ndarray) -> float:
         rate = numeric(time, state)
@@ -443,17 +635,20 @@ def _blocking_kernel(numeric: RateKernel, feasible: Callable[[np.ndarray], bool]
             raise ValueError("Dynamic thermodynamic enforcement requires a finite scalar process rate.")
         if rate < 0.0:
             raise ValueError("Dynamic thermodynamic enforcement supports nonnegative forward rates only.")
-        return rate if feasible(state) else 0.0
+        return rate * float(factor(state))
 
     return kernel
 
 
 __all__ = [
+    "CONSTRAINT_GRADIENT_RULE",
     "FINITE_DIFFERENCE_RELATIVE_STEP",
     "JACOBIAN_ANALYTIC",
     "JACOBIAN_BY_BACKEND",
     "JACOBIAN_COMPILED_LABEL",
     "JACOBIAN_FINITE_DIFFERENCE",
+    "JACOBIAN_REFUSED",
+    "JACOBIAN_SUMMARY_LABELS",
     "NEGATIVE_STATE_POLICY",
     "evaluation_state_for_rates",
     "KERNEL_NUMERIC",
