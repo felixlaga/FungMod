@@ -73,12 +73,19 @@ def biomass_yield_coefficient(
     parameters: ParameterSet,
     yield_symbol: str,
 ) -> float:
-    """Return a dimensionless biomass yield coefficient between 0 and 1."""
+    """Return a finite, non-negative dimensionless biomass yield coefficient.
+
+    The yield basis (mass per mass, C-mol per C-mol, formula units per mole) is
+    the caller's declaration; no basis-free ``<= 1`` cap is applied. Whether a
+    yield is physically admissible is the job of a conservation or energetics
+    check (``GibbsEnergyYieldBound.validate_yield`` with a carbon limit), not of
+    this accessor.
+    """
 
     yield_quantity = parameters.require_quantity(yield_symbol, "dimensionless")
     value = float(yield_quantity.magnitude)
-    if value < 0.0 or value > 1.0:
-        raise ValueError(f"{yield_symbol} must be between 0 and 1 for Stage 6 growth.")
+    if not np.isfinite(value) or value < 0.0:
+        raise ValueError(f"{yield_symbol} must be finite and non-negative.")
     return value
 
 

@@ -44,6 +44,21 @@ from .stoichiometry import (
 
 MACROCHEMICAL_BALANCE_MATURITY = "exploratory_software_tested"
 CHARGE_CONSERVATION_ROW = "charge"
+DEFAULT_MACROCHEMICAL_MAX_CONDITION_NUMBER = Parameter(
+    name="default macrochemical maximum condition number",
+    symbol="kappa_max_macrochemical",
+    value=1e8,
+    units="dimensionless",
+    uncertainty=None,
+    source=(
+        "Numerical acceptance convention for the free-coefficient conservation matrix; "
+        "not a physical parameter. With double precision (unit round-off about 1e-16) a "
+        "condition number of 1e8 bounds the relative coefficient error near 1e-8."
+    ),
+    confidence_level="testing",
+    notes="Balances whose free-column matrix is worse conditioned than this are refused.",
+    measurement_method="software configuration",
+)
 SECOND_LAW_ENTROPY_PRODUCTION_SOURCE = (
     "Isothermal isobaric chemical entropy production, T * sigma = -delta_r G * rate; "
     "Kondepudi and Prigogine, Modern Thermodynamics, 2nd ed., Wiley 2015."
@@ -140,6 +155,10 @@ class MacrochemicalSolution:
     coefficients: dict[str, float]
     fixed_species: tuple[str, ...]
     residuals: dict[str, float]
+    residual_scale: float
+    absolute_tolerance: float
+    condition_number: float | None
+    smallest_singular_value: float | None
 
     def reaction_gibbs(self) -> Quantity:
         """Return the reaction Gibbs energy per mole of reaction extent."""
@@ -151,23 +170,49 @@ class MacrochemicalSolution:
 
         return self._reaction_energy("formation_enthalpy")
 
+    def omitted_zero_coefficient_species(self, attribute: str) -> tuple[str, ...]:
+        """Species with a zero coefficient and no ``attribute`` formation energy.
+
+        A coefficient counts as zero when it is exactly zero or within the
+        solve's own residual acceptance threshold. Such a species contributes
+        nothing to a reaction energy, so its missing energy is recorded, not
+        treated as a refusal.
+        """
+
+        if attribute not in {"formation_gibbs", "formation_enthalpy"}:
+            raise ValueError(f"Unknown formation energy attribute {attribute!r}.")
+        threshold = self.absolute_tolerance * self.residual_scale
+        return tuple(
+            species.name
+            for species in self.balance.species
+            if getattr(species, attribute) is None and abs(self.coefficients[species.name]) <= threshold
+        )
+
     def _reaction_energy(self, attribute: str) -> Quantity:
         if not has_text(self.balance.thermodynamic_conditions):
             raise MacrochemicalBalanceError(
                 f"Balance {self.balance.name!r} must declare thermodynamic_conditions before "
                 "formation energies are combined."
             )
+        omitted = set(self.omitted_zero_coefficient_species(attribute))
         total: Quantity | None = None
         for species in self.balance.species:
             parameter = cast("Parameter | None", getattr(species, attribute))
             if parameter is None:
+                if species.name in omitted:
+                    continue
                 raise MacrochemicalBalanceError(
-                    f"Species {species.name!r} has no {attribute}; reaction energies are "
-                    "never computed from a partial set of formation energies."
+                    f"Species {species.name!r} has no {attribute} and a nonzero coefficient "
+                    f"{self.coefficients[species.name]!r}; reaction energies are never computed "
+                    "from a partial set of formation energies."
                 )
             term = _molar_energy(parameter) * self.coefficients[species.name]
             total = term if total is None else total + term
-        return cast(Quantity, total)
+        if total is None:
+            raise MacrochemicalBalanceError(
+                f"No species with a nonzero coefficient carries {attribute}; the reaction energy is undefined."
+            )
+        return total
 
     def entropy_budget(
         self,
@@ -247,6 +292,15 @@ class MacrochemicalSolution:
             "coefficients": dict(self.coefficients),
             "fixed_species": list(self.fixed_species),
             "residuals": dict(self.residuals),
+            "absolute_tolerance": self.absolute_tolerance,
+            "scale_value": self.residual_scale,
+            "scale_units": "conserved-quantity equivalents per reaction event",
+            "condition_number": self.condition_number,
+            "smallest_singular_value": self.smallest_singular_value,
+            "omitted_zero_coefficient_species": {
+                attribute: list(self.omitted_zero_coefficient_species(attribute))
+                for attribute in ("formation_gibbs", "formation_enthalpy")
+            },
             "sign_convention": "negative coefficients are consumed; positive are produced",
         }
 
@@ -306,13 +360,20 @@ class MacrochemicalBalance:
         fixed_coefficients: Mapping[str, float],
         *,
         absolute_tolerance: float | None = None,
+        max_condition_number: float | None = None,
     ) -> MacrochemicalSolution:
         """Solve every unfixed coefficient from element and charge conservation.
 
         Fails closed when conservation leaves coefficients undetermined (more
-        must be fixed) or cannot be satisfied (the species set or fixed values
-        are inconsistent). ``absolute_tolerance`` applies to conservation
-        residuals relative to the largest coefficient magnitude, at least one.
+        must be fixed), cannot be satisfied (the species set or fixed values
+        are inconsistent), or is too ill-conditioned to trust: the free-column
+        conservation matrix must have a condition number at most
+        ``max_condition_number`` (``DEFAULT_MACROCHEMICAL_MAX_CONDITION_NUMBER``).
+
+        Residuals are accepted when ``max|r| <= absolute_tolerance * scale`` with
+        ``scale = max(1, max_j |nu_j| max_e a_ej)``, the largest single term in
+        any conservation sum. The scale and the condition number are recorded
+        on the solution.
         """
 
         self.validate()
@@ -334,10 +395,19 @@ class MacrochemicalBalance:
         )
         if not math.isfinite(tolerance) or tolerance < 0.0:
             raise MacrochemicalBalanceError("absolute_tolerance must be finite and non-negative.")
+        condition_limit = (
+            float(cast(Quantity, DEFAULT_MACROCHEMICAL_MAX_CONDITION_NUMBER.quantity).magnitude)
+            if max_condition_number is None
+            else float(max_condition_number)
+        )
+        if not math.isfinite(condition_limit) or condition_limit < 1.0:
+            raise MacrochemicalBalanceError("max_condition_number must be finite and at least one.")
 
         labels, matrix = self.conservation_matrix()
         free = [index for index, name in enumerate(names) if name not in fixed]
         coefficients = np.array([fixed.get(name, 0.0) for name in names], dtype=float)
+        condition_number: float | None = None
+        smallest_singular_value: float | None = None
         if free:
             free_matrix = matrix[:, free]
             undetermined = len(free) - int(np.linalg.matrix_rank(free_matrix))
@@ -347,9 +417,22 @@ class MacrochemicalBalance:
                     f"{[names[index] for index in free]}; fix that many more coefficients. "
                     "No coefficient is chosen on the caller's behalf."
                 )
+            singular_values = np.linalg.svd(free_matrix, compute_uv=False)
+            smallest_singular_value = float(singular_values[-1])
+            condition_number = (
+                float(singular_values[0] / smallest_singular_value) if smallest_singular_value > 0.0 else math.inf
+            )
+            if condition_number > condition_limit:
+                raise MacrochemicalBalanceError(
+                    f"The conservation matrix of the free species {[names[index] for index in free]} "
+                    f"is ill-conditioned: condition number {condition_number:.3e} exceeds "
+                    f"{condition_limit:.3e} (smallest singular value {smallest_singular_value:.3e}). "
+                    "Solved coefficients would be numerically meaningless; fix more coefficients "
+                    "or remove near-dependent species."
+                )
             coefficients[free] = np.linalg.lstsq(free_matrix, -matrix @ coefficients, rcond=None)[0]
         residual = matrix @ coefficients
-        scale = max(1.0, float(np.max(np.abs(coefficients))))
+        scale = max(1.0, float(np.max(np.abs(matrix) * np.abs(coefficients)[np.newaxis, :])))
         if float(np.max(np.abs(residual))) > tolerance * scale:
             violated = {
                 label: float(value)
@@ -365,6 +448,10 @@ class MacrochemicalBalance:
             coefficients={name: float(value) for name, value in zip(names, coefficients, strict=True)},
             fixed_species=tuple(name for name in names if name in fixed),
             residuals={label: float(value) for label, value in zip(labels, residual, strict=True)},
+            residual_scale=scale,
+            absolute_tolerance=tolerance,
+            condition_number=condition_number,
+            smallest_singular_value=smallest_singular_value,
         )
 
     def solve_for_reaction_gibbs(
@@ -374,6 +461,7 @@ class MacrochemicalBalance:
         free_species: str,
         reaction_gibbs: Parameter,
         absolute_tolerance: float | None = None,
+        max_condition_number: float | None = None,
     ) -> MacrochemicalSolution:
         """Solve the one extra coefficient that gives a stated reaction Gibbs energy.
 
@@ -391,6 +479,7 @@ class MacrochemicalBalance:
             solution = self.solve(
                 {**fixed_coefficients, free_species: value},
                 absolute_tolerance=absolute_tolerance,
+                max_condition_number=max_condition_number,
             )
             return float(solution.reaction_gibbs().to(_MOLAR_ENERGY_UNITS).magnitude)
 
@@ -404,6 +493,7 @@ class MacrochemicalBalance:
         return self.solve(
             {**fixed_coefficients, free_species: (target - intercept) / slope},
             absolute_tolerance=absolute_tolerance,
+            max_condition_number=max_condition_number,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -444,6 +534,7 @@ def _quantity_dict(quantity: Quantity | None) -> dict[str, Any] | None:
 
 __all__ = [
     "CHARGE_CONSERVATION_ROW",
+    "DEFAULT_MACROCHEMICAL_MAX_CONDITION_NUMBER",
     "MACROCHEMICAL_BALANCE_MATURITY",
     "SECOND_LAW_ENTROPY_PRODUCTION_SOURCE",
     "MacrochemicalBalance",
