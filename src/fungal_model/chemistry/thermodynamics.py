@@ -1,7 +1,9 @@
-"""Thermodynamic metadata interfaces.
+"""Thermodynamic metadata interfaces and the dynamic Gibbs constraint.
 
-Stage 7 records approximate Gibbs free energy estimates when available. The
-framework does not yet enforce full thermodynamic flux analysis.
+Records approximate Gibbs free energy estimates with provenance, and couples one
+forward process rate to its dynamic reaction Gibbs energy either as a hard
+feasibility gate or as the continuous flux-force factor ``1 - exp(dG / (R T))``.
+Full thermodynamic flux analysis across a reaction network is not enforced here.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from fungal_model.core.assumptions import Assumption
 from fungal_model.core.kernels import KernelContext
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.provenance import ProvenanceError, UnknownParameterError, has_text
@@ -68,13 +71,91 @@ class GibbsFreeEnergyEstimate:
         }
 
 
+ENFORCEMENT_BLOCK = "block_unfavorable_forward_rate"
+ENFORCEMENT_DRIVING_FORCE = "driving_force"
+ENFORCEMENT_MODES = (ENFORCEMENT_BLOCK, ENFORCEMENT_DRIVING_FORCE)
+DRIVING_FORCE_MATURITY = "literature_backed_software_tested"
+DRIVING_FORCE_PROVENANCE = (
+    "Beard DA, Qian H (2007) Relationship between thermodynamic driving force "
+    "and one-way fluxes in reversible processes. PLoS ONE 2:e144.",
+    "Noor E, Flamholz A, Liebermeister W, Bar-Even A, Milo R (2013) A note on "
+    "the kinetics of enzyme action: a decomposition that highlights "
+    "thermodynamic effects. FEBS Lett 587:2772-2777.",
+)
+TEMPERATURE_DEPENDENCE_NONE = "none_declared"
+TEMPERATURE_DEPENDENCE_CONSTANT_ENTHALPY = "constant_enthalpy_gibbs_helmholtz"
+TEMPERATURE_DEPENDENCE_PROVENANCE = (
+    "Tewari YB, Goldberg RN (1989) Thermodynamics of hydrolysis of "
+    "disaccharides: cellobiose, gentiobiose, isomaltose, and maltose. "
+    "J Biol Chem 264:3966-3971.",
+    "Du B, Zhang Z, Grubner S, Yurkovich JT, Palsson BO, Zielinski DC (2018) "
+    "Temperature-dependent estimation of Gibbs energies using an updated "
+    "group-contribution method. Biophys J 114:2691-2702.",
+)
+ACTIVITY_BASIS_STATE = "trajectory_state"
+ACTIVITY_BASIS_FIXED = "fixed_activity"
+# exp(x) overflows double precision above about 709.8; the driving-force factor
+# -expm1(x) is refused beyond this exponent instead of returning -inf.
+DRIVING_FORCE_EXPONENT_LIMIT = 700.0
+
+
 @dataclass(frozen=True)
 class DynamicActivityParticipant:
-    """One explicitly bound trajectory state in a reaction quotient."""
+    """One participant of a reaction quotient.
+
+    A trajectory participant binds a solver state (``state_name``) whose
+    activity is ``max(c / c0, a_min)``. A fixed participant has
+    ``state_name == ""`` and a declared, sourced ``fixed_activity`` (for
+    example the solvent at unit activity under the biochemical standard
+    state); it contributes a constant to ``ln Q`` and nothing to the gradient.
+    """
 
     state_name: str
     species_id: str
     signed_coefficient: float
+    fixed_activity: float | None = None
+    activity_source: str | None = None
+
+    @property
+    def is_fixed(self) -> bool:
+        return self.fixed_activity is not None
+
+    @property
+    def activity_key(self) -> str:
+        """Key under which the activity is reported: state name, or species id when fixed."""
+
+        return self.species_id if self.is_fixed else self.state_name
+
+    def validate(self) -> None:
+        if not has_text(self.species_id):
+            raise ValueError("Dynamic thermodynamic participants require a nonblank species id.")
+        if not np.isfinite(self.signed_coefficient) or self.signed_coefficient == 0.0:
+            raise ValueError(
+                f"Dynamic thermodynamic participant {self.species_id!r} requires a "
+                "finite nonzero signed coefficient."
+            )
+        if self.is_fixed:
+            assert self.fixed_activity is not None
+            if self.state_name != "":
+                raise ValueError(
+                    f"Fixed-activity participant {self.species_id!r} must not bind a "
+                    "state name."
+                )
+            if not np.isfinite(self.fixed_activity) or self.fixed_activity <= 0.0:
+                raise ValueError(
+                    f"Fixed-activity participant {self.species_id!r} requires a finite "
+                    "positive activity."
+                )
+            if not has_text(self.activity_source):
+                raise ProvenanceError(
+                    f"Fixed-activity participant {self.species_id!r} requires a "
+                    "nonblank activity_source."
+                )
+        elif not has_text(self.state_name):
+            raise ValueError(
+                f"Dynamic thermodynamic participant {self.species_id!r} requires a "
+                "nonblank state name or a fixed activity."
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,6 +163,9 @@ class DynamicActivityParticipant:
             "species_id": self.species_id,
             "signed_coefficient": self.signed_coefficient,
             "role": "reactant" if self.signed_coefficient < 0.0 else "product",
+            "activity_basis": ACTIVITY_BASIS_FIXED if self.is_fixed else ACTIVITY_BASIS_STATE,
+            "fixed_activity": self.fixed_activity,
+            "activity_source": self.activity_source,
         }
 
 
@@ -101,9 +185,10 @@ class DynamicThermodynamicEvaluation:
     absolute_tolerance: float
     favorable: bool
     rate_blocked: bool
+    driving_force_factor: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "constraint_id": self.constraint_id,
             "process_id": self.process_id,
             "reaction_id": self.reaction_id,
@@ -120,11 +205,64 @@ class DynamicThermodynamicEvaluation:
             "favorable": self.favorable,
             "rate_blocked": self.rate_blocked,
         }
+        if self.driving_force_factor is not None:
+            data["driving_force_factor"] = self.driving_force_factor
+        return data
+
+
+@dataclass(frozen=True)
+class _ResolvedConstants:
+    """Unit-resolved constants shared by evaluation and compiled kernels."""
+
+    standard_units: str
+    standard_value: float
+    floor_value: float
+    temperature_k: float
+    gas_constant_value: float
+    standard_delta_g: float
+    tolerance_value: float
+
+    @property
+    def rt(self) -> float:
+        return self.gas_constant_value * self.temperature_k
+
+
+def driving_force_factor(delta_gibbs: float, rt: float) -> float:
+    """Flux-force factor ``phi = 1 - exp(dG / RT)`` (Beard and Qian 2007; Noor et al. 2013).
+
+    ``phi`` is 1 far from equilibrium in the forward direction, 0 at
+    equilibrium, and negative (reverse net flux) above it. Exponents beyond
+    :data:`DRIVING_FORCE_EXPONENT_LIMIT` are refused rather than overflowing.
+    """
+
+    exponent = delta_gibbs / rt
+    if not np.isfinite(exponent):
+        raise ValueError("Thermodynamic driving force requires a finite dG / (R T).")
+    if exponent > DRIVING_FORCE_EXPONENT_LIMIT:
+        raise ValueError(
+            f"Thermodynamic driving force exponent dG / (R T) = {exponent:.3g} exceeds "
+            f"{DRIVING_FORCE_EXPONENT_LIMIT:g}; the factor is not representable."
+        )
+    return float(-np.expm1(exponent))
 
 
 @dataclass(frozen=True)
 class DynamicThermodynamicConstraint:
-    """Provenance-bound dynamic Gibbs constraint for one forward process rate."""
+    """Provenance-bound dynamic Gibbs constraint for one forward process rate.
+
+    ``enforcement_mode`` selects how the forward law ``r_fwd`` is coupled to
+    ``dG = dG0(T) + R T ln Q``:
+
+    * ``block_unfavorable_forward_rate``: ``r = r_fwd * 1[dG < -tol]``. The
+      legacy indicator; no reverse flux, a dead zone of width ``tol``.
+    * ``driving_force``: ``r_net = r_fwd * (1 - exp(dG / (R T)))``; continuous,
+      zero at equilibrium, negative above it. The reverse flux inherits the
+      forward law's saturation (reverse saturation is not represented).
+
+    ``dG0(T) = dH0 - T (dH0 - dG0(T_ref)) / T_ref`` when ``standard_enthalpy``
+    and ``reference_temperature`` are both declared (constant enthalpy,
+    Gibbs-Helmholtz); otherwise ``dG0`` is used as given at every temperature.
+    """
 
     constraint_id: str
     process_id: str
@@ -142,7 +280,15 @@ class DynamicThermodynamicConstraint:
     standard_redox_potential: Parameter | None = None
     electron_transfer_number: Parameter | None = None
     faraday_constant: Parameter | None = None
-    enforcement_mode: str = "block_unfavorable_forward_rate"
+    enforcement_mode: str = ENFORCEMENT_BLOCK
+    standard_enthalpy: Parameter | None = None
+    reference_temperature: Parameter | None = None
+
+    @property
+    def temperature_dependence(self) -> str:
+        if self.standard_enthalpy is None and self.reference_temperature is None:
+            return TEMPERATURE_DEPENDENCE_NONE
+        return TEMPERATURE_DEPENDENCE_CONSTANT_ENTHALPY
 
     def validate(self) -> None:
         for field_name, value in (
@@ -153,14 +299,18 @@ class DynamicThermodynamicConstraint:
         ):
             if not has_text(value):
                 raise ValueError(f"Dynamic thermodynamic {field_name} must be nonblank.")
-        if self.enforcement_mode != "block_unfavorable_forward_rate":
+        if self.enforcement_mode not in ENFORCEMENT_MODES:
             raise ValueError(
-                "Dynamic thermodynamic enforcement_mode must be "
-                "'block_unfavorable_forward_rate'."
+                "Dynamic thermodynamic enforcement_mode must be one of "
+                f"{list(ENFORCEMENT_MODES)}; got {self.enforcement_mode!r}."
             )
         if not self.participants:
             raise ValueError("Dynamic thermodynamic constraint requires reaction participants.")
-        state_names = [participant.state_name for participant in self.participants]
+        for participant in self.participants:
+            participant.validate()
+        state_names = [
+            participant.state_name for participant in self.participants if not participant.is_fixed
+        ]
         species_ids = [participant.species_id for participant in self.participants]
         if len(set(state_names)) != len(state_names):
             raise ValueError(
@@ -170,21 +320,14 @@ class DynamicThermodynamicConstraint:
             raise ValueError(
                 "Dynamic thermodynamic reaction participants must bind distinct species ids."
             )
+        if not state_names:
+            raise ValueError(
+                "Dynamic thermodynamic reaction requires at least one trajectory participant."
+            )
         if not any(participant.signed_coefficient < 0.0 for participant in self.participants):
             raise ValueError("Dynamic thermodynamic reaction requires at least one reactant.")
         if not any(participant.signed_coefficient > 0.0 for participant in self.participants):
             raise ValueError("Dynamic thermodynamic reaction requires at least one product.")
-        for participant in self.participants:
-            if (
-                not has_text(participant.state_name)
-                or not has_text(participant.species_id)
-                or not np.isfinite(participant.signed_coefficient)
-                or participant.signed_coefficient == 0.0
-            ):
-                raise ValueError(
-                    "Dynamic thermodynamic participants require nonblank state/species "
-                    "ids and finite nonzero signed coefficients."
-                )
         if not self.provenance_refs or any(not has_text(value) for value in self.provenance_refs):
             raise ProvenanceError(
                 "Dynamic thermodynamic constraint requires nonblank provenance_refs."
@@ -238,6 +381,14 @@ class DynamicThermodynamicConstraint:
                 "Dynamic thermodynamic standard_energy.method must be "
                 "'standard_delta_gibbs' or 'redox_potential'."
             )
+        if (self.standard_enthalpy is None) != (self.reference_temperature is None):
+            raise ValueError(
+                "Temperature-dependent standard Gibbs energy requires both "
+                "standard_enthalpy and reference_temperature, or neither."
+            )
+        if self.standard_enthalpy is not None:
+            assert self.reference_temperature is not None
+            parameters.extend((self.standard_enthalpy, self.reference_temperature))
         for parameter in parameters:
             parameter.validate_provenance()
             parameter.validate_value()
@@ -268,9 +419,13 @@ class DynamicThermodynamicConstraint:
             _finite_value(self.standard_redox_potential, "volt")
             _positive_value(self.electron_transfer_number, "dimensionless")
             _positive_value(self.faraday_constant, "coulomb / mole")
+        if self.standard_enthalpy is not None:
+            assert self.reference_temperature is not None
+            _finite_value(self.standard_enthalpy, "joule / mole")
+            _positive_value(self.reference_temperature, "kelvin")
 
-    def standard_delta_gibbs_value(self) -> float:
-        """Return configured or redox-derived standard Gibbs energy in J/mol."""
+    def reference_standard_delta_gibbs_value(self) -> float:
+        """Standard Gibbs energy as declared (or redox-derived), in J/mol, before any temperature transform."""
 
         self.validate()
         if self.standard_energy_method == "standard_delta_gibbs":
@@ -297,14 +452,25 @@ class DynamicThermodynamicConstraint:
         delta_g = -(transfer_number * faraday * potential)
         return float(np.asarray(delta_g.to("joule / mole").magnitude, dtype=float))
 
-    def evaluate(
-        self,
-        state: Mapping[str, Quantity],
-        *,
-        rate_blocked: bool = False,
-    ) -> DynamicThermodynamicEvaluation:
-        """Evaluate activities, Q, and delta G for one solver state."""
+    def standard_delta_gibbs_value(self) -> float:
+        """Standard Gibbs energy at the constraint temperature, in J/mol.
 
+        With ``standard_enthalpy`` and ``reference_temperature`` declared this is
+        the constant-enthalpy Gibbs-Helmholtz form
+        ``dG0(T) = dH0 - T (dH0 - dG0(T_ref)) / T_ref`` (Tewari and Goldberg
+        1989; Du et al. 2018). Without them the declared value is returned.
+        """
+
+        reference = self.reference_standard_delta_gibbs_value()
+        if self.standard_enthalpy is None:
+            return reference
+        assert self.reference_temperature is not None
+        enthalpy = _finite_value(self.standard_enthalpy, "joule / mole")
+        reference_k = _positive_value(self.reference_temperature, "kelvin")
+        temperature_k = _positive_value(self.temperature, "kelvin")
+        return enthalpy - temperature_k * (enthalpy - reference) / reference_k
+
+    def _resolved(self) -> _ResolvedConstants:
         self.validate()
         standard_concentration = self.standard_concentration.quantity
         minimum_activity = self.minimum_activity.quantity
@@ -316,43 +482,67 @@ class DynamicThermodynamicConstraint:
         assert temperature is not None
         assert gas_constant is not None
         assert tolerance is not None
-        standard_value = float(standard_concentration.magnitude)
-        floor_value = float(minimum_activity.to("dimensionless").magnitude)
-        activities: dict[str, float] = {}
-        log_quotient = 0.0
-        for participant in self.participants:
-            if participant.state_name not in state:
-                raise ValueError(
-                    f"Dynamic thermodynamic constraint {self.constraint_id!r} "
-                    f"requires missing state {participant.state_name!r}."
-                )
-            concentration = assert_compatible(
-                state[participant.state_name],
-                str(standard_concentration.units),
-                name=participant.state_name,
-            )
-            concentration_value = float(concentration.magnitude)
-            if not np.isfinite(concentration_value) or concentration_value < 0.0:
-                raise ValueError(
-                    f"Dynamic thermodynamic state {participant.state_name!r} "
-                    "must be a finite nonnegative concentration."
-                )
-            activity = max(concentration_value / standard_value, floor_value)
-            activities[participant.state_name] = activity
-            log_quotient += participant.signed_coefficient * float(np.log(activity))
+        return _ResolvedConstants(
+            standard_units=str(standard_concentration.units),
+            standard_value=float(standard_concentration.magnitude),
+            floor_value=float(minimum_activity.to("dimensionless").magnitude),
+            temperature_k=float(temperature.to("kelvin").magnitude),
+            gas_constant_value=float(gas_constant.to("joule / mole / kelvin").magnitude),
+            standard_delta_g=self.standard_delta_gibbs_value(),
+            tolerance_value=float(tolerance.to("joule / mole").magnitude),
+        )
+
+    def _check_quotient(self, log_quotient: float) -> float:
         quotient = float(np.exp(log_quotient))
         if not np.isfinite(log_quotient) or not np.isfinite(quotient) or quotient <= 0.0:
             raise ValueError(
                 f"Dynamic thermodynamic constraint {self.constraint_id!r} "
                 "produced a non-finite or non-positive reaction quotient."
             )
-        temperature_k = float(temperature.to("kelvin").magnitude)
-        gas_constant_value = float(
-            gas_constant.to("joule / mole / kelvin").magnitude
+        return quotient
+
+    def evaluate(
+        self,
+        state: Mapping[str, Quantity],
+        *,
+        rate_blocked: bool = False,
+    ) -> DynamicThermodynamicEvaluation:
+        """Evaluate activities, Q, delta G, and (in driving-force mode) the factor for one solver state."""
+
+        constants = self._resolved()
+        activities: dict[str, float] = {}
+        log_quotient = 0.0
+        for participant in self.participants:
+            if participant.is_fixed:
+                assert participant.fixed_activity is not None
+                activity = float(participant.fixed_activity)
+            else:
+                if participant.state_name not in state:
+                    raise ValueError(
+                        f"Dynamic thermodynamic constraint {self.constraint_id!r} "
+                        f"requires missing state {participant.state_name!r}."
+                    )
+                concentration = assert_compatible(
+                    state[participant.state_name],
+                    constants.standard_units,
+                    name=participant.state_name,
+                )
+                concentration_value = float(concentration.magnitude)
+                if not np.isfinite(concentration_value) or concentration_value < 0.0:
+                    raise ValueError(
+                        f"Dynamic thermodynamic state {participant.state_name!r} "
+                        "must be a finite nonnegative concentration."
+                    )
+                activity = max(concentration_value / constants.standard_value, constants.floor_value)
+            activities[participant.activity_key] = activity
+            log_quotient += participant.signed_coefficient * float(np.log(activity))
+        quotient = self._check_quotient(log_quotient)
+        delta_g = constants.standard_delta_g + constants.rt * log_quotient
+        factor = (
+            driving_force_factor(delta_g, constants.rt)
+            if self.enforcement_mode == ENFORCEMENT_DRIVING_FORCE
+            else None
         )
-        standard_delta_g = self.standard_delta_gibbs_value()
-        delta_g = standard_delta_g + gas_constant_value * temperature_k * log_quotient
-        tolerance_value = float(tolerance.to("joule / mole").magnitude)
         return DynamicThermodynamicEvaluation(
             constraint_id=self.constraint_id,
             process_id=self.process_id,
@@ -360,80 +550,161 @@ class DynamicThermodynamicConstraint:
             activities=activities,
             log_reaction_quotient=log_quotient,
             reaction_quotient=quotient,
-            standard_delta_gibbs=standard_delta_g,
+            standard_delta_gibbs=constants.standard_delta_g,
             delta_gibbs=delta_g,
-            temperature_kelvin=temperature_k,
-            absolute_tolerance=tolerance_value,
-            favorable=delta_g < -tolerance_value,
+            temperature_kelvin=constants.temperature_k,
+            absolute_tolerance=constants.tolerance_value,
+            favorable=delta_g < -constants.tolerance_value,
             rate_blocked=rate_blocked,
+            driving_force_factor=factor,
         )
 
-    def compile_feasibility(self, context: KernelContext) -> Callable[[np.ndarray], bool] | None:
-        """Numeric favorability test over a state vector, mirroring :meth:`evaluate`.
+    def _compiled_participants(
+        self,
+        context: KernelContext,
+        constants: _ResolvedConstants,
+    ) -> tuple[list[tuple[str, int, float, float]], float]:
+        """State participants as ``(name, index, unit factor, coefficient)`` plus the fixed ``ln Q`` offset."""
 
-        Every constant (standard state, activity floor, temperature, gas
-        constant, standard Gibbs energy, tolerance) is resolved once; the
-        returned closure recomputes only the state-dependent reaction quotient
-        and raises the same errors as :meth:`evaluate` for invalid states.
-        """
-
-        self.validate()
-        standard_concentration = self.standard_concentration.quantity
-        minimum_activity = self.minimum_activity.quantity
-        temperature = self.temperature.quantity
-        gas_constant = self.gas_constant.quantity
-        tolerance = self.absolute_tolerance.quantity
-        assert standard_concentration is not None
-        assert minimum_activity is not None
-        assert temperature is not None
-        assert gas_constant is not None
-        assert tolerance is not None
-        standard_units = str(standard_concentration.units)
-        standard_value = float(standard_concentration.magnitude)
-        floor_value = float(minimum_activity.to("dimensionless").magnitude)
-        temperature_k = float(temperature.to("kelvin").magnitude)
-        gas_constant_value = float(gas_constant.to("joule / mole / kelvin").magnitude)
-        standard_delta_g = self.standard_delta_gibbs_value()
-        tolerance_value = float(tolerance.to("joule / mole").magnitude)
         participants: list[tuple[str, int, float, float]] = []
+        fixed_log_quotient = 0.0
         for participant in self.participants:
+            if participant.is_fixed:
+                assert participant.fixed_activity is not None
+                fixed_log_quotient += participant.signed_coefficient * float(
+                    np.log(participant.fixed_activity)
+                )
+                continue
             if participant.state_name not in context.state_index:
                 raise ValueError(
                     f"Dynamic thermodynamic constraint {self.constraint_id!r} "
                     f"requires missing state {participant.state_name!r}."
                 )
-            index, factor = context.state_slot(participant.state_name, standard_units)
-            participants.append((participant.state_name, index, factor, float(participant.signed_coefficient)))
-        constraint_id = self.constraint_id
+            index, factor = context.state_slot(participant.state_name, constants.standard_units)
+            participants.append(
+                (participant.state_name, index, factor, float(participant.signed_coefficient))
+            )
+        return participants, fixed_log_quotient
 
-        def favorable(state: np.ndarray) -> bool:
-            log_quotient = 0.0
+    def _compiled_delta_gibbs(
+        self,
+        context: KernelContext,
+    ) -> Callable[[np.ndarray], tuple[float, list[tuple[int, float, bool]]]]:
+        """Closure returning ``dG`` and, per state participant, ``(index, coefficient / y, floor inactive)``."""
+
+        constants = self._resolved()
+        participants, fixed_log_quotient = self._compiled_participants(context, constants)
+        constraint_id = self.constraint_id
+        standard_value = constants.standard_value
+        floor_value = constants.floor_value
+        standard_delta_g = constants.standard_delta_g
+        rt = constants.rt
+
+        def delta_gibbs(state: np.ndarray) -> tuple[float, list[tuple[int, float, bool]]]:
+            log_quotient = fixed_log_quotient
+            terms: list[tuple[int, float, bool]] = []
             for name, index, factor, coefficient in participants:
-                concentration_value = float(state[index] * factor)
+                raw_value = float(state[index])
+                concentration_value = raw_value * factor
                 if not np.isfinite(concentration_value) or concentration_value < 0.0:
                     raise ValueError(
                         f"Dynamic thermodynamic state {name!r} "
                         "must be a finite nonnegative concentration."
                     )
-                activity = max(concentration_value / standard_value, floor_value)
+                ratio = concentration_value / standard_value
+                floor_inactive = ratio > floor_value
+                activity = ratio if floor_inactive else floor_value
                 log_quotient += coefficient * float(np.log(activity))
+                terms.append((index, coefficient / raw_value if floor_inactive else 0.0, floor_inactive))
             quotient = float(np.exp(log_quotient))
             if not np.isfinite(log_quotient) or not np.isfinite(quotient) or quotient <= 0.0:
                 raise ValueError(
                     f"Dynamic thermodynamic constraint {constraint_id!r} "
                     "produced a non-finite or non-positive reaction quotient."
                 )
-            delta_g = standard_delta_g + gas_constant_value * temperature_k * log_quotient
-            return delta_g < -tolerance_value
+            return standard_delta_g + rt * log_quotient, terms
+
+        return delta_gibbs
+
+    def compile_feasibility(self, context: KernelContext) -> Callable[[np.ndarray], bool] | None:
+        """Numeric favorability test over a state vector, mirroring :meth:`evaluate`.
+
+        Block mode only: every constant is resolved once and the closure
+        recomputes the state-dependent reaction quotient. Driving-force mode
+        returns ``None`` because its enforcement is a continuous factor, not a
+        feasibility gate; callers then use :meth:`enforce` or
+        :meth:`compile_rate_factor`.
+        """
+
+        self.validate()
+        if self.enforcement_mode == ENFORCEMENT_DRIVING_FORCE:
+            return None
+        delta_gibbs = self._compiled_delta_gibbs(context)
+        tolerance_value = self._resolved().tolerance_value
+
+        def favorable(state: np.ndarray) -> bool:
+            return delta_gibbs(state)[0] < -tolerance_value
 
         return favorable
+
+    def compile_rate_factor(
+        self,
+        context: KernelContext,
+    ) -> Callable[[np.ndarray], tuple[float, np.ndarray | None]] | None:
+        """Numeric multiplier ``phi`` on the forward rate and its state gradient.
+
+        Block mode: ``phi`` is the indicator ``1[dG < -tol]`` and the gradient
+        is ``None`` (the indicator is not differentiable). Driving-force mode:
+        ``phi = 1 - exp(dG / (R T))`` with
+        ``d phi / d y_k = -exp(dG / (R T)) nu_k / y_k`` where the activity floor
+        is inactive, 0 where it is active, and 0 for fixed participants.
+        """
+
+        self.validate()
+        delta_gibbs = self._compiled_delta_gibbs(context)
+        constants = self._resolved()
+        size = len(context.state_index)
+        tolerance_value = constants.tolerance_value
+        rt = constants.rt
+        limit = DRIVING_FORCE_EXPONENT_LIMIT
+
+        if self.enforcement_mode == ENFORCEMENT_BLOCK:
+
+            def indicator(state: np.ndarray) -> tuple[float, np.ndarray | None]:
+                return (1.0 if delta_gibbs(state)[0] < -tolerance_value else 0.0), None
+
+            return indicator
+
+        def factor(state: np.ndarray) -> tuple[float, np.ndarray | None]:
+            delta_g, terms = delta_gibbs(state)
+            exponent = delta_g / rt
+            if not np.isfinite(exponent):
+                raise ValueError("Thermodynamic driving force requires a finite dG / (R T).")
+            if exponent > limit:
+                raise ValueError(
+                    f"Thermodynamic driving force exponent dG / (R T) = {exponent:.3g} "
+                    f"exceeds {limit:g}; the factor is not representable."
+                )
+            exponential = float(np.exp(exponent))
+            gradient = np.zeros(size, dtype=float)
+            for index, inverse_term, floor_inactive in terms:
+                if floor_inactive:
+                    gradient[index] = -exponential * inverse_term
+            return float(-np.expm1(exponent)), gradient
+
+        return factor
 
     def enforce(
         self,
         rate: Quantity,
         state: Mapping[str, Quantity],
     ) -> tuple[Quantity, DynamicThermodynamicEvaluation]:
-        """Block an unfavorable nonnegative forward rate."""
+        """Couple a nonnegative forward rate to the dynamic Gibbs energy.
+
+        Block mode returns the rate unchanged when favorable and zero
+        otherwise. Driving-force mode returns ``rate * phi``; a negative result
+        is reverse net flux and ``rate_blocked`` stays ``False``.
+        """
 
         rate_values = np.asarray(rate.magnitude, dtype=float)
         if rate_values.ndim != 0 or not np.isfinite(rate_values).all():
@@ -445,10 +716,128 @@ class DynamicThermodynamicConstraint:
                 "Dynamic thermodynamic enforcement supports nonnegative forward rates only."
             )
         evaluation = self.evaluate(state)
+        if self.enforcement_mode == ENFORCEMENT_DRIVING_FORCE:
+            assert evaluation.driving_force_factor is not None
+            return rate * evaluation.driving_force_factor, evaluation
         if evaluation.favorable:
             return rate, evaluation
         blocked = self.evaluate(state, rate_blocked=True)
         return Q_(0.0, rate.units), blocked
+
+    def assumptions(self) -> tuple[Assumption, ...]:
+        """Explicit modelling assumptions of the configured enforcement mode."""
+
+        records: list[Assumption] = []
+        if self.enforcement_mode == ENFORCEMENT_DRIVING_FORCE:
+            records.append(
+                Assumption(
+                    name=f"{self.constraint_id}.driving_force_flux_force",
+                    description=(
+                        "Net rate r_net = r_fwd * (1 - exp(dG / (R T))) with the "
+                        "configured irreversible forward law as r_fwd; zero at "
+                        "equilibrium, negative (reverse net flux) above it."
+                    ),
+                    justification=(
+                        "One-way flux ratio J+/J- = exp(-dG / (R T)) for a dilute "
+                        "process (Beard and Qian 2007); capacity x saturation x "
+                        "(1 - exp(dG / (R T))) decomposition (Noor et al. 2013)."
+                    ),
+                    known_limitations=(
+                        "reverse_saturation: not_represented. The reverse flux "
+                        "inherits the forward law's saturation, so a saturable "
+                        "forward law is not Haldane-consistent near and above "
+                        "equilibrium. A forward law that vanishes at zero reactant "
+                        "gives r_net = 0 there, so a reactant-free boundary state "
+                        "is a fixed point. Ideal-dilute activities with an "
+                        "explicit floor; no activity coefficients."
+                    ),
+                    source="; ".join(DRIVING_FORCE_PROVENANCE),
+                )
+            )
+        else:
+            records.append(
+                Assumption(
+                    name=f"{self.constraint_id}.block_unfavorable_forward_rate",
+                    description=(
+                        "Forward rate r = r_fwd * 1[dG < -absolute_tolerance]; "
+                        "no reverse flux is represented."
+                    ),
+                    justification=(
+                        "Legacy feasibility gate: a forward process cannot run "
+                        "against its Gibbs energy."
+                    ),
+                    known_limitations=(
+                        "reverse_flux: not_represented; reverse_saturation: "
+                        "not_represented. A state above equilibrium is frozen "
+                        "rather than relaxing back. The indicator is "
+                        "discontinuous at dG = -absolute_tolerance. A positive "
+                        "absolute_tolerance creates a dead zone: exergonic rates "
+                        "with |dG| below the tolerance are blocked."
+                    ),
+                    source=None,
+                )
+            )
+        if self.standard_enthalpy is None:
+            records.append(
+                Assumption(
+                    name=f"{self.constraint_id}.standard_gibbs_temperature_dependence",
+                    description=(
+                        "none_declared: the declared standard Gibbs energy is used "
+                        "unchanged at the constraint temperature."
+                    ),
+                    justification="No standard enthalpy or reference temperature was declared.",
+                    known_limitations=(
+                        "Temperature changes do not move the equilibrium constant."
+                    ),
+                    source=None,
+                )
+            )
+        else:
+            records.append(
+                Assumption(
+                    name=f"{self.constraint_id}.standard_gibbs_temperature_dependence",
+                    description=(
+                        "constant_enthalpy_gibbs_helmholtz: dG0(T) = dH0 - T (dH0 - "
+                        "dG0(T_ref)) / T_ref."
+                    ),
+                    justification=(
+                        "Gibbs-Helmholtz integration with a temperature-independent "
+                        "reaction enthalpy (van 't Hoff form)."
+                    ),
+                    known_limitations=(
+                        "Zero heat-capacity change; valid over modest temperature "
+                        "ranges around the reference temperature only."
+                    ),
+                    source="; ".join(TEMPERATURE_DEPENDENCE_PROVENANCE),
+                )
+            )
+        fixed = [participant for participant in self.participants if participant.is_fixed]
+        if fixed:
+            records.append(
+                Assumption(
+                    name=f"{self.constraint_id}.fixed_activity_participants",
+                    description=(
+                        "Participants with declared constant activity: "
+                        + ", ".join(
+                            f"{participant.species_id} = {participant.fixed_activity}"
+                            for participant in fixed
+                        )
+                        + "."
+                    ),
+                    justification=(
+                        "Declared standard-state convention for each fixed "
+                        "participant (for example unit solvent activity)."
+                    ),
+                    known_limitations=(
+                        "The fixed activity does not respond to the trajectory; "
+                        "it is a convention, not a measurement of the run."
+                    ),
+                    source="; ".join(
+                        str(participant.activity_source) for participant in fixed
+                    ),
+                )
+            )
+        return tuple(records)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -477,12 +866,38 @@ class DynamicThermodynamicConstraint:
             "faraday_constant": (
                 None if self.faraday_constant is None else self.faraday_constant.to_dict()
             ),
+            "standard_enthalpy": (
+                None if self.standard_enthalpy is None else self.standard_enthalpy.to_dict()
+            ),
+            "reference_temperature": (
+                None
+                if self.reference_temperature is None
+                else self.reference_temperature.to_dict()
+            ),
+            "temperature_dependence": self.temperature_dependence,
             "temperature": self.temperature.to_dict(),
             "gas_constant": self.gas_constant.to_dict(),
             "standard_concentration": self.standard_concentration.to_dict(),
             "minimum_activity": self.minimum_activity.to_dict(),
             "absolute_tolerance": self.absolute_tolerance.to_dict(),
             "provenance_refs": list(self.provenance_refs),
+            "reverse_saturation": "not_represented",
+            "maturity": (
+                DRIVING_FORCE_MATURITY
+                if self.enforcement_mode == ENFORCEMENT_DRIVING_FORCE
+                else "software_tested_legacy_gate"
+            ),
+            "law_provenance": (
+                list(DRIVING_FORCE_PROVENANCE)
+                if self.enforcement_mode == ENFORCEMENT_DRIVING_FORCE
+                else []
+            )
+            + (
+                list(TEMPERATURE_DEPENDENCE_PROVENANCE)
+                if self.standard_enthalpy is not None
+                else []
+            ),
+            "assumptions": [assumption.to_dict() for assumption in self.assumptions()],
         }
 
 
@@ -521,8 +936,20 @@ def _nonnegative_value(parameter: Parameter, units: str) -> float:
 
 
 __all__ = [
+    "ACTIVITY_BASIS_FIXED",
+    "ACTIVITY_BASIS_STATE",
+    "DRIVING_FORCE_EXPONENT_LIMIT",
+    "DRIVING_FORCE_MATURITY",
+    "DRIVING_FORCE_PROVENANCE",
     "DynamicActivityParticipant",
     "DynamicThermodynamicConstraint",
     "DynamicThermodynamicEvaluation",
+    "ENFORCEMENT_BLOCK",
+    "ENFORCEMENT_DRIVING_FORCE",
+    "ENFORCEMENT_MODES",
     "GibbsFreeEnergyEstimate",
+    "TEMPERATURE_DEPENDENCE_CONSTANT_ENTHALPY",
+    "TEMPERATURE_DEPENDENCE_NONE",
+    "TEMPERATURE_DEPENDENCE_PROVENANCE",
+    "driving_force_factor",
 ]

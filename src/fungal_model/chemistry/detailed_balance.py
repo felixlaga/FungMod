@@ -201,9 +201,12 @@ class DetailedBalanceNetwork:
             raise ValueError("Equilibrium relative_tolerance must be finite and in [1e-13, 1).")
         basis, singular, _ = np.linalg.svd(self.stoichiometry.astype(float), full_matrices=True)
         rank = int(np.sum(singular > max(self.stoichiometry.shape)*np.finfo(float).eps*singular[0]))
-        directions, invariants = basis[:, :rank].T, basis[:, rank:].T
+        directions, invariants = basis[:, :rank].T, _row_reduced(basis[:, rank:].T)
         total = invariants @ initial
-        scale = np.linalg.norm(initial)
+        # Each conservation residual is relative to its own pool total, so a trace
+        # pool is held to the same relative tolerance as the dominant one. The
+        # lower bound only keeps a zero total representable in floating point.
+        scale = np.maximum(np.abs(total), 1e-300)
 
         def residual(log_activity):
             c = self.c_standard*np.exp(log_activity)
@@ -211,7 +214,8 @@ class DetailedBalanceNetwork:
                                    (invariants @ c - total)/scale))
 
         def jacobian(log_activity):
-            return np.vstack((directions, invariants*(self.c_standard*np.exp(log_activity))[None, :]/scale))
+            return np.vstack((directions,
+                              invariants*(self.c_standard*np.exp(log_activity))[None, :]/scale[:, None]))
 
         # Bounds are numerical representability limits, not concentration floors.
         solution = least_squares(residual, np.log(initial/self.c_standard), jac=cast(Any, jacobian),
@@ -289,6 +293,37 @@ class DetailedBalanceNetwork:
                                 "No inferred kinetics, speciation, biomass chemistry or empirical validation.",
                                 "Zero concentrations leave chemical-potential diagnostics unavailable.",
                                 "Caller must source formation energies at the common declared conditions."]}
+
+
+def _row_reduced(rows: np.ndarray) -> np.ndarray:
+    """Gauss-Jordan row reduction of a full-row-rank basis; the row space is unchanged.
+
+    An orthonormal null-space basis from the SVD mixes disconnected pools into
+    every row, so a per-row relative residual would still be dominated by the
+    largest pool. The reduced basis has one pivot species per row, which
+    separates disconnected pools (Vallabhajosyula, Chickarmane and Sauro 2006,
+    Bioinformatics 22:346, conservation analysis by row reduction).
+    """
+    reduced = np.array(rows, dtype=float)
+    row_count, column_count = reduced.shape
+    largest = max(1.0, float(np.max(np.abs(reduced), initial=0.0)))
+    tolerance = 100 * max(reduced.shape) * np.finfo(float).eps * largest
+    pivot_row = 0
+    for column in range(column_count):
+        if pivot_row >= row_count:
+            break
+        candidate = pivot_row + int(np.argmax(np.abs(reduced[pivot_row:, column])))
+        if abs(reduced[candidate, column]) <= tolerance:
+            continue
+        reduced[[pivot_row, candidate]] = reduced[[candidate, pivot_row]]
+        reduced[pivot_row] /= reduced[pivot_row, column]
+        for other in range(row_count):
+            if other != pivot_row:
+                reduced[other] -= reduced[other, column] * reduced[pivot_row]
+        pivot_row += 1
+    if pivot_row != row_count:
+        raise ValueError("Conservation basis lost rank during row reduction.")
+    return reduced
 
 
 def _number(parameter: Parameter | None, units: str, *, positive: bool = False) -> float:
