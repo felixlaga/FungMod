@@ -14,6 +14,10 @@ other shipped process. They name roles, never organisms:
 * ``costed_secretion``: the secretion extent ``f max(capacity-m, 0) N/(K_N+N) y X``,
   with ``y`` the declared protein formula units per substrate formula unit of the
   secretion chemistry.
+* ``endogenous_maintenance``: the biomass-oxidising extent ``max(m - capacity, 0) X / Y_e``
+  that pays the maintenance deficit when uptake cannot (Beeftink et al. 1990);
+  ``Y_e`` is the maintenance substrate equivalent one biomass formula unit
+  supplies when oxidised. Opt-in; no default ``Y_e`` ships.
 * ``dilution_exchange``: ``D (c_feed - c)`` for one pool of a chemostat.
 * ``gas_transfer``: ``k_La (c_sat - c)`` for one dissolved pool.
 
@@ -25,6 +29,14 @@ stoichiometry and must be accounted for by the caller's ledger. An optional
 conservation check can integrate the extents alongside the pools. Negative
 trial states are projected to zero by the compiled core before a kernel runs
 (the classes' zero extension); the unit-aware ``rate`` methods refuse them.
+
+Because every extent is defined in the formula units of one pool (biomass for
+growth and endogenous maintenance, product for secretion, substrate for
+maintenance), the stoichiometry must carry ``+1`` or ``-1`` for that pool and
+``-1/Y`` (growth) or ``-1/y`` (secretion) for the substrate. ``closure_constants``
+verifies this at build time and refuses a mismatch, naming the expected
+coefficient, so that the yield in the rate and the yield in the stoichiometry
+cannot drift apart.
 """
 
 from __future__ import annotations
@@ -37,7 +49,7 @@ import numpy as np
 
 from fungal_model.core.assumptions import Assumption
 from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
-from fungal_model.core.parameters import ParameterSet
+from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 from fungal_model.processes.base import (
     ParameterRequirement,
@@ -49,8 +61,29 @@ from fungal_model.processes.base import (
 RESOURCE_LIMITED_GROWTH_PROCESS_TYPE = "resource_limited_growth"
 RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE = "resource_limited_maintenance"
 COSTED_SECRETION_PROCESS_TYPE = "costed_secretion"
+ENDOGENOUS_MAINTENANCE_PROCESS_TYPE = "endogenous_maintenance"
 DILUTION_EXCHANGE_PROCESS_TYPE = "dilution_exchange"
 GAS_TRANSFER_PROCESS_TYPE = "gas_transfer"
+ENDOGENOUS_MAINTENANCE_MATURITY = "literature_backed_software_tested"
+
+CLOSURE_STOICHIOMETRY_TOLERANCE = Parameter(
+    name="closure stoichiometry consistency tolerance",
+    symbol="tol_closure_stoichiometry",
+    value=1e-9,
+    units="dimensionless",
+    uncertainty=0.0,
+    source=(
+        "FungMod scientific audit 2026-10-22, processes finding F5: closure extents are defined in the formula "
+        "units of one pool, so the substrate coefficient must equal -1/Y (growth) or -1/y (secretion)."
+    ),
+    confidence_level="high",
+    notes=(
+        "Absolute tolerance on |nu_substrate * Y + 1| and on the unit coefficient of the defining pool; it "
+        "absorbs floating-point round-off of a coefficient written as -1/Y, not a physical uncertainty."
+    ),
+    measurement_method="software verification tolerance",
+    validity_range="build-time consistency check only",
+)
 
 
 def resource_limited_closure_assumption() -> Assumption:
@@ -71,6 +104,40 @@ def resource_limited_closure_assumption() -> Assumption:
             "must be supplied from an explicit macrochemical balance."
         ),
         source="Pirt (1965) maintenance energy partition; Monod saturation; no organism claim.",
+    )
+
+
+def endogenous_maintenance_assumption() -> Assumption:
+    """The Beeftink intermediate maintenance model: the deficit is paid by oxidising biomass."""
+
+    return Assumption(
+        name="endogenous maintenance pays the uptake deficit by biomass oxidation",
+        description=(
+            "When the uptake capacity c = q_max S/(K_S+S) O/(K_O+O) falls below the maintenance demand m, the "
+            "deficit d = max(m - c, 0) (substrate formula units per biomass formula unit per time) is met by "
+            "oxidising biomass at the extent r_e = d X / Y_e, where Y_e is the maintenance substrate "
+            "equivalent supplied per biomass formula unit oxidised. Above the demand the extent is zero; the "
+            "deficit is never paid twice."
+        ),
+        justification=(
+            "Beeftink, van der Heijden and Heijnen (1990) showed that maintenance is supplied simultaneously "
+            "from substrate and from endogenous respiration, with endogenous respiration taking over as the "
+            "substrate supply fails; van Bodegom (2007) and Wang and Post (2012) identify the absence of this "
+            "term as the main failure of pure Pirt closures under starvation."
+        ),
+        known_limitations=(
+            "Y_e is an energetic equivalence supplied by the caller (for example |dG_cat per biomass formula "
+            "unit| / |dG_cat per substrate formula unit|), not a measured decay constant; no death, lysis, "
+            "storage mobilisation, dormancy or recovery lag is represented; the rate is one-sided at c = m; "
+            "the oxidant and product coefficients of biomass oxidation must come from the caller's balance."
+        ),
+        source=(
+            "Beeftink HH, van der Heijden RTJM, Heijnen JJ (1990) Maintenance requirements: energy supply from "
+            "simultaneous endogenous respiration and substrate consumption. FEMS Microbiol Ecol 73:203-209; "
+            "van Bodegom P (2007) Microbial maintenance: a critical review on its quantification. Microb Ecol "
+            "53:513-523; Wang G, Post WM (2012) A theoretical reassessment of microbial maintenance and "
+            "implications for microbial ecology modeling. FEMS Microbiol Ecol 81:610-617. No organism claim."
+        ),
     )
 
 
@@ -114,6 +181,12 @@ def _non_negative(quantity: Quantity, name: str) -> float:
     return value
 
 
+def _closure_tolerance() -> float:
+    quantity = CLOSURE_STOICHIOMETRY_TOLERANCE.quantity
+    assert quantity is not None
+    return float(quantity.to("dimensionless").magnitude)
+
+
 @dataclass(frozen=True)
 class ClosureConstants:
     """Plain-float constants of the Pirt/Monod closure, resolved once at build time."""
@@ -144,6 +217,11 @@ class ClosureConstants:
     def maintenance(self, substrate: float, oxidant: float) -> float:
         return min(self.maintenance_demand, self.capacity(substrate, oxidant))
 
+    def deficit(self, substrate: float, oxidant: float) -> float:
+        """``max(m - capacity, 0)``: the specific maintenance demand uptake cannot pay."""
+
+        return max(self.maintenance_demand - self.capacity(substrate, oxidant), 0.0)
+
     def capacity_gradient(self, substrate: float, oxidant: float) -> tuple[float, float]:
         """``d(capacity)/d(substrate)`` and ``d(capacity)/d(oxidant)``."""
 
@@ -155,10 +233,16 @@ class ClosureConstants:
         )
 
     def budget_gradient(self, substrate: float, nutrient: float, oxidant: float, biomass: float) -> tuple[float, float, float, float]:
-        """Gradient of ``max(capacity - m, 0) N/(K_N+N) X`` with respect to (S, X, N, O); zero below the demand (the closure's kink)."""
+        """Gradient of ``max(capacity - m, 0) N/(K_N+N) X`` with respect to (S, X, N, O).
+
+        Zero below the demand and, when ``m > 0``, at the tie (the closure's
+        kink takes the left derivative). With ``m = 0`` the budget is the
+        capacity itself, so at an exhausted pool (``budget == 0``) the right
+        derivative of the capacity is returned instead of zero.
+        """
 
         budget = self.capacity(substrate, oxidant) - self.maintenance_demand
-        if budget <= 0.0:
+        if budget < 0.0 or (budget == 0.0 and self.maintenance_demand > 0.0):
             return (0.0, 0.0, 0.0, 0.0)
         limitation = nutrient / (self.nutrient_half_saturation + nutrient)
         d_substrate, d_oxidant = self.capacity_gradient(substrate, oxidant)
@@ -214,6 +298,11 @@ class _ClosureProcess(Process):
         description: str,
         source: str,
         notes: str,
+        extra_assumptions: tuple[Assumption, ...] = (),
+        limitations: tuple[str, ...] = (
+            "No death, storage, regulation, morphology or pH; the closure has a kink at capacity equal to demand.",
+        ),
+        labels: tuple[str, ...] = ("homogeneous", "physiology", "resource-limited"),
     ) -> None:
         pools = (substrate_state, biomass_state, nutrient_state, oxidant_state)
         if len(set(pools)) != 4:
@@ -248,14 +337,8 @@ class _ClosureProcess(Process):
             required_state_variables=tuple(required),
             changed_state_variables=tuple(changed),
             required_parameters=requirements,
-            assumptions=(resource_limited_closure_assumption(),),
-            validity=ValidityDomain(
-                description=description,
-                labels=("homogeneous", "physiology", "resource-limited"),
-                limitations=(
-                    "No death, storage, regulation, morphology or pH; the closure has a kink at capacity equal to demand.",
-                ),
-            ),
+            assumptions=(resource_limited_closure_assumption(), *extra_assumptions),
+            validity=ValidityDomain(description=description, labels=labels, limitations=limitations),
             failure_modes=(
                 "negative pool state",
                 "non-positive half-saturation constant",
@@ -293,7 +376,7 @@ class _ClosureProcess(Process):
                 raise ValueError(f"{symbol} must be non-negative.")
             return magnitude
 
-        return ClosureConstants(
+        constants = ClosureConstants(
             true_yield=value(self.true_yield_symbol, "dimensionless", non_negative=True),
             maintenance_demand=value(self.maintenance_demand_symbol, self.specific_units, non_negative=True),
             uptake_capacity=value(self.uptake_capacity_symbol, self.specific_units, non_negative=True),
@@ -301,6 +384,41 @@ class _ClosureProcess(Process):
             nutrient_half_saturation=value(self.nutrient_half_saturation_symbol, self.concentration_units, positive=True),
             oxidant_half_saturation=value(self.oxidant_half_saturation_symbol, self.concentration_units, positive=True),
         )
+        self._check_stoichiometry_consistency(constants, parameters)
+        return constants
+
+    def _check_stoichiometry_consistency(self, constants: ClosureConstants, parameters: ParameterSet) -> None:
+        """Refuse a stoichiometry that contradicts the formula-unit basis of this extent (overridden per process)."""
+
+        del constants, parameters
+
+    def _require_coefficient(self, state: str, expected: float, *, basis: str) -> None:
+        """Raise unless ``stoichiometry[state]`` equals ``expected`` within the declared tolerance."""
+
+        tolerance = _closure_tolerance()
+        actual = self.stoichiometry.get(state)
+        if actual is None or not abs(actual - expected) <= tolerance:
+            raise ValueError(
+                f"{self.name}: the stoichiometric coefficient of {state!r} must be {expected:+.12g} because {basis}; "
+                f"got {'none' if actual is None else f'{actual:+.12g}'}."
+            )
+
+    def _require_substrate_per_yield(self, yield_value: float, *, yield_symbol: str, basis: str) -> None:
+        """Raise unless ``stoichiometry[substrate] * yield + 1`` vanishes within the declared tolerance."""
+
+        tolerance = _closure_tolerance()
+        actual = self.stoichiometry.get(self.substrate_state)
+        if yield_value <= 0.0:
+            raise ValueError(
+                f"{self.name}: {yield_symbol} must be positive so that the substrate coefficient of "
+                f"{self.substrate_state!r} is defined as -1/{yield_symbol}; got {yield_value:.12g}."
+            )
+        expected = -1.0 / yield_value
+        if actual is None or not abs(actual * yield_value + 1.0) <= tolerance:
+            raise ValueError(
+                f"{self.name}: the stoichiometric coefficient of {self.substrate_state!r} must be -1/{yield_symbol} = "
+                f"{expected:+.12g} because {basis}; got {'none' if actual is None else f'{actual:+.12g}'}."
+            )
 
     def _compiled_closure(self, context: KernelContext) -> tuple[ClosureConstants, tuple[tuple[int, float], ...]]:
         constants = self.closure_constants(context.parameters)
@@ -406,6 +524,14 @@ class ResourceLimitedGrowthProcess(_ClosureProcess):
             raise ValueError(f"{self.allocation_fraction_symbol} must lie in [0, 1].")
         return value
 
+    def _check_stoichiometry_consistency(self, constants: ClosureConstants, parameters: ParameterSet) -> None:
+        del parameters
+        self._require_coefficient(self.biomass_state, 1.0, basis="the growth extent is counted in biomass formula units")
+        self._require_substrate_per_yield(
+            constants.true_yield, yield_symbol=self.true_yield_symbol,
+            basis="the growth extent already carries the true yield (biomass per substrate formula unit)",
+        )
+
     def rate(self, state: Mapping[str, Quantity], time: Quantity, parameters: ParameterSet, environment: object = None, geometry: object = None) -> Quantity:
         del time, environment, geometry
         substrate, biomass, nutrient, oxidant = self._pools(state)
@@ -499,6 +625,10 @@ class ResourceLimitedMaintenanceProcess(_ClosureProcess):
             source=source,
             notes=notes,
         )
+
+    def _check_stoichiometry_consistency(self, constants: ClosureConstants, parameters: ParameterSet) -> None:
+        del constants, parameters
+        self._require_coefficient(self.substrate_state, -1.0, basis="the maintenance extent is counted in substrate formula units")
 
     def rate(self, state: Mapping[str, Quantity], time: Quantity, parameters: ParameterSet, environment: object = None, geometry: object = None) -> Quantity:
         del time, environment, geometry
@@ -613,6 +743,21 @@ class CostedSecretionProcess(_ClosureProcess):
             raise ValueError(f"{self.secretion_yield_symbol} must be positive.")
         return fraction, secretion_yield
 
+    def _check_stoichiometry_consistency(self, constants: ClosureConstants, parameters: ParameterSet) -> None:
+        del constants
+        tolerance = _closure_tolerance()
+        # The process declares no product state: the product is the pool credited one formula unit per unit extent.
+        if not any(abs(coefficient - 1.0) <= tolerance for coefficient in self.stoichiometry.values()):
+            raise ValueError(
+                f"{self.name}: the secretion extent is counted in product formula units, so exactly one credited pool "
+                f"must carry the coefficient +1; got {dict(self.stoichiometry)}."
+            )
+        _, secretion_yield = self._allocation(parameters)
+        self._require_substrate_per_yield(
+            secretion_yield, yield_symbol=self.secretion_yield_symbol,
+            basis="the secretion extent already carries the secretion yield (product per substrate formula unit)",
+        )
+
     def rate(self, state: Mapping[str, Quantity], time: Quantity, parameters: ParameterSet, environment: object = None, geometry: object = None) -> Quantity:
         del time, environment, geometry
         substrate, biomass, nutrient, oxidant = self._pools(state)
@@ -660,6 +805,136 @@ class CostedSecretionProcess(_ClosureProcess):
     def to_dict(self) -> dict[str, Any]:
         data = super().to_dict()
         data.update({"allocation_fraction_symbol": self.allocation_fraction_symbol, "secretion_yield_symbol": self.secretion_yield_symbol})
+        return data
+
+
+@dataclass(frozen=True, init=False)
+class EndogenousMaintenanceProcess(_ClosureProcess):
+    """Biomass-oxidising extent ``max(m - capacity, 0) X / Y_e`` that pays the maintenance deficit.
+
+    ``Y_e`` (``endogenous_yield_symbol``, dimensionless, positive) is the
+    maintenance substrate equivalent (substrate formula units) that oxidising
+    one biomass formula unit supplies; the caller derives it from the two
+    catabolic Gibbs energies of its macrochemical balance. The stoichiometry
+    must carry ``-1`` for biomass; the oxidant and product coefficients of
+    biomass oxidation come from the caller's balance. Shares ``ClosureConstants``
+    with the growth, maintenance and secretion extents, so the deficit it pays
+    is exactly the demand those extents leave unpaid. Maturity
+    ``literature_backed_software_tested``; no ``Y_e`` ships with FungMod.
+    """
+
+    endogenous_yield_symbol: str
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        substrate_state: str,
+        biomass_state: str,
+        nutrient_state: str,
+        oxidant_state: str,
+        concentration_units: str,
+        time_units: str,
+        true_yield_symbol: str,
+        maintenance_demand_symbol: str,
+        uptake_capacity_symbol: str,
+        substrate_half_saturation_symbol: str,
+        nutrient_half_saturation_symbol: str,
+        oxidant_half_saturation_symbol: str,
+        endogenous_yield_symbol: str,
+        stoichiometry: Mapping[str, float],
+        extent_state: str | None = None,
+        source: str = "Generic endogenous maintenance process.",
+        notes: str = "",
+    ) -> None:
+        self._init_closure(
+            name=name,
+            process_type=ENDOGENOUS_MAINTENANCE_PROCESS_TYPE,
+            substrate_state=substrate_state,
+            biomass_state=biomass_state,
+            nutrient_state=nutrient_state,
+            oxidant_state=oxidant_state,
+            concentration_units=concentration_units,
+            time_units=time_units,
+            true_yield_symbol=true_yield_symbol,
+            maintenance_demand_symbol=maintenance_demand_symbol,
+            uptake_capacity_symbol=uptake_capacity_symbol,
+            substrate_half_saturation_symbol=substrate_half_saturation_symbol,
+            nutrient_half_saturation_symbol=nutrient_half_saturation_symbol,
+            oxidant_half_saturation_symbol=oxidant_half_saturation_symbol,
+            stoichiometry=stoichiometry,
+            extent_state=extent_state,
+            extra_requirements=(
+                ParameterRequirement(
+                    symbol=endogenous_yield_symbol, units="dimensionless",
+                    name="endogenous yield (maintenance substrate equivalents per biomass formula unit oxidised)",
+                ),
+            ),
+            extra_states=(),
+            description="Well-mixed endogenous maintenance: biomass oxidation pays the deficit between demand and uptake capacity.",
+            source=source,
+            notes=notes,
+            extra_assumptions=(endogenous_maintenance_assumption(),),
+            limitations=(
+                "No death, lysis, storage mobilisation, dormancy or recovery lag; the extent is one-sided at capacity "
+                "equal to demand; Y_e is an energetic equivalence supplied by the caller, not a measured decay constant.",
+            ),
+            labels=("homogeneous", "physiology", "resource-limited", "starvation", ENDOGENOUS_MAINTENANCE_MATURITY),
+        )
+        object.__setattr__(self, "endogenous_yield_symbol", endogenous_yield_symbol)
+
+    def _endogenous_yield(self, parameters: ParameterSet) -> float:
+        value = float(np.asarray(parameters.require_quantity(self.endogenous_yield_symbol, "dimensionless").magnitude, dtype=float))
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError(f"{self.endogenous_yield_symbol} must be a finite positive number.")
+        return value
+
+    def _check_stoichiometry_consistency(self, constants: ClosureConstants, parameters: ParameterSet) -> None:
+        del constants
+        self._require_coefficient(self.biomass_state, -1.0, basis="the endogenous extent is counted in biomass formula units oxidised")
+        self._endogenous_yield(parameters)
+
+    def rate(self, state: Mapping[str, Quantity], time: Quantity, parameters: ParameterSet, environment: object = None, geometry: object = None) -> Quantity:
+        del time, environment, geometry
+        substrate, biomass, _, oxidant = self._pools(state)
+        constants = self.closure_constants(parameters)
+        endogenous_yield = self._endogenous_yield(parameters)
+        return Q_(constants.deficit(substrate, oxidant) * biomass / endogenous_yield, self.rate_units)
+
+    def compile_rate(self, context: KernelContext) -> RateKernel | None:
+        constants, slots = self._compiled_closure(context)
+        inverse_yield = 1.0 / self._endogenous_yield(context.parameters)
+        (s_index, s_scale), (x_index, x_scale), _, (o_index, o_scale) = slots
+
+        def kernel(time: float, state: np.ndarray) -> float:
+            del time
+            return constants.deficit(state[s_index] * s_scale, state[o_index] * o_scale) * (state[x_index] * x_scale) * inverse_yield
+
+        return kernel
+
+    def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
+        constants, slots = self._compiled_closure(context)
+        inverse_yield = 1.0 / self._endogenous_yield(context.parameters)
+        (s_index, s_scale), (x_index, x_scale), _, (o_index, o_scale) = slots
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            substrate, biomass, oxidant = state[s_index] * s_scale, state[x_index] * x_scale, state[o_index] * o_scale
+            capacity = constants.capacity(substrate, oxidant)
+            result = np.zeros(size, dtype=float)
+            if capacity < constants.maintenance_demand:  # one-sided at the tie: zero from above
+                d_substrate, d_oxidant = constants.capacity_gradient(substrate, oxidant)
+                result[s_index] = -d_substrate * biomass * inverse_yield * s_scale
+                result[o_index] = -d_oxidant * biomass * inverse_yield * o_scale
+                result[x_index] = (constants.maintenance_demand - capacity) * inverse_yield * x_scale
+            return result
+
+        return gradient
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data.update({"endogenous_yield_symbol": self.endogenous_yield_symbol, "maturity": ENDOGENOUS_MAINTENANCE_MATURITY})
         return data
 
 
@@ -843,17 +1118,22 @@ class GasTransferProcess(_ExchangeProcess):
 
 
 __all__ = [
+    "CLOSURE_STOICHIOMETRY_TOLERANCE",
     "COSTED_SECRETION_PROCESS_TYPE",
     "DILUTION_EXCHANGE_PROCESS_TYPE",
+    "ENDOGENOUS_MAINTENANCE_MATURITY",
+    "ENDOGENOUS_MAINTENANCE_PROCESS_TYPE",
     "GAS_TRANSFER_PROCESS_TYPE",
     "RESOURCE_LIMITED_GROWTH_PROCESS_TYPE",
     "RESOURCE_LIMITED_MAINTENANCE_PROCESS_TYPE",
     "ClosureConstants",
     "CostedSecretionProcess",
     "DilutionExchangeProcess",
+    "EndogenousMaintenanceProcess",
     "GasTransferProcess",
     "ResourceLimitedGrowthProcess",
     "ResourceLimitedMaintenanceProcess",
+    "endogenous_maintenance_assumption",
     "exchange_assumption",
     "resource_limited_closure_assumption",
 ]

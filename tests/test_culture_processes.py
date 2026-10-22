@@ -345,3 +345,65 @@ def test_compiled_representation_refuses_colliding_parameter_symbols() -> None:
     # The processes refuse the collision too: one symbol cannot serve two requirements.
     with pytest.raises(ValueError, match="Duplicate parameter requirement"):
         culture.simulate_compiled(initial_state=respiring_state(), times=Q_([0, 1], "h"))
+
+
+def _right_difference(function, point: np.ndarray, index: int) -> float:
+    """Richardson-extrapolated right-sided difference (``2 D(h/2) - D(h)``, first-order stencil) with a state-scaled step."""
+
+    step = 1e-5 * max(abs(float(point[index])), 1e-2)
+
+    def difference(h: float) -> float:
+        unit = np.zeros_like(point)
+        unit[index] = h
+        return (function(point + unit) - function(point)) / h
+
+    return 2.0 * difference(step / 2.0) - difference(step)
+
+
+@pytest.mark.parametrize("exhausted", ["resource", "acceptor"])
+@pytest.mark.parametrize("builder", [growth, maintenance, secretion])
+def test_zero_demand_gradients_at_exhausted_pools_equal_the_right_sided_difference(builder, exhausted) -> None:
+    parameter_set = parameters(m=0.0)
+    context = _context("millimolar", parameter_set)
+    process = builder()
+    kernel, gradient = process.compile_rate(context), process.compile_jacobian(context)
+    assert kernel is not None and gradient is not None
+    point = np.array([0.8, 0.3, 0.4, 0.2, 0.0, 0.0])
+    point[STATE_NAMES.index(exhausted)] = 0.0
+    analytic = gradient(0.0, point)
+    numeric = np.array([_right_difference(lambda y: kernel(0.0, y), point, i) for i in range(len(STATE_NAMES))])
+    np.testing.assert_allclose(analytic, numeric, rtol=1e-6, atol=1e-9)
+    if builder is not maintenance:
+        assert analytic[STATE_NAMES.index(exhausted)] > 0.0, "with zero demand the growth budget is the capacity itself"
+    # A positive demand keeps the documented kink: zero growth gradient at an exhausted pool.
+    kinked = builder().compile_jacobian(_context("millimolar", parameters()))
+    assert kinked is not None
+    if builder is not maintenance:
+        assert np.all(kinked(0.0, point) == 0.0)
+
+
+@pytest.mark.parametrize("exhausted", ["S", "O"])
+def test_zero_demand_compiled_closure_gradient_matches_the_native_rate_jacobian(exhausted) -> None:
+    from dataclasses import replace
+
+    from tests.test_respiration import model as respiring_model
+
+    culture = respiring_culture(metabolism=replace(respiring_model(), maintenance_demand=respiring_parameter("m", 0.0, "1/h")))
+    names = culture._ledger_names()
+    context = KernelContext(state_index={name: index for index, name in enumerate(names)},
+                            state_units=dict.fromkeys(names, "mole / liter"), time_units="hour", parameters=culture.compiled_parameters())
+    point = np.zeros(len(names))
+    point[:4] = [0.02, 0.001, 0.01, 0.1]
+    point[culture.names.index(exhausted)] = 0.0
+    constants = culture._constants()
+    native = culture._rate_jacobian(point[:4], constants)
+    rates = culture._rates(point[:4], constants)
+    growth_process, maintenance_process = culture.compiled_processes()[:2]
+    for row, process in ((0, growth_process), (1, maintenance_process)):
+        gradient = process.compile_jacobian(context)
+        assert gradient is not None
+        expected = np.zeros(len(names))
+        expected[:4] = native[row] * point[1]
+        expected[1] += rates[row]
+        np.testing.assert_allclose(gradient(0.0, point), expected, rtol=1e-12, atol=0.0)
+    assert native[0][culture.names.index(exhausted)] > 0.0
