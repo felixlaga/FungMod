@@ -307,6 +307,10 @@ class _ConstraintWithoutNumericForm(DynamicThermodynamicConstraint):
         del context
         return None
 
+    def compile_rate_factor(self, context):
+        del context
+        return None
+
 
 def test_a_constraint_without_a_numeric_form_has_its_gradient_refused_and_labelled() -> None:
     model, request = _configured(ROOT / "data" / "model_configs" / "showcase_dynamic_thermodynamics.yml")

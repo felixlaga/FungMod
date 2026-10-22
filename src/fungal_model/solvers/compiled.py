@@ -10,8 +10,9 @@ the rate. The rate vector ``v(t, y)`` is evaluated by one kernel per process:
 
 * ``numeric``: a closure returned by :meth:`Process.compile_rate` that
   reproduces the process's unit-aware ``rate`` arithmetic on floats;
-* ``numeric_thermodynamic``: a numeric kernel followed by the configured
-  dynamic Gibbs feasibility test, blocking an unfavorable forward rate;
+* ``numeric_thermodynamic``: a numeric kernel multiplied by the configured
+  constraint's numeric rate factor: the block-mode feasibility indicator, or
+  the driving-force factor ``1 - exp(dG / (R T))``;
 * ``quantity_wrapped``: the process's own ``rate`` method evaluated on a
   reconstructed unit-bearing state, used when a process offers no kernel;
 * ``quantity_wrapped_thermodynamic``: the wrapped evaluation followed by the
@@ -30,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from fungal_model.chemistry.thermodynamics import DynamicThermodynamicConstraint
+from fungal_model.chemistry.thermodynamics import ENFORCEMENT_BLOCK, DynamicThermodynamicConstraint
 from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.numerics import SolverSettings
 from fungal_model.core.units import Q_, Quantity, assert_compatible
@@ -467,17 +468,32 @@ def _constraint_factor(
     """The constraint's numeric rate factor ``phi`` and its gradient, if it offers them.
 
     A constraint that compiles a rate factor (``compile_rate_factor``) returns
-    ``(phi, grad phi)`` with ``grad phi`` possibly ``None``; one that only
-    compiles a feasibility test returns the blocking indicator with no
-    gradient. ``(None, None)`` means the constraint offers no numeric form and
-    only its unit-aware ``enforce`` can evaluate it.
+    one closure ``y -> (phi, grad phi)`` with ``grad phi`` ``None`` where the
+    factor is not differentiable (the block-mode indicator); it is split here
+    into ``phi`` and ``grad phi`` closures, the gradient closure being
+    ``None`` in block mode. One that only compiles a feasibility test returns
+    the blocking indicator with no gradient. ``(None, None)`` means the
+    constraint offers no numeric form and only its unit-aware ``enforce`` can
+    evaluate it.
     """
 
     compile_rate_factor = getattr(constraint, "compile_rate_factor", None)
     if compile_rate_factor is not None:
-        compiled = compile_rate_factor(context)
-        if compiled is not None:
-            factor, factor_gradient = compiled
+        rate_factor = compile_rate_factor(context)
+        if rate_factor is not None:
+
+            def factor(state: np.ndarray) -> float:
+                return float(rate_factor(state)[0])
+
+            if getattr(constraint, "enforcement_mode", None) == ENFORCEMENT_BLOCK:
+                return factor, None
+
+            def factor_gradient(state: np.ndarray) -> np.ndarray:
+                gradient = rate_factor(state)[1]
+                if gradient is None:
+                    return np.zeros(len(context.state_index), dtype=float)
+                return np.asarray(gradient, dtype=float)
+
             return factor, factor_gradient
     feasible = constraint.compile_feasibility(context)
     if feasible is None:

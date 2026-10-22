@@ -29,7 +29,7 @@ from fungal_model.chemistry.thermodynamics import (
 from fungal_model.core.kernels import KernelContext
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.units import Q_
-from fungal_model.solvers.compiled import KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC
+from fungal_model.solvers.compiled import KERNEL_NUMERIC_THERMODYNAMIC
 from tests.test_dynamic_thermodynamic_enforcement import _dynamic_config, _dynamic_validation, _write_config
 
 
@@ -136,7 +136,9 @@ def test_driving_force_relaxes_a_product_dominated_start_that_block_mode_freezes
     assert validation["details"]["solver_time_enforcement"] == ENFORCEMENT_DRIVING_FORCE
     assert validation["details"]["recorded_blocked_count"] == 0
     kernel = result.solver_metadata["kernel"]["process_kernels"]["a_to_b"]
-    assert kernel == KERNEL_QUANTITY_WRAPPED_THERMODYNAMIC
+    # The compiled core multiplies the numeric forward kernel by the
+    # constraint's compiled driving-force factor (WP1 + WP2 wiring).
+    assert kernel == KERNEL_NUMERIC_THERMODYNAMIC
     constraint = result.assembly_report.to_dict()["dynamic_thermodynamic_constraints"][0]
     assert constraint["enforcement_mode"] == ENFORCEMENT_DRIVING_FORCE
     assert constraint["maturity"] == DRIVING_FORCE_MATURITY
