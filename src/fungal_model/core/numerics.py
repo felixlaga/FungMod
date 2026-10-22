@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from fungal_model.core.units import Quantity, assert_compatible, require_quantity
+from fungal_model.core.units import Q_, Quantity, assert_compatible, require_quantity
 
 
 class IntegrationError(ValueError):
@@ -31,6 +31,16 @@ JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND = "finite_difference_by_backend"
 JACOBIAN_COMPILED = "compiled"
 JACOBIAN_OPTIONS = frozenset({JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND, JACOBIAN_COMPILED})
 IMPLICIT_METHODS = frozenset({"LSODA", "BDF", "Radau"})
+#: Keys a plain ``solver`` config block may carry (see :meth:`SolverSettings.from_config`).
+SOLVER_CONFIG_KEYS = frozenset({"method", "rtol", "atol", "max_step", "first_step", "jacobian"})
+
+
+def _config_quantity(value: Any, name: str) -> Quantity:
+    """A ``{value, units}`` mapping as a unit-bearing quantity; anything else is refused."""
+
+    if not isinstance(value, Mapping) or set(value) != {"value", "units"}:
+        raise ValueError(f"{name} must be a mapping with exactly the keys 'value' and 'units'.")
+    return Q_(_positive_scalar(value["value"], name), str(value["units"]))
 
 
 @dataclass(frozen=True)
@@ -85,6 +95,51 @@ class SolverSettings:
                              f"atol[{name}]")
             for name, units in state_units.items()
         ], cells)
+
+    def finite_difference_scales(self, state_units: Mapping[str, str]) -> np.ndarray:
+        """Per-state scale ``sigma_i = atol_i / rtol`` in state units, in ``state_units`` order.
+
+        This is the threshold below which a finite-difference step of the
+        compiled Jacobian stops shrinking with the state (scipy's ``num_jac``
+        uses the same ratio), so the step follows the tolerance a state is
+        integrated with rather than the unit it is declared in.
+        """
+
+        atol = self.absolute_tolerances(state_units)
+        return np.full(len(state_units), float(atol) / self.rtol) if np.ndim(atol) == 0 else np.asarray(atol) / self.rtol
+
+    @classmethod
+    def from_config(cls, data: Mapping[str, Any]) -> "SolverSettings":
+        """Build settings from a plain ``solver`` config block; unknown keys are refused.
+
+        Keys: ``method``, ``rtol``, ``atol`` (a number in each state's own
+        units, or a mapping ``state -> {value, units}``), ``max_step`` and
+        ``first_step`` (``{value, units}`` in a time unit) and ``jacobian``.
+        Every key is optional and an absent key keeps the dataclass default.
+        """
+
+        if not isinstance(data, Mapping):
+            raise ValueError("A solver block must be a mapping.")
+        unknown = sorted(str(key) for key in data if key not in SOLVER_CONFIG_KEYS)
+        if unknown:
+            raise ValueError(f"Solver block contains unsupported keys: {unknown}; allowed: {sorted(SOLVER_CONFIG_KEYS)}.")
+        kwargs: dict[str, Any] = {}
+        if "method" in data:
+            kwargs["method"] = str(data["method"])
+        if "jacobian" in data:
+            kwargs["jacobian"] = str(data["jacobian"])
+        if "rtol" in data:
+            kwargs["rtol"] = _positive_scalar(data["rtol"], "rtol")
+        if "atol" in data:
+            atol = data["atol"]
+            if isinstance(atol, Mapping):
+                kwargs["atol"] = {str(name): _config_quantity(value, f"atol[{name}]") for name, value in atol.items()}
+            else:
+                kwargs["atol"] = _positive_scalar(atol, "atol")
+        for name in ("max_step", "first_step"):
+            if name in data and data[name] is not None:
+                kwargs[name] = _config_quantity(data[name], name)
+        return cls(**kwargs)
 
     def scipy_options(self, state_units: Mapping[str, str], time_units: str, *, cells: int = 1) -> dict[str, Any]:
         options = {"method": self.method, "rtol": self.rtol,
@@ -161,6 +216,7 @@ __all__ = [
     "JACOBIAN_COMPILED",
     "JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND",
     "JACOBIAN_OPTIONS",
+    "SOLVER_CONFIG_KEYS",
     "IntegrationError",
     "SolverSettings",
     "solve_checked",

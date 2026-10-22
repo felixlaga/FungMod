@@ -19,11 +19,14 @@ from fungal_model.registry.store import FungModRegistry
 ENVIRONMENT_MODIFIER_CONDITIONS: Mapping[str, str] = {
     "temperature_arrhenius_reference": "temperature",
     "temperature_cardinal_rosso": "temperature",
+    "temperature_sharpe_schoolfield": "temperature",
+    "temperature_equilibrium_model": "temperature",
     "ph_gaussian": "ph",
     "ph_cardinal_rosso": "ph",
     "oxygen_monod": "oxygen_concentration",
     "water_activity_threshold": "water_activity",
     "water_activity_cardinal_rosso_robinson": "water_activity",
+    "water_activity_cardinal_rosso": "water_activity",
 }
 ENVIRONMENT_MODIFIER_TYPES = frozenset(ENVIRONMENT_MODIFIER_CONDITIONS)
 
@@ -167,12 +170,99 @@ def build_template_environment_modifier(
                 role_field="optimum_water_activity_role", **role_arguments
             ),
         }
-    return {
-        "type": modifier_type,
-        "minimum_water_activity_symbol": _required_modifier_role_symbol(
-            role_field="minimum_water_activity_role", **role_arguments
-        ),
-    }
+    if modifier_type == "water_activity_threshold":
+        return {
+            "type": modifier_type,
+            "minimum_water_activity_symbol": _required_modifier_role_symbol(
+                role_field="minimum_water_activity_role", **role_arguments
+            ),
+        }
+    if modifier_type == "water_activity_cardinal_rosso":
+        configured = {
+            "type": modifier_type,
+            "minimum_water_activity_symbol": _required_modifier_role_symbol(
+                role_field="minimum_water_activity_role", **role_arguments
+            ),
+            "optimum_water_activity_symbol": _required_modifier_role_symbol(
+                role_field="optimum_water_activity_role", **role_arguments
+            ),
+            "maximum_water_activity_symbol": _required_modifier_role_symbol(
+                role_field="maximum_water_activity_role", **role_arguments
+            ),
+        }
+        _add_optional_modifier_source(configured, modifier)
+        return configured
+    if modifier_type == "temperature_sharpe_schoolfield":
+        configured = {
+            "type": modifier_type,
+            "activation_energy_symbol": _required_modifier_role_symbol(
+                role_field="activation_energy_role", **role_arguments
+            ),
+            "reference_temperature_symbol": _required_modifier_role_symbol(
+                role_field="reference_temperature_role", **role_arguments
+            ),
+            "high_inactivation_enthalpy_symbol": _required_modifier_role_symbol(
+                role_field="high_inactivation_enthalpy_role", **role_arguments
+            ),
+            "high_half_inactivation_temperature_symbol": _required_modifier_role_symbol(
+                role_field="high_half_inactivation_temperature_role", **role_arguments
+            ),
+        }
+        low_roles = ("low_inactivation_enthalpy_role", "low_half_inactivation_temperature_role")
+        declared_low = [role for role in low_roles if str(modifier.get(role, "")).strip()]
+        if len(declared_low) == 1:
+            raise error_type(
+                f"{modifier_label} requires both {low_roles[0]} and {low_roles[1]}, or neither."
+            )
+        for symbol_field, role_field in (
+            ("low_inactivation_enthalpy_symbol", "low_inactivation_enthalpy_role"),
+            ("low_half_inactivation_temperature_symbol", "low_half_inactivation_temperature_role"),
+            ("minimum_temperature_symbol", "minimum_temperature_role"),
+            ("maximum_temperature_symbol", "maximum_temperature_role"),
+        ):
+            _add_optional_modifier_role_symbol(
+                configured,
+                symbol_field,
+                parameter_symbols=parameter_symbols,
+                modifier=modifier,
+                role_field=role_field,
+                unresolved_label=unresolved_label,
+                error_type=error_type,
+            )
+        _add_optional_modifier_source(configured, modifier)
+        return configured
+    if modifier_type == "temperature_equilibrium_model":
+        configured = {
+            "type": modifier_type,
+            "activation_energy_symbol": _required_modifier_role_symbol(
+                role_field="activation_energy_role", **role_arguments
+            ),
+            "reference_temperature_symbol": _required_modifier_role_symbol(
+                role_field="reference_temperature_role", **role_arguments
+            ),
+            "equilibrium_enthalpy_symbol": _required_modifier_role_symbol(
+                role_field="equilibrium_enthalpy_role", **role_arguments
+            ),
+            "equilibrium_temperature_symbol": _required_modifier_role_symbol(
+                role_field="equilibrium_temperature_role", **role_arguments
+            ),
+        }
+        for symbol_field, role_field in (
+            ("minimum_temperature_symbol", "minimum_temperature_role"),
+            ("maximum_temperature_symbol", "maximum_temperature_role"),
+        ):
+            _add_optional_modifier_role_symbol(
+                configured,
+                symbol_field,
+                parameter_symbols=parameter_symbols,
+                modifier=modifier,
+                role_field=role_field,
+                unresolved_label=unresolved_label,
+                error_type=error_type,
+            )
+        _add_optional_modifier_source(configured, modifier)
+        return configured
+    raise error_type(f"Template {template_id!r} declares unsupported modifier type {modifier_type!r}.")
 
 
 def build_template_environment_entity(
@@ -313,6 +403,12 @@ def _add_optional_modifier_role_symbol(
         configured[symbol_field] = parameter_symbols[role]
     except KeyError as exc:
         raise error_type(f"{unresolved_label} references unresolved {role_field} {role!r}.") from exc
+
+
+def _add_optional_modifier_source(configured: dict[str, Any], modifier: Mapping[str, Any]) -> None:
+    source = str(modifier.get("source", "")).strip()
+    if source:
+        configured["source"] = source
 
 
 def _require_exact_environment_condition(

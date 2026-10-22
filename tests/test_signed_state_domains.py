@@ -26,8 +26,8 @@ def test_finite_difference_probes_remain_inside_declared_signed_domain(value):
         probes.append(y[0])
         assert -2 <= y[0] <= 3
         return y[0]**3
-    gradient = _finite_difference_gradient(rate, [0], 1, signed={0}, bounds=((-2, 3),))
-    # A one-sided probe has O(h) truncation error at the boundary.
+    gradient = _finite_difference_gradient(rate, [0], 1, np.ones(1), signed={0}, bounds=((-2, 3),))
+    # At the boundary the second-order one-sided stencil keeps every probe in the domain.
     assert gradient(0, np.array([value]))[0] == pytest.approx(3 * value**2, rel=2e-6)
     assert probes
 
@@ -37,20 +37,24 @@ def test_bounded_narrow_interval_uses_representable_in_domain_probe():
     def rate(t, y):
         assert low <= y[0] <= high
         return 2*y[0]
-    gradient = _finite_difference_gradient(rate, [0], 1, signed={0}, bounds=((low, high),))
+    gradient = _finite_difference_gradient(rate, [0], 1, np.ones(1), signed={0}, bounds=((low, high),))
     assert gradient(0, np.array([low]))[0] == 2
     assert gradient(0, np.array([high]))[0] == 2
 
 
 @pytest.mark.parametrize("value", [0., 1e-12, .1, 10.])
 def test_unbounded_nonnegative_fallback_remains_bitwise_identical(value):
+    # Declaring no bounds must leave the compiled core's unbounded policy
+    # (AUDIT-001 WP2: tolerance-scaled step, second-order one-sided stencil
+    # at the non-negative boundary) bitwise unchanged.
     def rate(t, y):
         return 3*y[0]**2 + 2*y[0]
     step = FINITE_DIFFERENCE_RELATIVE_STEP * max(abs(value), 1.)
-    old = ((rate(0, [value+step])-rate(0, [value])) / step if value-step < 0 else
+    old = ((-3*rate(0, [value]) + 4*rate(0, [value+step]) - rate(0, [value+2*step])) / (2*step) if value-step < 0 else
         (rate(0, [value+step])-rate(0, [value-step])) / (2*step))
-    current = _finite_difference_gradient(rate, [0], 1, bounds=((None, None),))(0, np.array([value]))[0]
-    assert current == old
+    current = _finite_difference_gradient(rate, [0], 1, np.ones(1), bounds=((None, None),))(0, np.array([value]))[0]
+    unbounded = _finite_difference_gradient(rate, [0], 1, np.ones(1))(0, np.array([value]))[0]
+    assert current == old == unbounded
 
 
 class _VoltageProcess(Process):

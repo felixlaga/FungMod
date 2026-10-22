@@ -3,6 +3,19 @@
 Equations
 ---------
 
+Generic cardinal model of order two (CM_2), for a condition ``x`` with
+cardinal values ``x_min < x_opt < x_max``::
+
+    gamma(x) = 0                                        for x <= x_min or x >= x_max
+    gamma(x) = (x - x_max) (x - x_min)^2
+               / { (x_opt - x_min) [ (x_opt - x_min)(x - x_opt)
+                                     - (x_opt - x_max)(x_opt + x_min - 2 x) ] }
+
+The CTMI is CM_2 applied to temperature; the Rosso-Robinson water-activity
+model is CM_2 applied to water activity with ``a_w,max`` fixed at 1.0 by the
+authors (pure water). ``cardinal_cm2_activity`` holds the algebra once and the
+condition-specific functions delegate to it.
+
 Cardinal temperature model with inflection (CTMI)::
 
     gamma_T(T) = 0                                      for T <= T_min or T >= T_max
@@ -28,14 +41,17 @@ cardinal temperatures of microbial growth highlighted by a new model.
 J Theor Biol 162:447-463 (CTMI). Rosso L, Lobry JR, Bajard S, Flandrois JP
 (1995) Convenient model to describe the combined effects of temperature and pH
 on microbial growth. Appl Environ Microbiol 61:610-616 (CPM, gamma concept).
+Rosso L, Robinson TP (2001) A cardinal model to describe the effect of water
+activity on the growth of moulds. Int J Food Microbiol 63:265-273 (CM_2 on
+water activity, n = 2, a_w,max = 1.0; DOI 10.1016/s0168-1605(00)00469-4).
 
 Limitations
 -----------
 
 Empirical shapes described by three cardinal values per condition. No
 sub-lethal injury, adaptation, thermal history, or temperature-pH interaction
-beyond the product of the two activities. The CTMI denominator is non-zero on
-the open interval ``(T_min, T_max)`` only when ``T_opt >= (T_min + T_max) / 2``;
+beyond the product of the two activities. The CM_2 denominator is non-zero on
+the open interval ``(x_min, x_max)`` only when ``x_opt >= (x_min + x_max) / 2``;
 parameter sets outside that domain are rejected rather than evaluated.
 
 Cardinal water-activity model (Rosso and Robinson 2001), the CTMI shape with the
@@ -125,18 +141,86 @@ def cardinal_water_activity_assumption() -> Assumption:
     )
 
 
-def _cardinal_model_with_inflection(flat: np.ndarray, minimum: float, optimum: float, maximum: float) -> np.ndarray:
-    """The cardinal family with inflection (exponent two) on values already checked for order and midpoint."""
+def rosso_robinson_water_activity_assumption() -> Assumption:
+    """Return the Rosso-Robinson CM_2 water-activity assumption (a_w,max a record value).
 
+    Used by ``WaterActivityCardinalModifier`` (config type
+    ``water_activity_cardinal_rosso``). ``cardinal_water_activity_assumption``
+    is the companion of ``cardinal_water_activity_activity``, whose maximum is
+    fixed at one.
+    """
+
+    return Assumption(
+        name="Rosso-Robinson cardinal water activity model",
+        description=(
+            "A rate scales with a dimensionless CM_2 activity of water activity that is one at "
+            "the optimum water activity and zero at or below the minimum and at or above the "
+            "maximum cardinal water activity."
+        ),
+        justification=(
+            "Rosso and Robinson (2001) fitted the order-two cardinal model, with a_w,max fixed "
+            "at 1.0 (pure water), to the radial growth of nine Aspergillus, Eurotium and "
+            "Xeromyces species across solutes and pH values with the same quality of fit."
+        ),
+        known_limitations=(
+            "Empirical growth-level shape with no solute-specific effect, hysteresis, substrate "
+            "water binding, spatial moisture gradient, or interaction with temperature beyond the "
+            "multiplicative gamma concept; a_w,max is a record value (the authors fix it at 1.0) "
+            "and the law is undefined when the optimum lies below the midpoint of the cardinal "
+            "range."
+        ),
+        source=(
+            "Rosso L, Robinson TP (2001) Int J Food Microbiol 63:265-273; "
+            "DOI 10.1016/s0168-1605(00)00469-4."
+        ),
+    )
+
+
+def cardinal_cm2_activity(
+    x: np.ndarray | float,
+    x_min: float,
+    x_opt: float,
+    x_max: float,
+) -> np.ndarray | float:
+    """Evaluate the dimensionless order-two cardinal model ``gamma(x)``.
+
+    The arguments are plain numbers in one consistent unit (kelvin for
+    temperature, dimensionless for water activity). The result is one at
+    ``x_opt`` and zero at and outside ``(x_min, x_max)``. Parameter sets with
+    ``x_opt < (x_min + x_max) / 2`` are refused because the denominator then
+    changes sign inside the cardinal range.
+    """
+
+    minimum = float(x_min)
+    optimum = float(x_opt)
+    maximum = float(x_max)
+    if not (np.isfinite(minimum) and np.isfinite(optimum) and np.isfinite(maximum)):
+        raise ValueError("Cardinal values must be finite.")
+    if not minimum < optimum < maximum:
+        raise ValueError(
+            "Cardinal values must satisfy minimum < optimum < maximum; got "
+            f"{minimum}, {optimum}, {maximum}."
+        )
+    if optimum < 0.5 * (minimum + maximum):
+        raise ValueError(
+            "CM_2 requires optimum >= (minimum + maximum) / 2 so that the denominator keeps "
+            f"one sign on the cardinal range; got optimum {optimum} against midpoint "
+            f"{0.5 * (minimum + maximum)}."
+        )
+    values = np.asarray(x, dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Cardinal model input must be finite.")
+    flat = np.atleast_1d(values)
     inside = (flat > minimum) & (flat < maximum)
     activity = np.zeros_like(flat, dtype=float)
-    values_inside = flat[inside]
-    numerator = (values_inside - maximum) * (values_inside - minimum) ** 2
-    bracket = (optimum - minimum) * (values_inside - optimum) - (optimum - maximum) * (
-        optimum + minimum - 2.0 * values_inside
+    x_inside = flat[inside]
+    numerator = (x_inside - maximum) * (x_inside - minimum) ** 2
+    bracket = (optimum - minimum) * (x_inside - optimum) - (optimum - maximum) * (
+        optimum + minimum - 2.0 * x_inside
     )
-    activity[inside] = numerator / ((optimum - minimum) * bracket)
-    return activity
+    denominator = (optimum - minimum) * bracket
+    activity[inside] = numerator / denominator
+    return _shaped(activity, values)
 
 
 def cardinal_temperature_activity(
@@ -166,8 +250,7 @@ def cardinal_temperature_activity(
             "so that the denominator keeps one sign on the cardinal range; got optimum "
             f"{optimum} K against midpoint {0.5 * (minimum + maximum)} K."
         )
-    activity = _cardinal_model_with_inflection(np.atleast_1d(values), minimum, optimum, maximum)
-    return Q_(_shaped(activity, values), "dimensionless")
+    return Q_(cardinal_cm2_activity(values, minimum, optimum, maximum), "dimensionless")
 
 
 MAXIMUM_WATER_ACTIVITY = 1.0
@@ -201,8 +284,7 @@ def cardinal_water_activity_activity(
             f"so that the denominator keeps one sign on the cardinal range; got optimum {optimum} against "
             f"midpoint {0.5 * (minimum + maximum)}."
         )
-    activity = _cardinal_model_with_inflection(np.atleast_1d(values), minimum, optimum, maximum)
-    return Q_(_shaped(activity, values), "dimensionless")
+    return Q_(cardinal_cm2_activity(values, minimum, optimum, maximum), "dimensionless")
 
 
 def cardinal_ph_activity(
@@ -271,10 +353,12 @@ def _dimensionless_scalar(quantity: Quantity, name: str) -> float:
 
 __all__ = [
     "MAXIMUM_WATER_ACTIVITY",
+    "cardinal_cm2_activity",
     "cardinal_ph_activity",
     "cardinal_ph_assumption",
     "cardinal_temperature_activity",
     "cardinal_temperature_assumption",
     "cardinal_water_activity_activity",
     "cardinal_water_activity_assumption",
+    "rosso_robinson_water_activity_assumption",
 ]

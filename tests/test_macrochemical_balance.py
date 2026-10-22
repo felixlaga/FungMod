@@ -8,6 +8,8 @@ from fungal_model.chemistry import (
     MacrochemicalBalance,
     MacrochemicalBalanceError,
     MacrochemicalSpecies,
+    StoichiometricReactionMetadata,
+    StoichiometricTerm,
 )
 from fungal_model.core.parameters import Parameter
 from fungal_model.core.provenance import ProvenanceError
@@ -397,3 +399,128 @@ def _growth_balance(
         source=ARTIFICIAL_SOURCE,
         thermodynamic_conditions=conditions,
     )
+
+
+# --------------------------------------------------------------------------
+# WP7: conditioning, scaled residuals, zero-coefficient energies
+# --------------------------------------------------------------------------
+
+
+def _near_dependent_balance(epsilon: float) -> MacrochemicalBalance:
+    """Two biomass-like species that differ only by ``epsilon`` in nitrogen."""
+
+    def biomass(name: str, nitrogen: float) -> MacrochemicalSpecies:
+        return MacrochemicalSpecies(
+            name=name,
+            composition=ElementalComposition.from_elements(
+                {"C": 1.0, "H": 1.8, "O": 0.5, "N": nitrogen}, source=ARTIFICIAL_SOURCE, formula=name
+            ),
+            charge=0.0,
+            charge_source=ARTIFICIAL_SOURCE,
+        )
+
+    return MacrochemicalBalance(
+        name="near-dependent species",
+        species=(
+            _species("glucose", "C6H12O6"),
+            _species("oxygen", "O2"),
+            _species("carbon_dioxide", "CO2"),
+            _species("water", "H2O"),
+            biomass("A", 0.2),
+            biomass("B", 0.2 + epsilon),
+        ),
+        source=ARTIFICIAL_SOURCE,
+    )
+
+
+def test_ill_conditioned_balance_is_refused_and_conditioning_is_recorded() -> None:
+    with pytest.raises(MacrochemicalBalanceError, match="ill-conditioned: condition number 5.4..e\\+13"):
+        _near_dependent_balance(1e-13).solve({"glucose": -1.0, "oxygen": -5.0})
+
+    solution = _near_dependent_balance(1e-6).solve({"glucose": -1.0, "oxygen": -5.0})
+    assert solution.condition_number == pytest.approx(5.47e6, rel=0.01)
+    assert solution.smallest_singular_value is not None and 0.0 < solution.smallest_singular_value < 1e-5
+    data = solution.to_dict()
+    assert data["condition_number"] == solution.condition_number
+    assert data["smallest_singular_value"] == solution.smallest_singular_value
+    assert data["scale_value"] == solution.residual_scale >= 1.0
+    assert data["absolute_tolerance"] == 1e-12
+    assert max(abs(value) for value in solution.residuals.values()) <= 1e-12 * solution.residual_scale
+
+    with pytest.raises(MacrochemicalBalanceError, match="ill-conditioned"):
+        _near_dependent_balance(1e-6).solve({"glucose": -1.0, "oxygen": -5.0}, max_condition_number=1e6)
+    with pytest.raises(MacrochemicalBalanceError, match="max_condition_number"):
+        _growth_balance().solve({"biomass": 1.0, "substrate": -2.0}, max_condition_number=0.5)
+
+
+def test_well_conditioned_balance_records_a_condition_number_near_one_digit() -> None:
+    solution = _growth_balance().solve({"biomass": 1.0, "substrate": -2.0})
+    assert solution.condition_number is not None and 1.0 <= solution.condition_number < 100.0
+    assert solution.residual_scale == pytest.approx(4.0)  # substrate CH2O: |-2| * 2 hydrogen atoms
+
+
+def _polymer_balance() -> MacrochemicalBalance:
+    return MacrochemicalBalance(
+        name="large polymer oxidation",
+        species=(
+            _species("polymer", "C60000H100002O50001"),
+            _species("oxygen", "O2"),
+            _species("carbon_dioxide", "CO2"),
+            _species("water", "H2O"),
+        ),
+        source=FORMULA_SOURCE,
+    )
+
+
+def test_large_polymer_passes_solve_and_the_static_validator_with_the_same_scale() -> None:
+    solution = _polymer_balance().solve({"polymer": -1.0})
+    assert solution.coefficients["oxygen"] == pytest.approx(-60000.0)
+    assert solution.residual_scale == pytest.approx(120000.0)
+
+    validation = validate_elemental_balance(solution.stoichiometric_metadata())
+    assert validation.passed
+    assert validation.details["scale_value"] == pytest.approx(solution.residual_scale)
+    assert validation.details["effective_tolerance"] == pytest.approx(1e-12 * 120000.0)
+    assert validation.details["max_relative_residual"] <= 1e-12
+
+
+def test_injected_atom_imbalance_fails_solve_and_the_validator() -> None:
+    balance = _polymer_balance()
+    perturbed = {"polymer": -1.0, "oxygen": -60000.0, "carbon_dioxide": 60000.0 + 1e-6, "water": 50001.0}
+    with pytest.raises(MacrochemicalBalanceError, match="cannot satisfy conservation.*'C'"):
+        balance.solve(perturbed)
+
+    exact = balance.solve({"polymer": -1.0}).stoichiometric_metadata()
+    products = tuple(
+        StoichiometricTerm(
+            species=term.species,
+            coefficient=perturbed[term.species],
+            composition=term.composition,
+            charge=term.charge,
+            charge_source=term.charge_source,
+        )
+        for term in exact.products
+    )
+    validation = validate_elemental_balance(
+        StoichiometricReactionMetadata(name=exact.name, reactants=exact.reactants, products=products, source=exact.source)
+    )
+    assert not validation.passed
+    assert validation.details["max_abs_residual"] == pytest.approx(2e-6, rel=1e-3)  # 1e-6 CO2 carries 2e-6 O
+
+
+def test_zero_coefficient_species_without_energy_no_longer_blocks_reaction_energies() -> None:
+    maintenance = _growth_balance(without_gibbs="biomass").solve({"biomass": 0.0, "substrate": -1.0})
+
+    assert maintenance.omitted_zero_coefficient_species("formation_gibbs") == ("biomass",)
+    assert maintenance.omitted_zero_coefficient_species("formation_enthalpy") == ()
+    assert maintenance.reaction_gibbs().to("kilojoule / mole").magnitude == pytest.approx(-490.0)
+    assert maintenance.to_dict()["omitted_zero_coefficient_species"] == {
+        "formation_gibbs": ["biomass"],
+        "formation_enthalpy": [],
+    }
+
+    growth = _growth_balance(without_gibbs="biomass").solve({"biomass": 1.0, "substrate": -2.0})
+    with pytest.raises(MacrochemicalBalanceError, match="'biomass' has no formation_gibbs and a nonzero coefficient"):
+        growth.reaction_gibbs()
+    with pytest.raises(ValueError, match="attribute"):
+        growth.omitted_zero_coefficient_species("formation_entropy")

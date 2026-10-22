@@ -347,7 +347,53 @@ class PHIonizationMichaelisMentenProcess(Process):
         return rate, gradient
 
     def compile_jacobian(self, context: KernelContext) -> JacobianKernel | None:
-        return None if self.state_source is None else self._dynamic(context)[1]
+        """Michaelis-Menten gradient with the folded ``kcat(pH)`` and ``Km(pH)``.
+
+        ``d(rate)/dS = kcat(pH) E Km(pH) / (Km(pH) + S)^2`` and
+        ``d(rate)/dE = kcat(pH) S / (Km(pH) + S)``, each times its unit factors.
+        With a declared pH state the gradient also carries ``d(rate)/dpH``
+        (see ``_dynamic``).
+        """
+
+        if self.state_source is not None:
+            return self._dynamic(context)[1]
+
+        constants = self.effective_constants(parameters=context.parameters, environment=context.environment)
+        substrate_index, to_substrate = context.state_slot(self.substrate_state, self.substrate_units)
+        enzyme_index, to_enzyme = context.state_slot(self.enzyme_state, self.enzyme_units)
+        kcat = float(
+            assert_compatible(constants["turnover_at_ph"], self.turnover_units, name=self.turnover_symbol).magnitude
+        )
+        km = float(
+            assert_compatible(
+                constants["michaelis_constant_at_ph"], self.substrate_units, name=self.michaelis_constant_symbol
+            ).magnitude
+        )
+        if km <= 0:
+            raise ValueError("Km(pH) must be positive for Michaelis-Menten kinetics.")
+        scale = float(
+            assert_compatible(
+                Q_(1.0, self.turnover_units) * Q_(1.0, self.enzyme_units),
+                self.rate_units,
+                name=f"{self.name} rate",
+            ).magnitude
+        )
+        size = len(context.state_index)
+
+        def gradient(time: float, state: np.ndarray) -> np.ndarray:
+            del time
+            substrate = state[substrate_index] * to_substrate
+            enzyme = state[enzyme_index] * to_enzyme
+            if enzyme < 0:
+                raise ValueError("enzyme must be non-negative for Michaelis-Menten kinetics.")
+            if substrate < 0:
+                raise ValueError("substrate must be non-negative for Michaelis-Menten kinetics.")
+            result = np.zeros(size, dtype=float)
+            result[substrate_index] = kcat * enzyme * km / (km + substrate) ** 2 * scale * to_substrate
+            result[enzyme_index] += kcat * substrate / (km + substrate) * scale * to_enzyme
+            return result
+
+        return gradient
 
     def contributions(self, rate: Quantity) -> Mapping[str, Quantity]:
         value = assert_compatible(rate, self.rate_units, name=f"{self.name} rate")

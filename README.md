@@ -375,6 +375,34 @@ each implementation:
   the five-enzyme showcase supplies separately labelled
   literature-reported inputs without claiming production readiness or
   validation,
+- opt-in laws added by the AUDIT-001 scientific audit, each with a primary
+  source, maturity `literature_backed_software_tested`, no shipped parameter
+  values and a compiled gradient: general reversible (mixed)
+  inhibition (`mixed_inhibition`), the Rosso-Robinson cardinal water-activity
+  law with a record-valued maximum (`water_activity_cardinal_rosso`; the
+  Rosso and Robinson law listed above, type
+  `water_activity_cardinal_rosso_robinson`, fixes it at one), the
+  Sharpe-Schoolfield and
+  Equilibrium Model enzyme temperature optima
+  (`temperature_sharpe_schoolfield`, `temperature_equilibrium_model`), a
+  mass-scaled accessible-area law and a closed enzyme-site balance for surface
+  catalysis (`area_model: mass_scaled`, `site_binding_surface_catalysis`),
+  endogenous maintenance by biomass oxidation (`endogenous_maintenance`), and
+  a continuous thermodynamic driving force `r_fwd * (1 - exp(dG / (R T)))`
+  with fixed solvent activities and constant-enthalpy `dG0(T)`
+  (`enforcement_mode: driving_force`); two environment laws on one condition
+  are refused unless `allow_stacked_condition_laws: true` is declared
+  (`docs/inhibition-laws.md`, `docs/environment-laws-extended.md`,
+  `docs/surface-site-balance.md`, `docs/starvation-physiology.md`,
+  `docs/thermodynamic-driving-force.md`),
+- an optional top-level `solver:` block in model configs (`method`, `rtol`,
+  unit-bearing per-state `atol`, `max_step`, `first_step`,
+  `jacobian: compiled`); unknown keys are refused and defaults are unchanged
+  without the block (`docs/solver-controls.md`),
+- degree-of-reduction and electron balances from elemental composition,
+  condition-number refusal of ill-posed macrochemical balances, and the
+  Heijnen dissipation correlation as a black-box yield prediction with a
+  carbon ceiling (`docs/black-box-yield.md`),
 - compatibility checks for enzyme/substrate/bond/fungus pairings during model
   assembly,
 - a top-level notebook set that imports package code rather than redefining

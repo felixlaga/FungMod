@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from fungal_model.chemistry.thermodynamics import (
+    ENFORCEMENT_MODES,
     DynamicActivityParticipant,
     DynamicThermodynamicConstraint,
 )
@@ -22,8 +23,10 @@ from fungal_model.io.model_config import (
 )
 
 
-_ENFORCEMENT_MODE = "block_unfavorable_forward_rate"
 _ACTIVITY_MODEL = "ideal_dilute_concentration_ratio_with_explicit_floor"
+_ACTIVITY_MODEL_FIELDS = {"type", "standard_concentration", "minimum_activity"}
+_ACTIVITY_MODEL_OPTIONAL_FIELDS = {"fixed_activities"}
+_TEMPERATURE_DEPENDENCE_FIELDS = {"standard_enthalpy", "reference_temperature"}
 _CONSTRAINT_FIELDS = {
     "id",
     "process_id",
@@ -146,27 +149,32 @@ def _constraint_from_config(
         required=_CONSTRAINT_FIELDS,
         field_name=f"thermodynamic_constraints.{item.id}",
     )
-    if item.enforcement_mode != _ENFORCEMENT_MODE:
+    if item.enforcement_mode not in ENFORCEMENT_MODES:
         raise ValueError(
             f"Dynamic thermodynamic constraint {item.id!r} has unsupported "
-            f"enforcement_mode {item.enforcement_mode!r}; expected {_ENFORCEMENT_MODE!r}."
+            f"enforcement_mode {item.enforcement_mode!r}; expected one of "
+            f"{list(ENFORCEMENT_MODES)}."
         )
+    activity = _closed_mapping(
+        raw["activity_model"],
+        allowed=_ACTIVITY_MODEL_FIELDS | _ACTIVITY_MODEL_OPTIONAL_FIELDS,
+        required=_ACTIVITY_MODEL_FIELDS,
+        field_name=f"thermodynamic_constraints.{item.id}.activity_model",
+    )
+    fixed_activities = _fixed_activities(
+        activity.get("fixed_activities"),
+        field_name=f"thermodynamic_constraints.{item.id}.activity_model.fixed_activities",
+    )
     participants = _participants(
         item=item,
         reaction=reaction,
         binding=binding,
         state_units=state_units,
-        standard_concentration=_parameter(
-            raw["activity_model"],
-            nested_key="standard_concentration",
-            field_name=f"thermodynamic_constraints.{item.id}.activity_model",
+        standard_concentration=_parameter_mapping(
+            activity["standard_concentration"],
+            field_name=f"thermodynamic_constraints.{item.id}.activity_model.standard_concentration",
         ),
-    )
-    activity = _closed_mapping(
-        raw["activity_model"],
-        allowed={"type", "standard_concentration", "minimum_activity"},
-        required={"type", "standard_concentration", "minimum_activity"},
-        field_name=f"thermodynamic_constraints.{item.id}.activity_model",
+        fixed_activities=fixed_activities,
     )
     activity_type = str(activity["type"]).strip()
     if activity_type != _ACTIVITY_MODEL:
@@ -195,7 +203,8 @@ def _constraint_from_config(
             "standard_redox_potential",
             "electron_transfer_number",
             "faraday_constant",
-        },
+        }
+        | _TEMPERATURE_DEPENDENCE_FIELDS,
         required={"method"},
         field_name=f"thermodynamic_constraints.{item.id}.standard_energy",
     )
@@ -204,6 +213,10 @@ def _constraint_from_config(
     standard_redox_potential: Parameter | None = None
     electron_transfer_number: Parameter | None = None
     faraday_constant: Parameter | None = None
+    standard_enthalpy, reference_temperature = _temperature_dependence(
+        standard_energy,
+        constraint_id=item.id,
+    )
     if method == "standard_delta_gibbs":
         _require_exact_energy_fields(
             standard_energy,
@@ -292,7 +305,74 @@ def _constraint_from_config(
         ),
         provenance_refs=provenance_refs,
         enforcement_mode=item.enforcement_mode,
+        standard_enthalpy=standard_enthalpy,
+        reference_temperature=reference_temperature,
     )
+
+
+def _temperature_dependence(
+    standard_energy: Mapping[str, Any],
+    *,
+    constraint_id: str,
+) -> tuple[Parameter | None, Parameter | None]:
+    """Optional ``standard_enthalpy`` and ``reference_temperature``: both or neither."""
+
+    declared = _TEMPERATURE_DEPENDENCE_FIELDS.intersection(str(key) for key in standard_energy)
+    if not declared:
+        return None, None
+    if declared != _TEMPERATURE_DEPENDENCE_FIELDS:
+        raise ValueError(
+            f"Dynamic thermodynamic constraint {constraint_id!r} standard_energy "
+            "declares a temperature dependence but needs both standard_enthalpy "
+            f"and reference_temperature; found {sorted(declared)}."
+        )
+    prefix = f"thermodynamic_constraints.{constraint_id}.standard_energy"
+    standard_enthalpy = _parameter_mapping(
+        standard_energy["standard_enthalpy"],
+        field_name=f"{prefix}.standard_enthalpy",
+    )
+    reference_temperature = _parameter_mapping(
+        standard_energy["reference_temperature"],
+        field_name=f"{prefix}.reference_temperature",
+    )
+    assert_compatible(Q_(1.0, standard_enthalpy.units), "joule / mole", name="standard_enthalpy")
+    assert_compatible(Q_(1.0, reference_temperature.units), "kelvin", name="reference_temperature")
+    return standard_enthalpy, reference_temperature
+
+
+def _fixed_activities(value: Any, *, field_name: str) -> dict[str, tuple[float, str]]:
+    """``{species_id: {value, source}}`` -> ``{species_id: (activity, source)}``; empty when absent."""
+
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping) or not value:
+        raise ValueError(f"{field_name} must be a nonempty mapping of species ids.")
+    result: dict[str, tuple[float, str]] = {}
+    for key, entry in value.items():
+        species_id = str(key).strip()
+        if not species_id:
+            raise ValueError(f"{field_name} species ids must be nonblank.")
+        data = _closed_mapping(
+            entry,
+            allowed={"value", "source"},
+            required={"value", "source"},
+            field_name=f"{field_name}.{species_id}",
+        )
+        raw_value = data["value"]
+        if (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, int | float)
+            or not np.isfinite(float(raw_value))
+            or float(raw_value) <= 0.0
+        ):
+            raise ValueError(
+                f"{field_name}.{species_id}.value must be a finite positive activity."
+            )
+        source = str(data["source"]).strip()
+        if not source:
+            raise ValueError(f"{field_name}.{species_id}.source must be nonblank.")
+        result[species_id] = (float(raw_value), source)
+    return result
 
 
 def _participants(
@@ -302,6 +382,7 @@ def _participants(
     binding: Mapping[str, Any],
     state_units: Mapping[str, str],
     standard_concentration: Parameter,
+    fixed_activities: Mapping[str, tuple[float, str]],
 ) -> tuple[DynamicActivityParticipant, ...]:
     binding_entries = binding.get("state_species_mapping")
     if not isinstance(binding_entries, Sequence) or isinstance(
@@ -328,11 +409,44 @@ def _participants(
             )
         bound_species_by_state[state_name] = species_id
     participants: list[DynamicActivityParticipant] = []
+    reaction_species = {
+        participant.species_id for participant in (*reaction.reactants, *reaction.products)
+    }
+    unknown_fixed = sorted(set(fixed_activities).difference(reaction_species))
+    if unknown_fixed:
+        raise ValueError(
+            f"Dynamic thermodynamic constraint {item.id!r} fixed_activities name "
+            f"species {unknown_fixed} that are not participants of reaction "
+            f"{reaction.id!r}."
+        )
     for side, sign, entries in (
         ("reactants", -1.0, reaction.reactants),
         ("products", 1.0, reaction.products),
     ):
         for index, participant in enumerate(entries):
+            coefficient = float(participant.coefficient)
+            if not np.isfinite(coefficient) or coefficient <= 0.0:
+                raise ValueError(
+                    f"Dynamic thermodynamic reaction participant "
+                    f"{participant.species_id!r} requires a finite positive coefficient."
+                )
+            fixed = fixed_activities.get(participant.species_id)
+            if fixed is not None:
+                # A declared fixed activity overrides a bound trajectory state.
+                # The solver still integrates that state; the override is
+                # recorded on the participant and in the assumption record.
+                bound = "" if participant.state_name is None else participant.state_name.strip()
+                participants.append(
+                    DynamicActivityParticipant(
+                        state_name="",
+                        species_id=participant.species_id,
+                        signed_coefficient=sign * coefficient,
+                        fixed_activity=fixed[0],
+                        activity_source=fixed[1],
+                        overridden_state_name=bound or None,
+                    )
+                )
+                continue
             state_name = "" if participant.state_name is None else participant.state_name.strip()
             if not state_name:
                 raise ValueError(
@@ -350,12 +464,6 @@ def _participants(
                     f"Dynamic thermodynamic constraint {item.id!r} participant "
                     f"{state_name!r}/{participant.species_id!r} does not match "
                     "the verified static state/species binding."
-                )
-            coefficient = float(participant.coefficient)
-            if not np.isfinite(coefficient) or coefficient <= 0.0:
-                raise ValueError(
-                    f"Dynamic thermodynamic reaction participant {state_name!r} "
-                    "requires a finite positive coefficient."
                 )
             assert_compatible(
                 Q_(1.0, state_units[state_name]),
@@ -425,24 +533,6 @@ def _required_passing_electron_binding(
     return binding
 
 
-def _parameter(
-    value: Any,
-    *,
-    nested_key: str,
-    field_name: str,
-) -> Parameter:
-    data = _closed_mapping(
-        value,
-        allowed={"type", "standard_concentration", "minimum_activity"},
-        required={"type", "standard_concentration", "minimum_activity"},
-        field_name=field_name,
-    )
-    return _parameter_mapping(
-        data[nested_key],
-        field_name=f"{field_name}.{nested_key}",
-    )
-
-
 def _parameter_mapping(value: Any, *, field_name: str) -> Parameter:
     data = _closed_mapping(
         value,
@@ -492,7 +582,7 @@ def _require_exact_energy_fields(
     expected: set[str],
     constraint_id: str,
 ) -> None:
-    actual = set(data)
+    actual = set(data).difference(_TEMPERATURE_DEPENDENCE_FIELDS)
     if actual != expected:
         missing = sorted(expected.difference(actual))
         extra = sorted(actual.difference(expected))

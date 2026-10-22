@@ -13,6 +13,7 @@ from fungal_model.core.errors import (
     MissingProcessError,
     ModelAssemblyError,
 )
+from fungal_model.core.numerics import SolverSettings
 from fungal_model.io.model_config import ModelConfig
 from fungal_model.processes.base import StateVariableSpec
 from fungal_model.processes import (
@@ -164,6 +165,8 @@ class ConfiguredProcessAssembler:
                 ),
                 thermodynamic_constraints=thermodynamic_constraints,
                 allow_unsourced_for_testing=config.mode == "toy",
+                # No solver block keeps the ModelBuilder default settings.
+                solver_settings=SolverSettings() if config.solver is None else config.solver.to_solver_settings(),
             ).assemble()
         except ModelAssemblyError as exc:
             details: dict[str, Any] = {"error_type": type(exc).__name__}

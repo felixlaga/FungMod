@@ -20,6 +20,12 @@ from pint.errors import DimensionalityError, PintError
 
 from fungal_model.core.units import Q_, Quantity, is_quantity
 from fungal_model.core.validators import conserved_weight
+from fungal_model.modifiers import (
+    CORNISH_BOWDEN_2012_SOURCE,
+    rosso_robinson_water_activity_modifier_from_config,
+    equilibrium_model_modifier_from_config,
+    sharpe_schoolfield_modifier_from_config,
+)
 from fungal_model.io.model_config import (
     ConfigReference,
     EntropyProductionRateTimeseriesConfig,
@@ -556,6 +562,46 @@ def _configured_process_modifier_row(
                 ),
             }
         )
+    elif modifier_type == "mixed_inhibition":
+        row.update(
+            {
+                "substrate_state": modifier.get("substrate_state", ""),
+                "michaelis_constant": modifier.get(
+                    "michaelis_constant",
+                    modifier.get("michaelis_constant_symbol", ""),
+                ),
+                "inhibitors": json.dumps(list(modifier.get("inhibitors", []) or []), sort_keys=True),
+                "mechanism": "general_reversible_inhibition",
+                "primary_source": modifier.get("primary_source", ""),
+                "law_source": CORNISH_BOWDEN_2012_SOURCE,
+                "maturity": modifier.get("maturity", ""),
+                "equation": (
+                    "a = (K_m + S) / (K_m*(1 + sum_i I_i/K_ic,i) + S*(1 + sum_i I_i/K_iu,i))"
+                ),
+                "limitation": (
+                    "Independent competitive, uncompetitive, noncompetitive or mixed inhibitors on one "
+                    "explicitly matched homogeneous Michaelis-Menten substrate only; no cooperative, "
+                    "irreversible or surface-adsorption inhibition."
+                ),
+            }
+        )
+    elif modifier_type in _SELF_DESCRIBING_ENVIRONMENT_MODIFIERS:
+        # These laws carry their own equation, law source, maturity and
+        # limitation; the row is taken from the built modifier itself.
+        built = _SELF_DESCRIBING_ENVIRONMENT_MODIFIERS[modifier_type](modifier)
+        record = built.to_dict()
+        row.update(
+            {
+                "environment_value": built.condition,
+                "parameters": json.dumps(
+                    [entry["symbol"] for entry in built.parameter_requirements]
+                ),
+                "law_source": record.get("law_source", ""),
+                "maturity": record.get("maturity", ""),
+                "equation": record.get("equation", ""),
+                "limitation": built.limitation,
+            }
+        )
     else:
         row.update(
             {
@@ -564,6 +610,13 @@ def _configured_process_modifier_row(
             }
         )
     return row
+
+
+_SELF_DESCRIBING_ENVIRONMENT_MODIFIERS: dict[str, Any] = {
+    "water_activity_cardinal_rosso": rosso_robinson_water_activity_modifier_from_config,
+    "temperature_sharpe_schoolfield": sharpe_schoolfield_modifier_from_config,
+    "temperature_equilibrium_model": equilibrium_model_modifier_from_config,
+}
 
 
 def _ph_ionization_law_row(process: Any) -> dict[str, Any]:

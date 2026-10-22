@@ -12,7 +12,7 @@ from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
-from fungal_model.modifiers.base import constant_activity_kernel
+from fungal_model.modifiers.base import CONDITION_OXYGEN, constant_activity_kernel
 
 
 def oxygen_monod_assumption() -> Assumption:
@@ -33,6 +33,18 @@ class OxygenModifier:
     oxygen_units: str
     name: str = "oxygen_modifier"
     state_source: str | None = None
+
+    @property
+    def condition(self) -> str:
+        """Modifier protocol: the condition this factor responds to."""
+
+        return CONDITION_OXYGEN
+
+    @property
+    def read_states(self) -> tuple[tuple[str, str], ...]:
+        """Modifier protocol: the declared ``state_source`` when set, else none (static environment)."""
+
+        return () if self.state_source is None else ((self.state_source, self.oxygen_units),)
 
     @property
     def assumptions(self) -> tuple[Assumption, ...]:
@@ -92,6 +104,11 @@ class OxygenModifier:
             return oxygen / (half + oxygen)
 
         return activity
+
+    def compile_activity_gradient(self, context: KernelContext) -> JacobianKernel | None:
+        """Modifier protocol name of :meth:`compile_activity_jacobian`."""
+
+        return self.compile_activity_jacobian(context)
 
     def compile_activity_jacobian(self, context: KernelContext) -> JacobianKernel:
         """Analytic derivative of the oxygen factor; the static factor has none."""

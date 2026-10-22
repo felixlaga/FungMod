@@ -205,3 +205,62 @@ def test_negative_unknown_and_missing_initial_states_are_rejected():
     for s in ({"S": Q_(1, "mol/L")}, dict(state(), S=Q_(-1, "mol/L")), dict(state(), X=Q_(float("inf"), "mol/L"))):
         with pytest.raises(ValueError):
             culture().simulate(initial_state=s, times=Q_([0, 1], "h"))
+
+
+def test_zero_demand_jacobian_at_exhausted_pools_equals_the_right_sided_difference():
+    c = culture(metabolism=replace(model(), maintenance_demand=parameter("m", 0, "1/h")))
+    constants = c._constants()
+
+    def rates(x):
+        return np.array(c._rates(x, constants))
+
+    for exhausted in ("S", "O"):
+        x = np.array([.02, .001, .01, .1])
+        x[c.names.index(exhausted)] = 0
+        analytic = c._rate_jacobian(x, constants)
+        numeric = np.zeros((3, 4))
+        for j in range(4):
+            unit = np.zeros(4)
+            unit[j] = 1e-9
+            numeric[:, j] = (rates(x + unit) - rates(x)) / 1e-9
+        np.testing.assert_allclose(analytic, numeric, rtol=1e-4, atol=1e-9)
+        assert analytic[0, c.names.index(exhausted)] > 0
+        assert np.all(analytic[1:] == 0)
+    # A positive demand keeps the kink: zero growth derivative at an exhausted pool, maintenance follows the capacity.
+    kinked = culture()._rate_jacobian(np.array([0, .001, .01, .1]), culture()._constants())
+    assert np.all(kinked[0] == 0) and kinked[1, 0] > 0 and kinked[2, 0] == -kinked[1, 0]
+
+
+def test_tijhuis_maintenance_gibbs_correlation_and_substrate_conversion():
+    from fungal_model.fungi.maintenance_correlation import (
+        MAINTENANCE_CORRELATION_MATURITY, maintenance_correlation_record, substrate_maintenance_from_gibbs,
+        tijhuis_maintenance_gibbs, tijhuis_maintenance_assumption)
+    for celsius, expected in ((20, 2.80), (30, 7.12), (37, 13.21)):
+        value = tijhuis_maintenance_gibbs(Q_(celsius, "degC"))
+        assert value.to("kJ/mol/h").magnitude == pytest.approx(expected, abs=0.005)
+        assert value.to("kJ/mol/h").magnitude == pytest.approx(
+            tijhuis_maintenance_gibbs(Q_(celsius + 273.15, "K")).to("kJ/mol/h").magnitude, rel=1e-12)
+    assert tijhuis_maintenance_gibbs(Q_(298.15, "K")).to("kJ/mol/h").magnitude == 4.5
+    # m_S = m_G / |dG_cat| in substrate formula units per C-mol biomass per hour.
+    m_g = tijhuis_maintenance_gibbs(Q_(30, "degC"))
+    m_s = substrate_maintenance_from_gibbs(m_g, Q_(-2843, "kJ/mol"))
+    assert m_s.to("1/h").magnitude == pytest.approx(m_g.to("kJ/mol/h").magnitude / 2843, rel=1e-12)
+    assert substrate_maintenance_from_gibbs(Q_(1.0, "J/mol/s"), Q_(-1.0, "kJ/mol")).to("1/h").magnitude == pytest.approx(3.6)
+    for bad in (Q_(0, "K"), Q_(-5, "K"), Q_(float("nan"), "K"), Q_([290, 300], "K")):
+        with pytest.raises(ValueError):
+            tijhuis_maintenance_gibbs(bad)
+    with pytest.raises(UnitError):
+        tijhuis_maintenance_gibbs(Q_(300, "mol/L"))
+    with pytest.raises(ValueError, match="negative"):
+        substrate_maintenance_from_gibbs(m_g, Q_(2843, "kJ/mol"))
+    with pytest.raises(ValueError, match="negative"):
+        substrate_maintenance_from_gibbs(m_g, Q_(0, "kJ/mol"))
+    with pytest.raises(ValueError, match="non-negative"):
+        substrate_maintenance_from_gibbs(Q_(-1, "kJ/mol/h"), Q_(-2843, "kJ/mol"))
+    with pytest.raises(UnitError):
+        substrate_maintenance_from_gibbs(m_g, Q_(-2843, "kJ"))
+    record = maintenance_correlation_record()
+    assert record["maturity"] == MAINTENANCE_CORRELATION_MATURITY == "literature_backed_software_tested"
+    assert set(record["constants"]) == {"m_G_ref", "E_a_m", "T_ref_m", "R"}
+    assert "Tijhuis" in record["source"] and "no fungus-specific" in record["validity"]
+    assert "fungus" in tijhuis_maintenance_assumption().known_limitations

@@ -17,8 +17,13 @@ from fungal_model.core.units import Q_
 from fungal_model.core.validators import (
     validate_biomass_yield_limit,
     validate_carbon_conservation,
+    validate_charge_balance,
+    validate_electron_balance,
+    validate_elemental_balance,
     validate_oxygen_limitation,
 )
+
+SOURCE = "Molecular formula; exact chemical identity, not a measured parameter."
 
 
 def parameter(
@@ -302,3 +307,118 @@ def test_biomass_yield_limit_fails_above_configured_maximum() -> None:
 
     assert not validation.passed
 
+
+
+# --------------------------------------------------------------------------
+# WP7: yield caps dropped, scaled static tolerances
+# --------------------------------------------------------------------------
+
+
+def test_biomass_yield_limit_accepts_mass_yields_above_one() -> None:
+    """A 1.2 kg/kg yield is legitimate on a light substrate; only the configured maximum binds."""
+
+    validation = validate_biomass_yield_limit(
+        yield_parameter=parameter(name="configured yield", symbol="Y_B", value=1.2, units="dimensionless"),
+        maximum_yield_parameter=parameter(
+            name="maximum theoretical yield", symbol="Y_max", value=1.3, units="dimensionless"
+        ),
+    )
+    assert validation.passed
+
+    above = validate_biomass_yield_limit(
+        yield_parameter=parameter(name="configured yield", symbol="Y_B", value=1.4, units="dimensionless"),
+        maximum_yield_parameter=parameter(
+            name="maximum theoretical yield", symbol="Y_max", value=1.3, units="dimensionless"
+        ),
+    )
+    assert not above.passed
+
+    negative_maximum = validate_biomass_yield_limit(
+        yield_parameter=parameter(name="configured yield", symbol="Y_B", value=0.4, units="dimensionless"),
+        maximum_yield_parameter=parameter(
+            name="maximum theoretical yield", symbol="Y_max", value=-0.1, units="dimensionless"
+        ),
+    )
+    assert not negative_maximum.passed
+    assert "finite and non-negative" in negative_maximum.message
+
+
+def test_static_balance_validators_scale_the_tolerance_by_the_largest_term() -> None:
+    polymer = StoichiometricReactionMetadata(
+        name="large polymer oxidation",
+        reactants=(
+            StoichiometricTerm(
+                species="polymer",
+                coefficient=1.0,
+                composition=ElementalComposition.from_formula("C60000H100002O50001", source=SOURCE),
+                charge=0.0,
+                charge_source=SOURCE,
+                electron_equivalents=240000.0,
+                electron_source=SOURCE,
+            ),
+            StoichiometricTerm(
+                species="oxygen",
+                coefficient=60000.0 + 2e-11,
+                composition=ElementalComposition.from_formula("O2", source=SOURCE),
+                charge=0.0,
+                charge_source=SOURCE,
+                electron_equivalents=-4.0,
+                electron_source=SOURCE,
+            ),
+        ),
+        products=(
+            StoichiometricTerm(
+                species="carbon_dioxide",
+                coefficient=60000.0,
+                composition=ElementalComposition.from_formula("CO2", source=SOURCE),
+                charge=0.0,
+                charge_source=SOURCE,
+                electron_equivalents=0.0,
+                electron_source=SOURCE,
+            ),
+            StoichiometricTerm(
+                species="water",
+                coefficient=50001.0,
+                composition=ElementalComposition.from_formula("H2O", source=SOURCE),
+                charge=0.0,
+                charge_source=SOURCE,
+                electron_equivalents=0.0,
+                electron_source=SOURCE,
+            ),
+        ),
+        source=SOURCE,
+    )
+
+    elemental = validate_elemental_balance(polymer)
+    assert elemental.passed  # 4e-11 atoms of oxygen against an effective tolerance of 1.2e-7
+    assert elemental.details["scale_value"] == pytest.approx(120000.0)
+    assert elemental.details["absolute_tolerance"] == 1e-12
+    assert elemental.details["effective_tolerance"] == pytest.approx(1.2e-7)
+
+    electrons = validate_electron_balance(polymer)
+    assert electrons.passed
+    assert electrons.details["scale_value"] == pytest.approx(240000.0)
+
+    charge = validate_charge_balance(polymer)
+    assert charge.passed
+    assert charge.details["scale_value"] == 1.0
+
+    small = StoichiometricReactionMetadata(
+        name="small imbalance",
+        reactants=(
+            StoichiometricTerm(
+                species="water",
+                coefficient=1.0 + 2e-11,
+                composition=ElementalComposition.from_formula("H2O", source=SOURCE),
+            ),
+        ),
+        products=(
+            StoichiometricTerm(
+                species="water_out",
+                coefficient=1.0,
+                composition=ElementalComposition.from_formula("H2O", source=SOURCE),
+            ),
+        ),
+        source=SOURCE,
+    )
+    assert not validate_elemental_balance(small).passed  # scale stays at 2 here; 4e-11 > 2e-12

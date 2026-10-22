@@ -12,7 +12,7 @@ from fungal_model.core.kernels import JacobianKernel, KernelContext, RateKernel
 from fungal_model.core.parameters import ParameterSet
 from fungal_model.core.units import Quantity, assert_compatible
 from fungal_model.entities.environment import Environment
-from fungal_model.modifiers.base import constant_activity_kernel
+from fungal_model.modifiers.base import CONDITION_PH, constant_activity_kernel
 from fungal_model.modifiers.state_environment import check_state_environment, state_activity_quantity
 from fungal_model.kinetics.ph import gaussian_ph_activity, gaussian_ph_activity_assumption
 
@@ -28,6 +28,18 @@ class PHModifier:
     maximum_ph_symbol: str | None = None
     name: str = "ph_modifier"
     state_source: str | None = None
+
+    @property
+    def condition(self) -> str:
+        """Modifier protocol: the condition this factor responds to."""
+
+        return CONDITION_PH
+
+    @property
+    def read_states(self) -> tuple[tuple[str, str], ...]:
+        """Modifier protocol: the declared ``state_source`` when set, else none (static environment)."""
+
+        return () if self.state_source is None else ((self.state_source, "dimensionless"),)
 
     @property
     def assumptions(self) -> tuple[Assumption, ...]:
@@ -82,6 +94,11 @@ class PHModifier:
         if self.state_source is None:
             return constant_activity_kernel(self, context)
         return self._dynamic(context)[0]
+
+    def compile_activity_gradient(self, context: KernelContext) -> JacobianKernel | None:
+        """Modifier protocol name of :meth:`compile_activity_jacobian`."""
+
+        return self.compile_activity_jacobian(context)
 
     def compile_activity_jacobian(self, context: KernelContext) -> JacobianKernel:
         if self.state_source is None:

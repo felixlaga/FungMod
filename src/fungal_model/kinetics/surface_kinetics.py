@@ -12,6 +12,10 @@ adsorption coverage and hydrolysis proportional to occupied accessible PET
 surface area. It does not include dynamic adsorption/desorption state variables,
 enzyme deactivation, product inhibition, diffusion, crystallinity evolution, or
 changes in surface area during erosion.
+
+The generic enzyme-site balance (``site_binding_bound_enzyme`` and its
+derivatives) lives in :mod:`fungal_model.kinetics.site_binding` and is
+re-exported here; it is substrate-agnostic.
 """
 
 from __future__ import annotations
@@ -25,6 +29,10 @@ from fungal_model.core.provenance import UnknownParameterError
 from fungal_model.core.units import Q_, Quantity, assert_compatible
 from fungal_model.kinetics.arrhenius import ArrheniusReferenceTemperatureScaler
 from fungal_model.kinetics.ph import GaussianPHActivityProfile
+from fungal_model.kinetics.site_binding import (
+    site_binding_bound_enzyme,
+    site_binding_bound_enzyme_derivatives,
+)
 from fungal_model.processes.surface import (
     AccessibleSitePool,
     LangmuirAdsorptionModel,
@@ -195,5 +203,7 @@ class PETSurfaceHydrolysisRateLaw:
 __all__ = [
     "PETSurfaceHydrolysisRateLaw",
     "pet_surface_hydrolysis_assumption",
+    "site_binding_bound_enzyme",
+    "site_binding_bound_enzyme_derivatives",
     "surface_hydrolysis_rate",
 ]

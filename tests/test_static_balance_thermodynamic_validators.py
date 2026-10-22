@@ -36,25 +36,25 @@ from fungal_model.workflows import ConfiguredModelExecutionError
 
 def test_elemental_balance_reports_residuals_for_balanced_synthetic_reaction() -> None:
     reaction = _reaction(
-        name="synthetic X2 split",
-        reactants=(_term("X2_pool", 1.0, formula="X2"),),
-        products=(_term("X_pool", 2.0, formula="X"),),
+        name="synthetic Ne2 split",
+        reactants=(_term("X2_pool", 1.0, formula="Ne2"),),
+        products=(_term("X_pool", 2.0, formula="Ne"),),
     )
 
     validation = validate_elemental_balance(reaction)
 
     assert validation.passed
     assert validation.to_dict()["status"] == "passed"
-    assert validation.details["residuals"]["X"]["residual_value"] == pytest.approx(0.0)
+    assert validation.details["residuals"]["Ne"]["residual_value"] == pytest.approx(0.0)
     assert validation.details["residual_units"] == "atom equivalents per reaction event"
     assert validation.details["provenance_refs"]
 
 
 def test_elemental_balance_fails_for_unbalanced_unrelated_synthetic_reaction() -> None:
     reaction = _reaction(
-        name="synthetic Y2 loss",
-        reactants=(_term("Y2_pool", 1.0, formula="Y2"),),
-        products=(_term("Y_pool", 1.0, formula="Y"),),
+        name="synthetic Ar2 loss",
+        reactants=(_term("Y2_pool", 1.0, formula="Ar2"),),
+        products=(_term("Y_pool", 1.0, formula="Ar"),),
     )
 
     validation = validate_elemental_balance(reaction)
@@ -68,7 +68,7 @@ def test_missing_composition_is_inconclusive_not_passed() -> None:
     reaction = _reaction(
         name="missing composition",
         reactants=(StoichiometricTerm(species="unknown_left", coefficient=1.0),),
-        products=(_term("known_right", 1.0, formula="Z"),),
+        products=(_term("known_right", 1.0, formula="Kr"),),
     )
 
     validation = validate_elemental_balance(reaction)
@@ -81,13 +81,13 @@ def test_missing_composition_is_inconclusive_not_passed() -> None:
 def test_charge_and_electron_balance_use_only_explicit_metadata() -> None:
     charge_balanced = _reaction(
         name="synthetic charge transfer",
-        reactants=(_term("left_ion", 1.0, formula="Q", charge=-1.0),),
-        products=(_term("right_ion", 1.0, formula="Q", charge=-1.0),),
+        reactants=(_term("left_ion", 1.0, formula="Xe", charge=-1.0),),
+        products=(_term("right_ion", 1.0, formula="Xe", charge=-1.0),),
     )
     electron_unbalanced = _reaction(
         name="synthetic electron mismatch",
-        reactants=(_term("reduced_pool", 1.0, formula="R", electron_equivalents=1.0),),
-        products=(_term("oxidized_pool", 1.0, formula="R", electron_equivalents=2.0),),
+        reactants=(_term("reduced_pool", 1.0, formula="He", electron_equivalents=1.0),),
+        products=(_term("oxidized_pool", 1.0, formula="He", electron_equivalents=2.0),),
     )
 
     charge = validate_charge_balance(charge_balanced)
@@ -103,8 +103,8 @@ def test_charge_and_electron_balance_use_only_explicit_metadata() -> None:
 def test_missing_charge_or_electron_metadata_is_inconclusive() -> None:
     reaction = _reaction(
         name="missing scalar metadata",
-        reactants=(_term("left_pool", 1.0, formula="M"),),
-        products=(_term("right_pool", 1.0, formula="M"),),
+        reactants=(_term("left_pool", 1.0, formula="Rn"),),
+        products=(_term("right_pool", 1.0, formula="Rn"),),
     )
 
     charge = validate_charge_balance(reaction)
@@ -114,6 +114,15 @@ def test_missing_charge_or_electron_metadata_is_inconclusive() -> None:
     assert electron.to_dict()["status"] == "inconclusive"
     assert not charge.passed
     assert not electron.passed
+
+
+@pytest.mark.parametrize("placeholder_formula", ["X2", "Q", "A"])
+def test_placeholder_formula_symbols_are_refused(placeholder_formula: str) -> None:
+    with pytest.raises(ValueError, match="not chemical elements"):
+        ElementalComposition.from_formula(
+            placeholder_formula,
+            source="Synthetic placeholder-symbol fixture; no scientific claim.",
+        )
 
 
 def test_condition_specific_gibbs_validator_reports_favorable_and_unfavorable_estimates() -> None:
@@ -277,8 +286,8 @@ def test_validator_registry_loads_static_balance_and_thermodynamic_validators() 
         {
             "validator_type": "elemental_balance",
             "reaction": _reaction_config(
-                reactants=[{"species": "A2_pool", "coefficient": 1.0, "formula": "A2"}],
-                products=[{"species": "A_pool", "coefficient": 2.0, "formula": "A"}],
+                reactants=[{"species": "A2_pool", "coefficient": 1.0, "formula": "F2"}],
+                products=[{"species": "A_pool", "coefficient": 2.0, "formula": "F"}],
             ),
         }
     )
@@ -600,8 +609,8 @@ def test_configured_species_reaction_metadata_records_passed_assembly_checks(tmp
             product_coefficient=1.0,
             checks=["elemental", "charge", "electron"],
             species_metadata={
-                "x2_pool": {"formula": "X", "charge": 0.0, "electron_equivalents": 0.0},
-                "x_pool": {"formula": "X", "charge": 0.0, "electron_equivalents": 0.0},
+                "x2_pool": {"formula": "Ne", "charge": 0.0, "electron_equivalents": 0.0},
+                "x_pool": {"formula": "Ne", "charge": 0.0, "electron_equivalents": 0.0},
             },
         )
     )
@@ -631,8 +640,8 @@ def test_model_config_exposes_static_balance_metadata_schema_sections(tmp_path: 
             product_coefficient=1.0,
             checks=["elemental", "charge"],
             species_metadata={
-                "x2_pool": {"formula": "X", "charge": 0.0},
-                "x_pool": {"formula": "X", "charge": 0.0},
+                "x2_pool": {"formula": "Ne", "charge": 0.0},
+                "x_pool": {"formula": "Ne", "charge": 0.0},
             },
         )
     )
@@ -658,7 +667,7 @@ def test_exploratory_assembly_check_records_inconclusive_missing_composition(tmp
             required=False,
             species_metadata={
                 "x2_pool": {},
-                "x_pool": {"formula": "X"},
+                "x_pool": {"formula": "Ne"},
             },
         )
     )
@@ -689,10 +698,10 @@ def test_scientific_required_binding_rejects_unrelated_balanced_reaction(tmp_pat
                 "product_amount": {"species": "b_pool", "role": "product"},
             },
             species_metadata={
-                "a_pool": {"formula": "A"},
+                "a_pool": {"formula": "F"},
                 "b_pool": {"formula": "B"},
-                "x2_pool": {"formula": "X2"},
-                "x_pool": {"formula": "X"},
+                "x2_pool": {"formula": "Ne2"},
+                "x_pool": {"formula": "Ne"},
             },
         )
     )
@@ -732,8 +741,8 @@ def test_scientific_required_binding_rejects_invalid_process_mappings(
             product_coefficient=1.0,
             checks=["elemental"],
             species_metadata={
-                "x2_pool": {"formula": "X"},
-                "x_pool": {"formula": "X"},
+                "x2_pool": {"formula": "Ne"},
+                "x_pool": {"formula": "Ne"},
             },
         )
     )
@@ -770,8 +779,8 @@ def test_scientific_required_assembly_check_blocks_unbalanced_reaction(tmp_path:
             product_coefficient=1.0,
             checks=["elemental"],
             species_metadata={
-                "x2_pool": {"formula": "X2"},
-                "x_pool": {"formula": "X"},
+                "x2_pool": {"formula": "Ne2"},
+                "x_pool": {"formula": "Ne"},
             },
         )
     )
@@ -1153,13 +1162,13 @@ def _configured_mm_product_map_config() -> dict[str, Any]:
             "species": {
                 "substrate_species": {
                     "name": "substrate_species",
-                    "formula": "X2",
+                    "formula": "Ne2",
                     "source": source,
                     "composition_source": source,
                 },
                 "product_species": {
                     "name": "product_species",
-                    "formula": "X",
+                    "formula": "Ne",
                     "source": source,
                     "composition_source": source,
                 },

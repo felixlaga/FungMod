@@ -20,7 +20,7 @@ from fungal_model.kinetics.cardinal import (
     cardinal_water_activity_activity,
     cardinal_water_activity_assumption,
 )
-from fungal_model.modifiers.base import constant_activity_kernel
+from fungal_model.modifiers.base import CONDITION_PH, CONDITION_WATER_ACTIVITY, constant_activity_kernel
 from fungal_model.modifiers.state_environment import check_state_environment, state_activity_quantity
 
 CARDINAL_TEMPERATURE_MODIFIER_TYPE = "temperature_cardinal_rosso"
@@ -100,6 +100,18 @@ class CardinalPHModifier:
     state_source: str | None = None
 
     @property
+    def condition(self) -> str:
+        """Modifier protocol: the condition this factor responds to."""
+
+        return CONDITION_PH
+
+    @property
+    def read_states(self) -> tuple[tuple[str, str], ...]:
+        """Modifier protocol: the declared ``state_source`` when set, else none (static environment)."""
+
+        return () if self.state_source is None else ((self.state_source, "dimensionless"),)
+
+    @property
     def assumptions(self) -> tuple[Assumption, ...]:
         return (cardinal_ph_assumption(),)
 
@@ -141,6 +153,11 @@ class CardinalPHModifier:
         if self.state_source is None:
             return constant_activity_kernel(self, context)
         return self._dynamic(context)[0]
+
+    def compile_activity_gradient(self, context: KernelContext) -> JacobianKernel | None:
+        """Modifier protocol name of :meth:`compile_activity_jacobian`."""
+
+        return self.compile_activity_jacobian(context)
 
     def compile_activity_jacobian(self, context: KernelContext) -> JacobianKernel:
         if self.state_source is None:
@@ -197,6 +214,18 @@ class CardinalWaterActivityModifier:
     optimum_water_activity_symbol: str
     source: str
     name: str = "cardinal_water_activity_modifier"
+
+    @property
+    def condition(self) -> str:
+        """Modifier protocol: the condition this factor responds to."""
+
+        return CONDITION_WATER_ACTIVITY
+
+    @property
+    def read_states(self) -> tuple[tuple[str, str], ...]:
+        """Modifier protocol: reads no solver state."""
+
+        return ()
 
     @property
     def assumptions(self) -> tuple[Assumption, ...]:

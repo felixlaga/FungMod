@@ -26,6 +26,186 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## AUDIT-001 Scientific Audit: Seven Work Packages Integrated
+
+Date: 2026-10-22
+
+Status: complete for the stated scope. Seven work packages from the
+2026-10-22 scientific audit (thermodynamics, solvers, kinetics, modifiers,
+processes, fungi, macrochemistry reports) are merged on `audit/integration`
+and wired into the public factory path. Every new law is opt-in, carries a
+primary source and maturity `literature_backed_software_tested`, and ships no
+parameter values. Default trajectories of existing configs do not change.
+
+AUDIT-001 was merged onto main after BIO-004 and HELDOUT-001, with these reconciliations: main's state-driven `PHModifier`, `CardinalPHModifier` and `OxygenModifier` and its `CardinalWaterActivityModifier` now declare the WP4 `condition`, `read_states` and `compile_activity_gradient` (their pH and oxygen states keep BIO-004's role, sign domain and bounds, a state-driven law needs no environment, and it counts towards the stacked-condition guard), the product-rule Jacobian replaces main's state-only policy, and a state reader without a gradient falls back to recorded finite differences; the WP2 finite-difference stencil keeps BIO-004's bounded and signed-state probes, now second-order one-sided where the domain has room for `2h`; `ionization.py` keeps main's state-driven pH gradient beside WP2's static analytic gradient; the WP6 closure check reads main's unit-bearing coefficients in pool units, and `EndogenousMaintenanceProcess` accepts main's separate state bases and optional nutrient and oxidant pools (`Y_e` then carries substrate-per-biomass units); main's and the audit's Rosso and Robinson water-activity laws share `cardinal_cm2_activity` and both stay, with the audit's modifier, builder and assumption renamed `RossoRobinsonWaterActivityModifier`, `rosso_robinson_water_activity_modifier_from_config` and `rosso_robinson_water_activity_assumption` to end a name clash; two main tests gained the biomass `+1` coefficient and the audit's FD signature, and the Richardson reference floor of `test_compiled_jacobian.py` no longer drops below 1e-4 of the largest state (`tests/test_audit_main_merge.py`).
+
+Changed, per package:
+
+- WP1 thermodynamic driving force (`chemistry/thermodynamics.py`,
+  `workflows/dynamic_thermodynamics.py`, `chemistry/detailed_balance.py`):
+  new `enforcement_mode: driving_force` with `r_net = r_fwd * (1 - exp(dG / (R T)))`
+  (Beard and Qian 2007; Noor et al. 2013), reverse net flux above
+  equilibrium, refusal at `dG / (R T) > 700`; fixed-activity participants
+  (solvent at a = 1) with a required source; optional constant-enthalpy
+  `dG0(T)`; `compile_rate_factor` gives `phi` and its analytic gradient;
+  detailed-balance equilibrium residuals scaled per conserved pool, so a
+  1e-12 M pool is conserved exactly. Block mode, its dead zone and every
+  existing trajectory are unchanged. Findings thermo 1 (critical), 3, 5, 7, 11.
+- WP2 compiled-core numerics (`solvers/compiled.py`, `solvers/process_ode.py`,
+  `core/numerics.py`, `io/model_config.py`, `workflows/configured_processes.py`,
+  `calibration/compiled_predictor.py`): finite-difference step
+  `eps^(1/3) * max(|y_i|, atol_i / rtol)`, one-sided at the non-negative
+  boundary; constrained gradient `phi * grad v + v * grad phi`, the block
+  indicator never differentiated; optional top-level `solver:` config block
+  (unknown keys refused); `integrate_compiled` honours `jacobian: compiled` in
+  runs and in the calibration predictor; analytic gradients for thermal
+  inactivation, pH-ionization Michaelis-Menten and transglycosylation.
+  Findings solvers 1, 2, 5, 8, 9, 13; processes F1; kinetics F4, F5.
+- WP3 surface area and site balance (`processes/surface.py`,
+  `processes/factories.py`, `kinetics/langmuir.py`, new
+  `kinetics/site_binding.py`): opt-in `area_model: mass_scaled`
+  (`A = A_0 (m / m_0)^n`, Kadam et al. 2004) removes the depletion step;
+  new `site_binding_surface_catalysis` process with a closed enzyme-site
+  balance (Andersen et al. 2018; Kari et al. 2017); analytic surface
+  Jacobians. The constant-until-depletion law stays the default and is now
+  recorded as a limitation. Findings kinetics F1, F2, F3, F12; processes F8.
+- WP4 modifier gradients, condition guard, mixed inhibition
+  (`modifiers/*`, `processes/rate_modifiers.py`,
+  `kinetics/_coupled_inhibition.py`): analytic activity gradients for every
+  state-reading modifier composed by the product rule; modifier-read states
+  declared with role `modifier_input`; two environment laws on one condition
+  refused unless `allow_stacked_condition_laws` is declared (gamma concept,
+  Zwietering et al. 1992); new `mixed_inhibition` (Cornish-Bowden 2012);
+  `law_source` and `mechanism` records; product inhibition labelled
+  noncompetitive. Findings modifiers 1, 2, 4, 7 (partial), 11; processes F4,
+  F6; kinetics F10.
+- WP5 environment laws (`kinetics/cardinal.py`, new
+  `kinetics/temperature_optimum.py`, new `modifiers/water_activity_cardinal.py`
+  and `modifiers/temperature_optimum.py`,
+  `screening/template_environment_modifiers.py`): Rosso-Robinson CM_2 water
+  activity (`water_activity_cardinal_rosso`), Sharpe-Schoolfield
+  (`temperature_sharpe_schoolfield`) and Equilibrium Model
+  (`temperature_equilibrium_model`) laws; CTMI now delegates to the shared
+  CM_2 algebra (identical to 1e-14). Findings modifiers 3, 6; kinetics F6;
+  processes F11.
+- WP6 starvation physiology (`processes/culture.py`, new
+  `processes/culture_factories.py`, `fungi/respiration.py`, new
+  `fungi/maintenance_correlation.py`): opt-in `endogenous_maintenance`
+  (biomass oxidation pays `max(m - c, 0) / Y_e`); closure stoichiometry
+  checked against the declared yields at build; zero-demand Jacobian fix;
+  Tijhuis et al. 1993 maintenance correlation as a function. Findings fungi
+  2, 9, 11; processes F5, F9; macrochem 5.
+- WP7 macrochemistry (`chemistry/stoichiometry.py`,
+  `chemistry/macrochemistry.py`, `core/validators.py`, `fungi/energetics.py`,
+  `fungi/metabolism.py`, `fungi/coupling.py`): degree of reduction and
+  electron balances from composition (ammonia reference); condition-number
+  refusal above a declared 1e8; residual acceptance scaled by the reaction's
+  atom magnitude in the solve and the validators alike; Heijnen dissipation
+  correlation and `DissipationYieldPrediction` with a carbon ceiling;
+  basis-free `Y <= 1` caps removed, with `FungalCouplingModel` now passing its
+  own single-input mass-closure maximum of 1. Findings macrochem 1, 2, 3, 4,
+  8, 9, 10, 11 (partial), 13; fungi 6.
+
+Integration wiring (this entry):
+
+- `solvers/compiled.py`: WP1's `compile_rate_factor` returns one closure
+  `y -> (phi, grad phi)`, while WP2 expected a pair. `_constraint_factor` now
+  splits the closure, so driving-force processes run as
+  `numeric_thermodynamic` with the analytic factor gradient and block mode
+  keeps the never-differentiated indicator. Without this adapter seven tests
+  failed after the merge.
+- `processes/factories.py`: dispatch for `mixed_inhibition` and the three WP5
+  types; `mixed_inhibition` joins the mechanistic-inhibition list that
+  requires a matched Michaelis-Menten base; `allow_stacked_condition_laws` read
+  from the process config (YAML boolean only, a quoted string is refused);
+  `EndogenousMaintenanceFactory` registered in `default_foundation_factories`
+  (lazy import, because `culture_factories` reuses private builders of
+  `factories`).
+- `processes/rate_modifiers.py`: modifiers that declare `parameter_requirements`
+  and `limitation` (the WP5 laws) contribute them to the wrapped process.
+- `solvers/process_ode.py`: per-time-point
+  `dynamic_thermodynamics.<id>.driving_force_factor` series in driving-force
+  mode; validation message and scope text branch on the mode; constraint
+  assumption records reach `SimulationResult.assumptions`.
+- `workflows/configured_outputs.py`: configured-modifier rows for
+  `mixed_inhibition` and the three WP5 laws (they were labelled
+  `unsupported_configured_modifier` before).
+- Exports: WP5 modifiers and builders from `fungal_model.modifiers`; WP3
+  site-binding and WP6 endogenous-maintenance names and
+  `mixed_inhibition_modifier_from_config` from `fungal_model.processes`; the
+  Tijhuis correlation from `fungal_model.fungi`.
+- Pyright fixes in WP2 and WP3 code (`configured_processes.py` solver-settings
+  argument, `kinetics/langmuir.py`, `kinetics/site_binding.py`); no numeric
+  change.
+- Docs: seven new pages in the mkdocs nav under Core concepts; the
+  driving-force and starvation pages updated for the wiring.
+
+Tests: new `tests/test_thermodynamic_driving_force.py`,
+`tests/test_solver_config_block.py`, `tests/test_surface_site_balance.py`,
+`tests/test_modifier_gradients.py`, `tests/test_mixed_inhibition.py`,
+`tests/test_water_activity_cardinal.py`, `tests/test_temperature_optimum_laws.py`,
+`tests/test_endogenous_maintenance.py`, `tests/test_degree_of_reduction.py` and
+`tests/test_audit_integration.py` (mixed inhibition and cardinal water
+activity through the public factory path on the compiled core with the
+compiled Jacobian, the stacking guard, the driving-force factor series).
+Extended: `tests/test_compiled_jacobian.py` (Richardson reference; the
+modifier and constraint kind assertion relaxed to analytic or finite
+difference, merged from WP2 and WP4), `tests/test_solver_numerics.py`,
+`tests/test_generic_surface_processes.py`, `tests/test_process_factory_library.py`
+(two new factory types), `tests/test_culture_processes.py`,
+`tests/test_respiration.py`, `tests/test_macrochemical_balance.py`,
+`tests/test_stoichiometry_thermodynamics.py`, `tests/test_fungal_dynamics.py`,
+`tests/test_static_balance_thermodynamic_validators.py` (scaled tolerances),
+`tests/test_config_driven_case_assembly.py` and
+`tests/test_configured_model_workflow.py` (renamed product-inhibition
+assumption name).
+`tests/test_thermodynamic_driving_force.py` now expects the
+`numeric_thermodynamic` kernel for driving-force mode.
+
+Scientific impact: no default trajectory changes. Opt-in mechanisms are new.
+Behaviour changes by design: closure processes whose stoichiometry contradicts
+their yields, models that stack two environment laws on one condition, and
+macrochemical balances with condition number above 1e8 now fail at build;
+biomass yields above 1 kg/kg are accepted by the accessors, with admissibility
+left to conservation and energetics checks; product inhibition is labelled
+noncompetitive (assumption name changed).
+
+Backward compatibility: `to_dict` keys are additive. Modifier-read states now
+carry the role `modifier_input`, and wrapped processes list them right after
+the base substrate, so compiled state order can change for such models.
+`MacrochemicalSolution` gained required fields (only `solve` constructs it).
+
+Deferred findings (PLAN.md traceability): solvers 3 (needs FD-010 parameter
+slots); thermo 4 (needs pKa and ionic-strength records); thermo 6 (a
+reversible modular law is a new family; WP1 records `reverse_saturation:
+not_represented`); processes F2 (needs a sourced glucose `K_iG`); fungi 1
+(legacy class, FD-009; needs a volume contract); fungi 3 (needs an organism
+record for the alpha term); fungi 4 (needs a four-pool balance record);
+transport F1 to F5 (state document step 6); kinetics crystallinity variant of
+the area law; surface adsorption inhibition. Rejected: kinetics F13
+(Ratkowsky), processes F13, kinetics F11, thermo 12, solvers 12, macrochem 12.
+
+Remaining ambiguities: `api/result_tables.py` still names the product
+inhibition family "generic reversible product inhibition modifier", and the
+configured-modifier rows of the older inhibition types do not yet emit
+`law_source` or `mechanism`; toy inhibition configs still declare
+`literature_backed_software_tested` on artificial modifiers; the integrator
+cost of driving-force mode at tight tolerances is unmeasured; a fixed solvent
+that is not a process state still fails the static electron-balance gate;
+the native `ResourceLimitedCulture` and `DegradingCulture` still freeze
+biomass under starvation; `culture_factories.py` imports private helpers of
+`factories.py`; the Heijnen validity bounds on `gamma_S` should be checked
+against the paper.
+
+Risk: medium. The merge touches the compiled core and the modifier wrapper,
+and the full suite, ruff, pyright and the strict docs build pass (see
+`/tmp/fungmod_audit/INTEGRATION.md` for the gate tails).
+
+Recommended next task: emit `law_source` and `mechanism` in the configured
+outputs and result tables for every inhibition type and relabel the toy
+inhibition configs `framework_benchmark`; then measure driving-force mode on
+the dynamic-thermodynamics showcase at tight tolerances.
+
 ## HELDOUT-001 Held-Out Gelain Loadings: Digitized Data, Registry Conditions, Frozen Predictions
 
 Date: 2026-10-09

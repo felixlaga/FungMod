@@ -294,8 +294,11 @@ class ResourceLimitedCulture:
     def _rate_jacobian(state: np.ndarray, constants: tuple[float, ...]) -> np.ndarray:
         """Piecewise derivatives of the closure, including its zero extension.
 
-        At zero pools the right derivative is used. At capacity == demand,
-        growth/maintenance select zero derivatives; the closure has a kink.
+        At zero pools the right derivative is used. At capacity == demand with
+        a positive demand, growth/maintenance select zero derivatives; the
+        closure has a kink. With zero demand the growth budget is the capacity
+        itself, so an exhausted pool (capacity == demand == 0) takes the right
+        derivative of the capacity rather than the kink's zero.
         """
         substrate, _, nitrogen, oxidant = np.maximum(state[:4], 0)
         yield_value, demand, capacity, ks, kn, ko = constants
@@ -303,7 +306,7 @@ class ResourceLimitedCulture:
         derivative = np.zeros(4)
         derivative[0] = capacity * ks / (ks+substrate)**2 * oxidant / (ko+oxidant) * (state[0] >= 0)
         derivative[3] = capacity * substrate / (ks+substrate) * ko / (ko+oxidant)**2 * (state[3] >= 0)
-        growth = yield_value * nitrogen / (kn+nitrogen) * derivative * (available > demand)
+        growth = yield_value * nitrogen / (kn+nitrogen) * derivative * ((available > demand) | (demand == 0))
         growth[2] += yield_value * max(available-demand, 0) * kn / (kn+nitrogen)**2 * (state[2] >= 0)
         maintenance = derivative * (available < demand)
         return np.array([growth, maintenance, -maintenance])

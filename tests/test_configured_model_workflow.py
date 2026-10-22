@@ -712,7 +712,7 @@ def test_configured_model_runs_with_explicit_product_inhibition_modifier(tmp_pat
     process_config = json.loads((tmp_path / "product_inhibited" / "input_model_config.json").read_text(encoding="utf-8"))[
         "processes"
     ][0]
-    assert any(item["name"] == "reversible product inhibition modifier" for item in assumptions)
+    assert any(item["name"] == "noncompetitive product inhibition" for item in assumptions)
     assert metadata["configured_process_modifiers"] == [
         {
             "process_id": "a_to_b",
@@ -764,7 +764,7 @@ def test_non_pet_surface_benchmark_runs_with_explicit_product_inhibition_modifie
             ),
         }
     ]
-    assert any(item["name"] == "reversible product inhibition modifier" for item in assumptions)
+    assert any(item["name"] == "noncompetitive product inhibition" for item in assumptions)
     assert process_config["modifiers"] == [
         {
             "type": "product_inhibition",

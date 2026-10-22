@@ -151,7 +151,7 @@ def test_optional_closure_jacobian_on_separate_bases(cls, oxidant):
     process = cls(name="uptake", substrate_state="G", biomass_state="X", oxidant_state="O" if oxidant else None,
         concentration_units="mmol/L", state_units=units, time_units="h", true_yield_symbol="Y", maintenance_demand_symbol="m", uptake_capacity_symbol="q",
         substrate_half_saturation_symbol="K", oxidant_half_saturation_symbol="KO" if oxidant else None,
-        stoichiometry={"G": {"value": -20, "units": "mmol/g"}} if cls is ResourceLimitedGrowthProcess else {"G": -1})
+        stoichiometry={"G": {"value": -20, "units": "mmol/g"}, "X": 1.0} if cls is ResourceLimitedGrowthProcess else {"G": -1})
     context = KernelContext(state_index={"G": 0, "X": 1, "O": 2}, state_units=units, time_units="h", parameters=_parameters())
     kernel, derivative = process.compile_rate(context), process.compile_jacobian(context)
     vector = np.array([2., .3, .2])

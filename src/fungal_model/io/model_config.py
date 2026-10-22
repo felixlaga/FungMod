@@ -9,6 +9,8 @@ from typing import Any, Mapping
 
 import yaml
 
+from fungal_model.core.numerics import SOLVER_CONFIG_KEYS, SolverSettings
+
 
 REQUIRED_MODEL_CONFIG_FIELDS = (
     "kind",
@@ -730,6 +732,64 @@ class ThermodynamicConstraintConfig:
 
 
 @dataclass(frozen=True)
+class SolverConfig:
+    """Optional top-level ``solver`` block: integration controls for the compiled core.
+
+    Keys are those of :data:`fungal_model.core.numerics.SOLVER_CONFIG_KEYS`:
+    ``method``, ``rtol``, ``atol`` (a number in each state's own units or a
+    per-state mapping ``state -> {value, units}``), ``max_step`` and
+    ``first_step`` (``{value, units}``) and ``jacobian``. Unknown keys and
+    invalid values are refused when the config is loaded; an absent key keeps
+    the :class:`~fungal_model.core.numerics.SolverSettings` default.
+    """
+
+    method: str | None
+    rtol: float | None
+    atol: Any
+    max_step: Mapping[str, Any] | None
+    first_step: Mapping[str, Any] | None
+    jacobian: str | None
+    raw: Mapping[str, Any]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "SolverConfig":
+        block = _mapping(data, field_name="solver")
+        unknown = sorted(str(key) for key in block if key not in SOLVER_CONFIG_KEYS)
+        if unknown:
+            raise ModelConfigError(
+                f"solver block contains unsupported keys: {unknown}; allowed: {sorted(SOLVER_CONFIG_KEYS)}."
+            )
+        try:
+            SolverSettings.from_config(block)
+        except ValueError as exc:
+            raise ModelConfigError(f"solver block is invalid: {exc}") from exc
+        return cls(
+            method=None if block.get("method") is None else str(block["method"]),
+            rtol=None if block.get("rtol") is None else float(block["rtol"]),
+            atol=deepcopy(block.get("atol")),
+            max_step=deepcopy(block.get("max_step")),
+            first_step=deepcopy(block.get("first_step")),
+            jacobian=None if block.get("jacobian") is None else str(block["jacobian"]),
+            raw=deepcopy(dict(block)),
+        )
+
+    def to_solver_settings(self) -> SolverSettings:
+        """The :class:`SolverSettings` this block declares."""
+
+        return SolverSettings.from_config(self.raw)
+
+    def validate(self) -> ModelConfigValidationResult:
+        try:
+            self.to_solver_settings()
+        except ValueError as exc:
+            return ModelConfigValidationResult(passed=False, message=f"solver block is invalid: {exc}", invalid_fields=("solver",))
+        return ModelConfigValidationResult(passed=True, message="Solver block is valid.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return deepcopy(dict(self.raw))
+
+
+@dataclass(frozen=True)
 class ModelConfig:
     """Loaded generic model configuration."""
 
@@ -749,6 +809,8 @@ class ModelConfig:
     reaction_metadata: tuple[ReactionMetadataConfig, ...] = ()
     balance_checks: tuple[BalanceCheckConfig, ...] = ()
     thermodynamic_constraints: tuple[ThermodynamicConstraintConfig, ...] = ()
+    #: Optional ``solver`` block; ``None`` means the compiled core's default settings.
+    solver: SolverConfig | None = None
     path: Path | None = None
 
     @classmethod
@@ -787,6 +849,7 @@ class ModelConfig:
                     _as_sequence(data.get("thermodynamic_constraints", ()))
                 )
             ),
+            solver=None if data.get("solver") is None else SolverConfig.from_mapping(data["solver"]),
             path=None if path is None else Path(path),
         )
 
@@ -802,6 +865,7 @@ class ModelConfig:
             self.time.validate(),
             *(validator.validate() for validator in self.validators),
             self.outputs.validate(),
+            *(() if self.solver is None else (self.solver.validate(),)),
         )
         invalid = tuple(
             field
@@ -885,6 +949,7 @@ __all__ = [
     "ReactionMetadataConfig",
     "ReactionParticipantMetadataConfig",
     "REQUIRED_MODEL_CONFIG_FIELDS",
+    "SolverConfig",
     "TimeConfig",
     "ThermodynamicConstraintConfig",
     "VALID_MODEL_MATURITIES",

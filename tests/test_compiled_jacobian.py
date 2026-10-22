@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from fungal_model.chemistry.thermodynamics import DynamicThermodynamicConstraint
 from fungal_model.core.kernels import KernelContext
 from fungal_model.core.numerics import JACOBIAN_COMPILED, JACOBIAN_FINITE_DIFFERENCE_BY_BACKEND, SolverSettings
 from fungal_model.core.parameters import Parameter, ParameterSet
@@ -16,7 +17,15 @@ from fungal_model.io.model_config import load_model_config
 from fungal_model.plugins.pet import pet_substrate_loader_registry
 from fungal_model.processes import MassActionProcess, ModelBuilder, ProcessRegistry, RateModifierProcess
 from fungal_model.solvers import ProcessODESolver, RunRequest
-from fungal_model.solvers.compiled import JACOBIAN_ANALYTIC, JACOBIAN_BY_BACKEND, JACOBIAN_COMPILED_LABEL, JACOBIAN_FINITE_DIFFERENCE
+from fungal_model.solvers.compiled import (
+    CONSTRAINT_GRADIENT_RULE,
+    FINITE_DIFFERENCE_RELATIVE_STEP,
+    JACOBIAN_ANALYTIC,
+    JACOBIAN_BY_BACKEND,
+    JACOBIAN_COMPILED_LABEL,
+    JACOBIAN_FINITE_DIFFERENCE,
+    JACOBIAN_REFUSED,
+)
 from fungal_model.workflows.configured_model import ConfiguredInputLoader, ConfiguredProcessAssembler, require_runnable_config
 from tests.test_degrading_culture import model as degrading_model
 from tests.test_degrading_culture import state as degrading_state
@@ -36,20 +45,51 @@ def _configured(path: Path):
     return model, request
 
 
-def _finite_difference_jacobian(rhs, time: float, state: np.ndarray, *, relative_step: float = 1e-6) -> np.ndarray:
+def _richardson_jacobian(rhs, time: float, state: np.ndarray, *, relative_step: float = 1e-3) -> np.ndarray:
+    """Reference Jacobian: Richardson extrapolation of differences with a state-scaled step.
+
+    Central differences ``(4 D(h/2) - D(h)) / 3`` (error O(h^4)) wherever
+    ``y_i - h >= 0``; at the non-negative boundary forward differences
+    extrapolated twice, ``R(h) = 2 D(h/2) - D(h)`` then ``(4 R(h/2) - R(h)) / 3``
+    (error O(h^3)). The step ``h_i = relative_step * max(|y_i|, floor)`` with
+    ``floor = max(min_j |y_j|, 1e-4 max_j |y_j|)`` over the nonzero states
+    perturbs a zero state as if it were the smallest state present, but never
+    by less than a 1e-4 fraction of the largest; it is independent of the
+    implementation's own stencil and step.
+    """
+
     size = state.size
+    nonzero = np.abs(state[state != 0.0])
+    # The floor never drops below a 1e-4 fraction of the largest state, so a
+    # state many decades below the others (BIO-004 chain-scission fragments)
+    # is not stepped into the round-off of right-hand-side rows that the
+    # large states dominate.
+    floor = max(float(np.min(nonzero)), 1e-4 * float(np.max(nonzero))) if nonzero.size else 1.0
     matrix = np.zeros((size, size), dtype=float)
     for index in range(size):
-        step = relative_step * max(abs(state[index]), 1.0)
-        upper, lower = state.copy(), state.copy()
-        upper[index] += step
-        lower[index] -= step
-        if lower[index] < 0.0:
-            lower[index] = state[index]
-            matrix[:, index] = (rhs(time, upper) - rhs(time, lower)) / step
+        step = relative_step * max(abs(state[index]), floor)
+        one_sided = state[index] - step < 0.0
+
+        def difference(h: float) -> np.ndarray:
+            upper, lower = state.copy(), state.copy()
+            upper[index] += h
+            if one_sided:
+                return (rhs(time, upper) - rhs(time, lower)) / h
+            lower[index] -= h
+            return (rhs(time, upper) - rhs(time, lower)) / (2.0 * h)
+
+        if one_sided:
+            def forward(h: float) -> np.ndarray:
+                return 2.0 * difference(h / 2.0) - difference(h)
+
+            matrix[:, index] = (4.0 * forward(step / 2.0) - forward(step)) / 3.0
         else:
-            matrix[:, index] = (rhs(time, upper) - rhs(time, lower)) / (2.0 * step)
+            matrix[:, index] = (4.0 * difference(step / 2.0) - difference(step)) / 3.0
     return matrix
+
+
+def _initial_vector(compiled, request) -> np.ndarray:
+    return np.array([float(Q_(request.initial_state[name]).to(units).magnitude) for name, units in zip(compiled.state_names, compiled.state_units, strict=True)])
 
 
 @pytest.mark.parametrize("config_path", MODEL_CONFIGS, ids=[path.stem for path in MODEL_CONFIGS])
@@ -60,17 +100,17 @@ def test_compiled_jacobian_is_the_derivative_of_the_compiled_rhs(config_path: Pa
     assert set(summary["jacobian_kernels"].values()) <= {JACOBIAN_ANALYTIC, JACOBIAN_FINITE_DIFFERENCE}
     assert summary["analytic_jacobian_count"] == sum(kind == JACOBIAN_ANALYTIC for kind in summary["jacobian_kernels"].values())
     for process in compiled.processes:
-        if process.constraint is not None:
-            assert process.jacobian_kind == JACOBIAN_FINITE_DIFFERENCE, process.name
-        elif isinstance(process.process, RateModifierProcess):
+        if isinstance(process.process, RateModifierProcess) or process.constraint is not None:
+            assert process.jacobian_kind in {JACOBIAN_ANALYTIC, JACOBIAN_FINITE_DIFFERENCE}, process.name
+        if process.constraint is None and isinstance(process.process, RateModifierProcess):
             dynamic = any(getattr(modifier, "state_source", None) is not None for modifier in process.process.rate_modifiers)
-            expected_kind = JACOBIAN_ANALYTIC if dynamic and process.process.compile_jacobian(compiled.context) is not None else JACOBIAN_FINITE_DIFFERENCE
-            assert process.jacobian_kind == expected_kind, process.name
-    initial = np.array([float(Q_(request.initial_state[name]).to(units).magnitude) for name, units in zip(compiled.state_names, compiled.state_units, strict=True)])
+            if dynamic and process.process.compile_jacobian(compiled.context) is not None:
+                assert process.jacobian_kind == JACOBIAN_ANALYTIC, process.name
+    initial = _initial_vector(compiled, request)
     rng = np.random.default_rng(3)
     for trial in range(3):
         state = initial if trial == 0 else initial * rng.uniform(0.5, 1.5, initial.size) + 1e-6 * rng.uniform(0.0, 1.0, initial.size)
-        expected = _finite_difference_jacobian(compiled.rhs, 0.0, state)
+        expected = _richardson_jacobian(compiled.rhs, 0.0, state)
         actual = compiled.jacobian(0.0, state)
         scale = float(np.max(np.abs(expected))) if np.any(expected) else 1.0
         np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-6 * scale, err_msg=f"{config_path.name} trial {trial}")
@@ -188,3 +228,110 @@ def test_a_process_without_an_analytic_gradient_is_differentiated_numerically_an
     assert compiled.summary()["jacobian_kernels"] == {"square law": JACOBIAN_FINITE_DIFFERENCE}
     assert compiled.jacobian(0.0, np.array([2.0]))[0, 0] == pytest.approx(-0.25 * 2.0 * 2.0, rel=1e-6)
     assert compiled.jacobian(0.0, np.array([-1.0]))[0, 0] == 0.0  # below the orthant the projected rate is flat
+
+
+CLOSED_FORM_CONFIGS = (
+    "toy_thermal_inactivation_dissolved.yml",
+    "toy_ph_ionization_dissolved.yml",
+    "phanerochaete_bgl1b_cellobiose_transglycosylation.yml",
+)
+
+
+@pytest.mark.parametrize("name", CLOSED_FORM_CONFIGS)
+def test_inactivation_ionization_and_transglycosylation_gradients_are_analytic_and_match_richardson(name: str) -> None:
+    model, request = _configured(ROOT / "data" / "model_configs" / name)
+    compiled = ProcessODESolver(model).compile(request)
+    assert set(compiled.summary()["jacobian_kernels"].values()) == {JACOBIAN_ANALYTIC}, compiled.summary()["jacobian_kernels"]
+    initial = _initial_vector(compiled, request)
+    rng = np.random.default_rng(11)
+    interior = [initial, initial * rng.uniform(0.3, 1.7, initial.size) + 1e-3 * np.max(initial) * rng.uniform(0.0, 1.0, initial.size)]
+    for state in interior:
+        expected = _richardson_jacobian(compiled.rhs, 0.0, state)
+        scale = float(np.max(np.abs(expected)))
+        np.testing.assert_allclose(compiled.jacobian(0.0, state), expected, rtol=1e-6, atol=1e-9 * scale, err_msg=name)
+    for index in range(initial.size):  # one state at zero: forward-difference reference, analytic kernel still exact
+        state = interior[1].copy()
+        state[index] = 0.0
+        expected = _richardson_jacobian(compiled.rhs, 0.0, state)
+        scale = float(np.max(np.abs(expected))) if np.any(expected) else 1.0
+        actual = compiled.jacobian(0.0, state)
+        assert np.isfinite(actual).all()
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-8 * scale, err_msg=f"{name} zero state {index}")
+
+
+def test_constrained_gradient_equals_the_one_sided_limits_and_never_differentiates_the_indicator() -> None:
+    model, request = _configured(ROOT / "data" / "model_configs" / "showcase_dynamic_thermodynamics.yml")
+    compiled = ProcessODESolver(model).compile(request)
+    assert compiled.state_names == ("dissolved_substrate_amount", "released_product_amount")
+    summary = compiled.summary()
+    assert summary["constraint_gradient_rule"] == CONSTRAINT_GRADIENT_RULE
+    assert summary["jacobian_kernels"] == {compiled.processes[0].name: JACOBIAN_ANALYTIC}
+    offset = 1e-5
+    blocked_side = compiled.jacobian(0.0, np.array([0.5 - offset, 0.5 + offset]))  # Q > K: forward rate blocked
+    feasible_side = compiled.jacobian(0.0, np.array([0.5 + offset, 0.5 - offset]))  # Q < K: first-order law active
+    at_switch = compiled.jacobian(0.0, np.array([0.5, 0.5]))  # dG = 0 is not below -tol: blocked branch
+    assert np.all(blocked_side == 0.0)
+    np.testing.assert_allclose(feasible_side, [[-0.1, 0.0], [0.1, 0.0]], rtol=1e-12, atol=0.0)
+    np.testing.assert_array_equal(at_switch, blocked_side)
+    assert float(np.max(np.abs(at_switch))) <= float(np.max(np.abs(feasible_side)))  # no spike of order 1/h
+    for state in ([0.5 - offset, 0.5 + offset], [0.5 + offset, 0.5 - offset]):
+        reference = _richardson_jacobian(compiled.rhs, 0.0, np.array(state), relative_step=1e-7)
+        np.testing.assert_allclose(compiled.jacobian(0.0, np.array(state)), reference, rtol=1e-6, atol=1e-9)
+
+
+@pytest.mark.parametrize("method", ["BDF", "Radau"])
+def test_showcase_with_the_compiled_jacobian_costs_within_twice_the_backend(method: str) -> None:
+    model, request = _configured(ROOT / "data" / "model_configs" / "showcase_dynamic_thermodynamics.yml")
+    backend = ProcessODESolver(replace(model, solver_settings=SolverSettings(method=method))).run(request)
+    compiled = ProcessODESolver(replace(model, solver_settings=SolverSettings(method=method, jacobian=JACOBIAN_COMPILED))).run(request)
+    assert compiled.solver_metadata["kernel"]["jacobian"] == JACOBIAN_COMPILED_LABEL
+    assert backend.solver_metadata["kernel"]["jacobian"] == JACOBIAN_BY_BACKEND
+    assert compiled.solver_metadata["njev"] > 0
+    assert compiled.solver_metadata["nfev"] <= 2 * backend.solver_metadata["nfev"], (method, compiled.solver_metadata["nfev"], backend.solver_metadata["nfev"])
+    for name in backend.states:
+        np.testing.assert_allclose(compiled.states[name].magnitude, backend.states[name].magnitude, rtol=1e-5, atol=1e-7)
+
+
+def test_kernel_summary_reports_the_jacobian_setting_and_the_finite_difference_scales() -> None:
+    model, request = _configured(ROOT / "data" / "model_configs" / "toy_homogeneous_ab.yml")
+    default = ProcessODESolver(model).kernel_summary(request)
+    assert default["jacobian"] == JACOBIAN_BY_BACKEND
+    assert default["finite_difference_relative_step"] == FINITE_DIFFERENCE_RELATIVE_STEP == pytest.approx(np.finfo(float).eps ** (1 / 3))
+    assert set(default["finite_difference_scales"]) == {spec.name for spec in model.state_variables}
+    assert all(scale == pytest.approx(1e-2) for scale in default["finite_difference_scales"].values())  # default atol / rtol
+    implicit = replace(model, solver_settings=SolverSettings(method="BDF", jacobian=JACOBIAN_COMPILED))
+    assert ProcessODESolver(implicit).kernel_summary(request)["jacobian"] == JACOBIAN_COMPILED_LABEL
+    explicit = replace(model, solver_settings=SolverSettings(method="RK45", jacobian=JACOBIAN_COMPILED))
+    assert ProcessODESolver(explicit).kernel_summary(request)["jacobian"] == JACOBIAN_BY_BACKEND
+    tight = replace(model, solver_settings=SolverSettings(rtol=1e-6, atol=1e-12))
+    assert all(scale == pytest.approx(1e-6) for scale in ProcessODESolver(tight).kernel_summary(request)["finite_difference_scales"].values())
+    with pytest.raises(ValueError, match="jacobian label"):
+        ProcessODESolver(model).compile(request).summary(jacobian="symbolic")
+
+
+class _ConstraintWithoutNumericForm(DynamicThermodynamicConstraint):
+    """A constraint that only its unit-aware ``enforce`` can evaluate: no factor, no feasibility kernel."""
+
+    def compile_feasibility(self, context):
+        del context
+        return None
+
+    def compile_rate_factor(self, context):
+        del context
+        return None
+
+
+def test_a_constraint_without_a_numeric_form_has_its_gradient_refused_and_labelled() -> None:
+    model, request = _configured(ROOT / "data" / "model_configs" / "showcase_dynamic_thermodynamics.yml")
+    opaque = tuple(
+        _ConstraintWithoutNumericForm(**{item.name: getattr(constraint, item.name) for item in fields(constraint)})
+        for constraint in model.thermodynamic_constraints
+    )
+    compiled = ProcessODESolver(replace(model, thermodynamic_constraints=opaque)).compile(request)
+    name = compiled.processes[0].name
+    assert compiled.summary()["jacobian_kernels"] == {name: JACOBIAN_REFUSED}
+    assert compiled.summary()["analytic_jacobian_count"] == 0
+    state = np.array([0.6, 0.4])
+    np.testing.assert_allclose(compiled.rhs(0.0, state), ProcessODESolver(model).compile(request).rhs(0.0, state), rtol=1e-12)
+    with pytest.raises(ValueError, match="offers no numeric rate factor"):
+        compiled.jacobian(0.0, state)

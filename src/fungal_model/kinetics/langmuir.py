@@ -67,7 +67,37 @@ def langmuir_surface_coverage(
     )
 
 
+def langmuir_coverage_derivative(
+    *,
+    free_enzyme: Quantity,
+    adsorption_equilibrium_constant: Quantity,
+) -> Quantity:
+    """Derivative of the Langmuir coverage with respect to the free enzyme.
+
+    ``d theta / dE = K_ads / (1 + K_ads * E)**2``, in reciprocal enzyme units.
+    It is the exact derivative of :func:`langmuir_surface_coverage` for every
+    ``E >= 0``; there is no kink or boundary case.
+    """
+
+    enzyme = require_quantity(free_enzyme, name="free_enzyme")
+    adsorption_constant = require_quantity(
+        adsorption_equilibrium_constant,
+        name="adsorption_equilibrium_constant",
+    )
+    _ensure_non_negative(enzyme, "free_enzyme")
+    _ensure_non_negative(adsorption_constant, "adsorption_equilibrium_constant")
+
+    adsorption_strength = assert_compatible(
+        adsorption_constant * enzyme,
+        "dimensionless",
+        name="K_ads * free_enzyme",
+    )
+    denominator = LANGMUIR_DENOMINATOR_OFFSET.quantity + adsorption_strength
+    return adsorption_constant / denominator / denominator
+
+
 __all__ = [
     "LANGMUIR_DENOMINATOR_OFFSET",
+    "langmuir_coverage_derivative",
     "langmuir_surface_coverage",
 ]

@@ -404,3 +404,225 @@ def test_assimilable_product_can_support_growth() -> None:
     assert result.species["hydrolysate"].magnitude[-1] < result.species["hydrolysate"].magnitude[0]
     assert validate_non_negative(result).passed
 
+
+
+# --------------------------------------------------------------------------
+# WP7: dissipation yield, carbon-limited Gibbs bound, yield caps dropped
+# --------------------------------------------------------------------------
+
+from fungal_model.chemistry import ElementalComposition, MacrochemicalBalance, MacrochemicalSpecies  # noqa: E402
+from fungal_model.fungi.energetics import (  # noqa: E402
+    HEIJNEN_DISSIPATION_MATURITY,
+    HEIJNEN_DISSIPATION_SOURCE,
+    DissipationYieldPrediction,
+    GibbsEnergyYieldBound,
+    GrowthEnergeticsError,
+    heijnen_dissipation_from_composition,
+    heijnen_dissipation_per_cmol_biomass,
+)
+
+ILLUSTRATIVE_SOURCE = (
+    "Illustrative pH-7 formation energies from the 2026-10 macrochemistry audit record "
+    "(scratch values for a software test; not registry data and not a physical claim)."
+)
+ILLUSTRATIVE_CONDITIONS = "pH 7, 298 K, unit activities; illustrative audit values."
+# Glucose, NH4+, O2, HCO3-, H2O, H+, biomass CH1.8O0.5N0.2 in kJ/mol (audit report section 2.6).
+ILLUSTRATIVE_GIBBS = {
+    "glucose": -917.2,
+    "ammonium": -79.4,
+    "oxygen": 0.0,
+    "bicarbonate": -586.8,
+    "water": -237.2,
+    "proton": -39.9,
+    "biomass": -67.0,
+}
+
+
+def _energy(symbol: str, kilojoule_per_mole: float, *, source: str | None = ILLUSTRATIVE_SOURCE) -> Parameter:
+    return Parameter(
+        name=symbol,
+        symbol=symbol,
+        value=kilojoule_per_mole,
+        units="kilojoule / mole",
+        uncertainty=None,
+        source=source,
+        confidence_level="testing",
+        notes="Illustrative value for a software test.",
+    )
+
+
+def _composition(formula: str | dict[str, float]) -> ElementalComposition:
+    if isinstance(formula, str):
+        return ElementalComposition.from_formula(formula, source=ILLUSTRATIVE_SOURCE)
+    return ElementalComposition.from_elements(formula, source=ILLUSTRATIVE_SOURCE, formula="CH1.8O0.5N0.2")
+
+
+def _aerobic_glucose_balance() -> MacrochemicalBalance:
+    formulas: dict[str, tuple[str | dict[str, float], float]] = {
+        "glucose": ("C6H12O6", 0.0),
+        "ammonium": ("NH4", 1.0),
+        "oxygen": ("O2", 0.0),
+        "bicarbonate": ("HCO3", -1.0),
+        "water": ("H2O", 0.0),
+        "proton": ("H", 1.0),
+        "biomass": ({"C": 1.0, "H": 1.8, "O": 0.5, "N": 0.2}, 0.0),
+    }
+    return MacrochemicalBalance(
+        name="aerobic glucose growth on ammonium",
+        species=tuple(
+            MacrochemicalSpecies(
+                name=name,
+                composition=_composition(formula),
+                charge=charge,
+                charge_source=ILLUSTRATIVE_SOURCE,
+                formation_gibbs=_energy(f"delta_f_G_{name}", ILLUSTRATIVE_GIBBS[name]),
+            )
+            for name, (formula, charge) in formulas.items()
+        ),
+        source=ILLUSTRATIVE_SOURCE,
+        thermodynamic_conditions=ILLUSTRATIVE_CONDITIONS,
+    )
+
+
+def test_heijnen_dissipation_for_glucose_is_236_kilojoule_per_cmol() -> None:
+    dissipation = heijnen_dissipation_per_cmol_biomass(carbon_atoms=6.0, degree_of_reduction_per_carbon=4.0)
+
+    assert dissipation.quantity.to("kilojoule / mole").magnitude == pytest.approx(236.0, abs=1.0)
+    assert dissipation.source == HEIJNEN_DISSIPATION_SOURCE
+    assert dissipation.validity_range is not None and "1 to 6 carbon atoms" in dissipation.validity_range
+    from_composition = heijnen_dissipation_from_composition(_composition("C6H12O6"), 0.0)
+    assert from_composition.quantity.magnitude == pytest.approx(dissipation.quantity.magnitude)
+
+
+def test_heijnen_dissipation_refuses_inputs_outside_the_transcribed_domain() -> None:
+    with pytest.raises(GrowthEnergeticsError, match="carbon_atoms 7.0 is outside"):
+        heijnen_dissipation_per_cmol_biomass(carbon_atoms=7.0, degree_of_reduction_per_carbon=4.0)
+    with pytest.raises(GrowthEnergeticsError, match="degree_of_reduction_per_carbon 8.5 is outside"):
+        heijnen_dissipation_per_cmol_biomass(carbon_atoms=1.0, degree_of_reduction_per_carbon=8.5)
+    with pytest.raises(GrowthEnergeticsError, match="no carbon"):
+        heijnen_dissipation_from_composition(_composition("NH4"), 1.0)
+
+
+def test_dissipation_yield_prediction_reproduces_the_audit_value() -> None:
+    balance = _aerobic_glucose_balance()
+    prediction = DissipationYieldPrediction.predict(
+        balance,
+        biomass_species="biomass",
+        substrate_species="glucose",
+        dissipation_per_cmol_biomass=heijnen_dissipation_from_composition(_composition("C6H12O6"), 0.0),
+        oxygen_species="oxygen",
+    )
+
+    assert prediction.yield_per_carbon == pytest.approx(0.669, rel=0.01)
+    assert prediction.yield_per_substrate == pytest.approx(6.0 * prediction.yield_per_carbon)
+    assert prediction.carbon_ceiling_per_substrate == pytest.approx(6.0)
+    assert prediction.oxygen_per_cmol_biomass == pytest.approx(-0.446, abs=0.002)
+    assert prediction.solution.reaction_gibbs().to("kilojoule / mole").magnitude == pytest.approx(-236.05, abs=0.05)
+    assert prediction.solution.coefficients["biomass"] == 1.0
+
+    data = prediction.to_dict()
+    assert data["maturity"] == HEIJNEN_DISSIPATION_MATURITY
+    assert data["assumptions"][0]["name"] == "heijnen_van_dijken_dissipation_correlation"
+    assert data["yield_per_carbon_units"] == "C-mol biomass / C-mol substrate"
+    assert "No rate" in data["limitations"]
+
+
+def test_dissipation_yield_prediction_refuses_bad_inputs() -> None:
+    balance = _aerobic_glucose_balance()
+    dissipation = heijnen_dissipation_from_composition(_composition("C6H12O6"), 0.0)
+
+    with pytest.raises(GrowthEnergeticsError, match="substrate_species 'ethanol' is not in balance"):
+        DissipationYieldPrediction.predict(
+            balance, biomass_species="biomass", substrate_species="ethanol", dissipation_per_cmol_biomass=dissipation
+        )
+    with pytest.raises(GrowthEnergeticsError, match="must differ"):
+        DissipationYieldPrediction.predict(
+            balance, biomass_species="glucose", substrate_species="glucose", dissipation_per_cmol_biomass=dissipation
+        )
+    with pytest.raises(GrowthEnergeticsError, match="finite and positive"):
+        DissipationYieldPrediction.predict(
+            balance,
+            biomass_species="biomass",
+            substrate_species="glucose",
+            dissipation_per_cmol_biomass=_energy("D_e", -236.0),
+        )
+    with pytest.raises(GrowthEnergeticsError, match="Both biomass and substrate must contain carbon"):
+        DissipationYieldPrediction.predict(
+            balance, biomass_species="biomass", substrate_species="ammonium", dissipation_per_cmol_biomass=dissipation
+        )
+
+
+def test_gibbs_yield_bound_with_a_carbon_limit_rejects_three_cmol_per_cmol() -> None:
+    bound = GibbsEnergyYieldBound(
+        catabolic_delta_gibbs=_energy("dG_cat", -478.0),
+        anabolic_delta_gibbs=_energy("dG_an", 100.0),
+    )
+    declared = Q_(3.0, "dimensionless")
+
+    unconstrained = bound.validate_yield(declared)
+    assert unconstrained.passed  # the Gibbs bound alone (4.78) knows nothing about atoms
+    assert unconstrained.details["binding_limit"] == "thermodynamic"
+    assert unconstrained.details["carbon_limit"] is None
+
+    limited = bound.validate_yield(declared, carbon_limit=Q_(1.0, "dimensionless"))
+    assert not limited.passed
+    assert limited.details["binding_limit"] == "carbon_conservation"
+    assert limited.details["maximum_yield"] == pytest.approx(1.0)
+    assert limited.details["thermodynamic_ceiling"] == pytest.approx(4.78)
+    assert "create carbon" in limited.message
+    with pytest.raises(GrowthEnergeticsError, match="carbon"):
+        bound.enforce_yield(declared, carbon_limit=Q_(1.0, "dimensionless"))
+    with pytest.raises(GrowthEnergeticsError, match="carbon_limit must be finite and positive"):
+        bound.validate_yield(declared, carbon_limit=Q_(0.0, "dimensionless"))
+    assert bound.validate_yield(Q_(0.6, "dimensionless"), carbon_limit=Q_(1.0, "dimensionless")).passed
+
+
+def test_biomass_yield_coefficient_accepts_values_above_one_and_refuses_negative() -> None:
+    accepted = biomass_yield_coefficient(
+        parameters=ParameterSet([parameter(name="yield", symbol="Y_B", value=1.2, units="dimensionless")]),
+        yield_symbol="Y_B",
+    )
+    assert accepted == pytest.approx(1.2)
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        biomass_yield_coefficient(
+            parameters=ParameterSet([parameter(name="yield", symbol="Y_B", value=-0.1, units="dimensionless")]),
+            yield_symbol="Y_B",
+        )
+
+
+def test_biomass_yield_coefficient_honours_a_caller_declared_maximum() -> None:
+    parameters = ParameterSet([parameter(name="yield", symbol="Y_B", value=1.2, units="dimensionless")])
+    with pytest.raises(ValueError, match="exceeds the caller's mass-closure maximum 1.0"):
+        biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=1.0)
+    assert biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=1.5) == pytest.approx(1.2)
+    with pytest.raises(ValueError, match="maximum for Y_B must be finite and positive"):
+        biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=0.0)
+    with pytest.raises(ValueError, match="maximum for Y_B must be finite and positive"):
+        biomass_yield_coefficient(parameters=parameters, yield_symbol="Y_B", maximum=float("nan"))
+
+
+def test_fungal_coupling_refuses_a_mass_yield_above_one_on_its_single_input_uptake() -> None:
+    # FungalCouplingModel's uptake reaction is {product: 1} -> {active_biomass: Y_B}
+    # in kilogram / second with no co-substrate, so Y_B > 1 would create mass.
+    from dataclasses import replace
+
+    from tests.test_coupling_compiled import _degradation_process
+    from tests.test_fungal_coupling import _model
+
+    model = _model()
+    fungus = model.fungus
+    overridden = make_fungal_parameter_set(
+        [
+            replace(item, value=1.2) if item.symbol == "Y_B" else item
+            for item in fungus.parameters
+        ]
+    )
+    capped = replace(model, fungus=replace(fungus, parameters=overridden))
+    with pytest.raises(ValueError, match="Y_B = 1.2 exceeds the caller's mass-closure maximum 1.0"):
+        capped.reactions()
+    with pytest.raises(ValueError, match="Y_B = 1.2 exceeds the caller's mass-closure maximum 1.0"):
+        capped.compiled_processes([_degradation_process()])
+    # The unmodified fixture (Y_B = 0.5) still assembles.
+    uptake = [reaction for reaction in model.reactions() if "uptake" in reaction.name]
+    assert len(uptake) == 1
+    assert uptake[0].products["active_biomass"] == pytest.approx(0.5)

@@ -76,13 +76,20 @@ nav:
       - User-supplied data: user-data.md
       - Outputs and artifacts: concepts/outputs.md
       - Compiled model core: compiled-core.md
+      - Solver controls: solver-controls.md
+      - Thermodynamic driving force: thermodynamic-driving-force.md
       - Organism physiology in the registry: organism-physiology.md
+      - Starvation physiology: starvation-physiology.md
+      - Black-box growth yield: black-box-yield.md
       - Environment response laws: environment-response.md
       - Six new mechanisms: bio004-mechanisms.md
       - Finite-enzyme adsorption: bio004-adsorption.md
       - Sugar uptake and oxygen: bio004-uptake-oxygen.md
       - Chain scission and peroxide: bio004-chain-peroxide.md
       - Spatial mycelium: spatial-mycelium.md
+      - Extended environment laws: environment-laws-extended.md
+      - Inhibition laws: inhibition-laws.md
+      - Surface area and site balance: surface-site-balance.md
   - Tutorials:
       - Full example notebooks: notebooks.md
       - Configured models: configured-models.md
