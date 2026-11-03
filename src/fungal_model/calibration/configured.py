@@ -208,10 +208,20 @@ def calibrate_configured_model(
     output_dir: str | Path | None = None,
     split: Mapping[str, Any] | None = None,
     max_nfev: int | None = None,
+    relative_difference_step: float | None = None,
     profile_grids: Mapping[str, Quantity] | None = None,
     profile_source: str | None = None,
 ) -> CalibrationResult:
-    """Fit configured-model parameters against a synthetic or literature dataset."""
+    """Fit configured-model parameters against a synthetic or literature dataset.
+
+    ``relative_difference_step`` is the relative finite-difference step of the
+    least-squares Jacobian in the linear space of the fitted parameters; ``None``
+    selects ``fungal_model.calibration.fitting.DEFAULT_RELATIVE_DIFFERENCE_STEP``.
+    The step used, its origin and the evaluation budget are recorded in
+    ``optimizer_metadata`` and therefore in ``optimizer_metadata.json`` and
+    ``calibration_record.json`` of a saved bundle. The same step is handed to the
+    optional profile-likelihood refits.
+    """
 
     source_config_path = Path(model_config).expanduser().resolve()
     source_config_data = _load_yaml_mapping(source_config_path)
@@ -286,6 +296,7 @@ def calibrate_configured_model(
         validation_indices=(),
         calibration_source=calibration_source,
         max_nfev=max_nfev,
+        relative_difference_step=relative_difference_step,
     )
     final_result = _run_with_parameters(run_config_data, source_config_path, fit_result.fitted_parameters, symbols)
     train_comparison = evaluate_model_against_dataset(
@@ -321,6 +332,7 @@ def calibrate_configured_model(
             result=fit_result, predict=predict, observations=observations,
             residual_scales=residual_scales, grids=profile_grids,
             source=profile_source or "", max_nfev=max_nfev,
+            relative_difference_step=relative_difference_step,
         ).to_dict()
     result = CalibrationResult(
         dataset_id=dataset_obj.dataset_id,

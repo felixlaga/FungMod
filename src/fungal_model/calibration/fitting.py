@@ -51,6 +51,65 @@ BOUND_PROXIMITY_RELATIVE_TOLERANCE = Parameter(
     measurement_method="software configuration",
 )
 
+DEFAULT_RELATIVE_DIFFERENCE_STEP = Parameter(
+    name="least-squares finite-difference relative step",
+    symbol="delta_fit_fd",
+    value=1.0e-3,
+    units="dimensionless",
+    uncertainty=None,
+    source=(
+        "Gelain 2020 model-criticism study, frozen-plan amendment 3 of 2026-10-05 "
+        "(data/benchmarks/gelain_2020_criticism/plan.json on branch "
+        "claude/gelain-criticism-plan, commits 085d44f and 70e599a, ledger entry "
+        "CRIT-003). With scipy's default step of about 1.5e-8 the forward differences "
+        "differentiated the adaptive ODE integrator's step noise: residual-derivative "
+        "norms of weakly entering constants were 15 times their converged values, the "
+        "trust region collapsed and every start stopped 1.3 percent above the minimum "
+        "COPASI found. A relative step of 1e-3 made the optimum stationary and "
+        "reproduced the cross-solver optimum. The Gelain v2 plan had declared the same "
+        "value as log_parameter_difference_step."
+    ),
+    confidence_level="testing",
+    notes=(
+        "Relative step of the forward-difference Jacobian in the linear parameter space "
+        "that fit_least_squares optimises: scipy perturbs each parameter by "
+        "delta_fit_fd times its current magnitude, so the step is one part in a "
+        "thousand of the value whatever its units. Appropriate when residuals come from "
+        "an adaptive integrator whose output is rough at the tolerance level; a smooth "
+        "analytic predictor would tolerate a smaller step, and a caller may declare one. "
+        "The step degenerates for a parameter whose value is exactly zero, where scipy "
+        "substitutes its machine-precision default. The value and its origin are "
+        "recorded in optimizer_metadata of every result."
+    ),
+    measurement_method="software configuration",
+)
+
+#: Description recorded with every fit of the space in which the difference step acts.
+FINITE_DIFFERENCE_PARAMETER_SPACE = (
+    "linear: each fitted parameter is perturbed by relative_difference_step times its "
+    "current magnitude, in its declared units"
+)
+
+
+def _resolve_relative_difference_step(step: float | None) -> tuple[float, str]:
+    """Return the finite-difference step to use and where it came from."""
+
+    if step is None:
+        value = float(cast(Quantity, DEFAULT_RELATIVE_DIFFERENCE_STEP.quantity).magnitude)
+        return value, "default DEFAULT_RELATIVE_DIFFERENCE_STEP"
+    if (
+        isinstance(step, bool)
+        or not isinstance(step, (int, float, np.integer, np.floating))
+        or not np.isfinite(step)
+        or not 0.0 < float(step) < 1.0
+    ):
+        raise ValueError(
+            "relative_difference_step must be a finite number strictly between 0 and 1; "
+            f"got {step!r}. It is the relative finite-difference step of the Jacobian "
+            "in linear parameter space."
+        )
+    return float(step), "caller"
+
 
 def _parameter_with_value(
     parameter: Parameter,
@@ -296,8 +355,23 @@ def fit_least_squares(
     residual_scales: Mapping[str, Quantity] | None = None,
     calibration_source: str,
     max_nfev: int | None = None,
+    relative_difference_step: float | None = None,
 ) -> LeastSquaresCalibrationResult:
     """Fit selected parameters by bounded least squares.
+
+    The optimiser works in the linear parameter space of the fittable
+    parameters' declared units and estimates the Jacobian by forward
+    differences. ``relative_difference_step`` is the relative step of those
+    differences (each parameter is perturbed by the step times its current
+    magnitude). When it is ``None`` the named constant
+    ``DEFAULT_RELATIVE_DIFFERENCE_STEP`` (1e-3) applies; it exists because
+    scipy's default of about 1.5e-8 differentiates the step noise of adaptive
+    ODE integrators. The step actually used, its origin, and the evaluation
+    budget actually passed to scipy are recorded in ``optimizer_metadata``
+    (``relative_difference_step``, ``relative_difference_step_origin``,
+    ``finite_difference_parameter_space``, ``max_nfev``, ``max_nfev_origin``).
+    ``max_nfev=None`` keeps scipy's documented budget of 100 evaluations per
+    fitted parameter, which is then recorded as the number used.
 
     Failed optimizer runs are returned as `success=False` reports rather than
     being hidden or converted into apparently valid fits.
@@ -307,6 +381,9 @@ def fit_least_squares(
         raise ProvenanceError("calibration_source is required.")
     if not fittable_parameters:
         raise ValueError("At least one fittable parameter is required.")
+    difference_step, difference_step_origin = _resolve_relative_difference_step(
+        relative_difference_step
+    )
     base_parameters.validate(require_values=True)
     fittables = tuple(fittable_parameters)
     for parameter in fittables:
@@ -321,7 +398,28 @@ def fit_least_squares(
         strict=True,
     )
     bounds = (np.asarray(lower_bounds, dtype=float), np.asarray(upper_bounds, dtype=float))
+    if max_nfev is None:
+        # scipy's documented default for the trust-region-reflective method.
+        effective_max_nfev: Any = 100 * len(fittables)
+        max_nfev_origin = "scipy default (100 evaluations per fitted parameter)"
+    else:
+        effective_max_nfev = max_nfev
+        max_nfev_origin = "caller"
+    optimizer_settings: dict[str, Any] = {
+        "max_nfev": effective_max_nfev,
+        "max_nfev_origin": max_nfev_origin,
+        "relative_difference_step": difference_step,
+        "relative_difference_step_origin": difference_step_origin,
+        "finite_difference_parameter_space": FINITE_DIFFERENCE_PARAMETER_SPACE,
+    }
     warnings: list[str] = []
+    for spec, value in zip(fittables, x0, strict=True):
+        if value == 0.0:
+            warnings.append(
+                f"Fittable parameter {spec.symbol} starts at exactly zero; the relative "
+                "finite-difference step degenerates there and scipy substitutes its "
+                "machine-precision default step until the parameter moves away from zero."
+            )
     validation_uses_training_data = validation_indices is None
     if validation_uses_training_data:
         warnings.append(
@@ -358,7 +456,8 @@ def fit_least_squares(
             objective,
             x0,
             bounds=bounds,
-            max_nfev=max_nfev,
+            max_nfev=effective_max_nfev,
+            diff_step=difference_step,
         )
     except Exception as exc:
         return LeastSquaresCalibrationResult(
@@ -375,7 +474,7 @@ def fit_least_squares(
             covariance=None,
             confidence_intervals=None,
             warnings=tuple(warnings),
-            optimizer_metadata={"exception_type": type(exc).__name__},
+            optimizer_metadata={"exception_type": type(exc).__name__, **optimizer_settings},
         )
 
     fitted_parameters = parameter_set_from_vector(optimizer_result.x)
@@ -439,6 +538,7 @@ def fit_least_squares(
             "status": int(optimizer_result.status),
             "optimality": float(optimizer_result.optimality),
             "active_mask": np.asarray(optimizer_result.active_mask, dtype=int).tolist(),
+            **optimizer_settings,
         },
     )
 
@@ -446,6 +546,8 @@ def fit_least_squares(
 __all__ = [
     "APPROXIMATE_NORMAL_95_Z",
     "BOUND_PROXIMITY_RELATIVE_TOLERANCE",
+    "DEFAULT_RELATIVE_DIFFERENCE_STEP",
+    "FINITE_DIFFERENCE_PARAMETER_SPACE",
     "FittableParameter",
     "LeastSquaresCalibrationResult",
     "PredictionFunction",

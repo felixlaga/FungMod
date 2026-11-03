@@ -56,6 +56,7 @@
         - FittableParameter
         - LeastSquaresCalibrationResult
         - fit_least_squares
+        - DEFAULT_RELATIVE_DIFFERENCE_STEP
         - CalibrationEvidenceContext
         - CalibrationAuditCriteria
         - CalibrationEvidenceAudit

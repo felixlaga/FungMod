@@ -141,6 +141,36 @@ exact culture and assay conditions, replicate structure, analytical uncertainty
 or a justified residual model, licenses, immutable model/data versions, and an
 external scientific review appropriate to the intended claim.
 
+## Finite-difference step
+
+`fit_least_squares` optimises in the linear space of the fitted parameters'
+declared units and estimates the Jacobian by forward differences. The relative
+step of those differences is an explicit argument, `relative_difference_step`:
+scipy perturbs each parameter by the step times its current magnitude. When the
+caller omits it, the named constant
+`fungal_model.calibration.DEFAULT_RELATIVE_DIFFERENCE_STEP` (1e-3) applies. The
+constant exists because scipy's default of about 1.5e-8 differentiates the step
+noise of adaptive ODE integrators: in the Gelain 2020 model-criticism study
+(frozen-plan amendment 3, ledger entry CRIT-003) the residual-derivative norms of
+weakly entering constants were 15 times their converged values at scipy's step,
+the trust region collapsed, and every start stopped 1.3 percent above the
+minimum that COPASI found; a relative step of 1e-3 made the optimum stationary.
+A smooth analytic predictor tolerates a smaller step and a caller may declare
+one; a parameter that starts at exactly zero has no relative step there, scipy
+substitutes its machine-precision default, and the result warns about it.
+
+Every `LeastSquaresCalibrationResult` records what was used in
+`optimizer_metadata`: `relative_difference_step`,
+`relative_difference_step_origin` (`caller` or
+`default DEFAULT_RELATIVE_DIFFERENCE_STEP`), `finite_difference_parameter_space`,
+`max_nfev` (the budget actually passed to scipy, 100 evaluations per fitted
+parameter when the caller passed none) and `max_nfev_origin`. Failed fits record
+the same settings next to `exception_type`. `calibrate_configured_model`
+accepts the same `relative_difference_step`, so `optimizer_metadata.json` and
+`calibration_record.json` of a saved bundle carry it, and hands it to the
+profile-likelihood refits. Fits recorded before this argument existed were
+produced with scipy's default step; none is stored in this repository.
+
 ## Profile likelihood
 
 `profile_likelihood(...)` supplements the local covariance approximation by
@@ -155,6 +185,10 @@ analysis/noise-model source; digitization scales do not establish this noise
 model. The inputs must reproduce the original training objective. Failed points
 remain explicit with null costs. Finite grids and local optima do not establish
 global identifiability, and no confidence endpoints are inferred from a grid edge.
+
+The nuisance refits use the finite-difference step recorded in the reference
+fit's `optimizer_metadata` unless `relative_difference_step` is passed; the
+report's `optimizer_settings` records the step, its origin and `max_nfev`.
 
 Configured calibration accepts `profile_grids` and `profile_source` and saves
 the report inside `optimizer_metadata.json`. It profiles training observations

@@ -144,7 +144,13 @@ from fungmod import uncertainty, calibration, transport
 - **Calibration** (`fungmod.calibration`): least-squares fitting
   (`fit_least_squares`, `FittableParameter`) and a publication-oriented
   **calibration evidence audit** (`audit_calibration_evidence`) whose software
-  pass never authorizes a publication claim.
+  pass never authorizes a publication claim. The fit's finite-difference step
+  is declared, not inherited from scipy: `relative_difference_step` sets the
+  relative step of the Jacobian in the linear parameter space, the named
+  constant `DEFAULT_RELATIVE_DIFFERENCE_STEP` (1e-3) applies when it is
+  omitted, and the step used, its origin and the evaluation budget are
+  recorded in `optimizer_metadata` of every result. See
+  [calibration evidence](calibration-evidence.md#finite-difference-step).
 - **Transport** (`fungmod.transport`): 1D and uniform-Cartesian 2D/3D
   finite-volume reaction–diffusion engines.
 

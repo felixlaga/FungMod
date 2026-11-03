@@ -26,6 +26,148 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CAL-001 Declared Finite-Difference Step For Least-Squares Calibration
+
+Date: 2026-10-06
+
+Status: complete. The public least-squares calibration API declares the
+finite-difference step of its Jacobian instead of inheriting scipy's default,
+and every result records the step and the evaluation budget actually used.
+
+Changed:
+
+- `calibration/fitting.py`: `fit_least_squares` takes
+  `relative_difference_step` (relative step of the forward-difference Jacobian
+  in the linear parameter space the optimiser works in; each parameter is
+  perturbed by the step times its magnitude). `None` selects the named
+  constant `DEFAULT_RELATIVE_DIFFERENCE_STEP`, a provenance-carrying
+  `Parameter` of 1e-3 whose source is the Gelain 2020 model-criticism
+  amendment 3 (ledger CRIT-003 on branch `claude/gelain-criticism-plan`,
+  commits 085d44f and 70e599a): at scipy's default of about 1.5e-8 the
+  differences picked up the adaptive integrator's step noise, derivative norms
+  of weakly entering constants were 15 times their converged values, the trust
+  region collapsed and the fit stopped 1.3 percent above COPASI's minimum. The
+  step is validated (finite, strictly between 0 and 1, `ValueError`
+  otherwise) and passed as `diff_step`. `max_nfev=None` is resolved to scipy's
+  documented 100 evaluations per fitted parameter and the resolved value is
+  passed and recorded. `optimizer_metadata` gains `relative_difference_step`,
+  `relative_difference_step_origin` (`caller` or
+  `default DEFAULT_RELATIVE_DIFFERENCE_STEP`),
+  `finite_difference_parameter_space`, `max_nfev` and `max_nfev_origin`, on
+  the exception path as well. A fittable parameter whose initial value is
+  exactly zero adds a warning, because the relative step degenerates there and
+  scipy substitutes its machine-precision default.
+- `calibration/profile.py`: `profile_likelihood` takes
+  `relative_difference_step`; when omitted the nuisance refits reuse the step
+  recorded in the reference fit's `optimizer_metadata`, so the profile is
+  computed with the optimiser that produced the reference. The report gains
+  `optimizer_settings` (step, origin, `max_nfev`); `schema_version` stays
+  `1.0.0` because the key is additive.
+- `calibration/configured.py`: `calibrate_configured_model` takes
+  `relative_difference_step` and hands it to the fit and to the profile; the
+  existing metadata spread puts it into `optimizer_metadata.json` and
+  `calibration_record.json` of a saved bundle.
+- `calibration/__init__.py` exports `DEFAULT_RELATIVE_DIFFERENCE_STEP`.
+- Docs: `docs/api.md` lists the constant; `docs/user-guide.md` names the
+  argument; `docs/calibration-evidence.md` gains a "Finite-difference step"
+  section and a profile note; `docs/release-notes.md` and `CHANGELOG.md`
+  record the change.
+
+Not changed: the research benchmarks (`research/gelain_culture.py`,
+`research/gelain_joint.py`) call scipy directly in log space with the
+`log_parameter_difference_step` of their frozen plans and are untouched; the
+Bayesian sampler is gradient-free; residual definitions, bounds handling,
+covariance and confidence-interval diagnostics, every model, registry record,
+dataset and frozen artifact.
+
+Tests added (`tests/test_calibration_difference_step.py`):
+
+- `test_declared_step_reaches_lower_cost_than_scipy_default_on_integrator_noise`:
+  artificial saturating loss dy/dt = -k y/(K+y) (1 + 0.3 sin 40t), LSODA at
+  rtol 1e-6 / atol 1e-9 (about 950 steps per solve), 24 observations with
+  deterministic pseudo-noise. From the start (2, 1) with the same objective,
+  bounds and budget, scipy's default step stops with cost 66 while the
+  declared step reaches 2.2e-3 and recovers k and K within 0.1 and 1.4
+  percent; the test asserts a factor of 10.
+- `test_scipy_default_step_differentiates_integrator_noise`: over six starts
+  the default-step Jacobian error against a tight central-difference reference,
+  summed over columns, is about 40 times the declared-step error (asserted: 5).
+- `test_default_step_and_budget_are_recorded_and_saved`,
+  `test_caller_step_and_budget_are_recorded`,
+  `test_failed_fit_still_records_optimizer_settings`: metadata keys on the
+  success, caller-declared and exception paths and in `fit_result.json`.
+- `test_invalid_difference_step_is_rejected` (0, 1, negative, nan, inf, bool,
+  string).
+- `test_zero_initial_value_degenerate_step_is_warned`.
+- `test_profile_reuses_reference_fit_step_and_records_it`: the refits receive
+  the reference fit's step, a caller override wins, and `optimizer_settings` is
+  in `to_dict()`.
+- `test_configured_calibration_records_step_and_hands_it_to_profile`:
+  `calibration_record.json`, `optimizer_metadata.json` and the embedded profile
+  carry the declared step.
+
+Commands run:
+
+- `ruff check src tests`: all checks passed.
+- `pyright --pythonpath /Users/felix/Documents/GitHub/FungMod/.venv/bin/python`:
+  0 errors. Plain `pyright` under the conda interpreter reports five
+  pre-existing `reportMissingImports` for `libsbml`/`libsedml` in
+  `standards/`, which are not installed there.
+- `pytest tests/test_calibration_difference_step.py tests/test_calibration.py
+  tests/test_profile_likelihood.py tests/test_calibration_evidence.py
+  tests/test_configured_synthetic_calibration.py
+  tests/test_calibration_config_contract.py`: 66 passed in 9.3 s.
+- `pytest tests/test_research_runner_guardrails.py
+  tests/test_canonical_fungmod_api.py tests/test_foundation_complete_gate.py
+  tests/test_guardrails_public_api.py tests/test_product_inhibition_examples.py
+  tests/test_source_provider_api.py`: 50 passed.
+- `PYTHONPATH=src python -m mkdocs build --strict` (venv): built in 1.4 s.
+  Without `PYTHONPATH` the venv's editable install resolves to the main
+  checkout and fails on `calibration.compiled_predictor`, unrelated to this
+  task.
+- `pytest` (full suite, conda interpreter): 1774 passed, 2 failed, 4 skipped
+  in 6 min 45 s. The two failures are environmental: `test_packaged_distribution`
+  needs the `build` module and `test_release_notebooks` needs `nbformat`,
+  neither installed in that interpreter; both modules pass under the project
+  venv (15 passed). The four skips are the optional `standards` extra.
+
+Scientific impact: no model, registry value, dataset or recorded result
+changes. Every fit through `fit_least_squares` now differentiates with a
+relative step of 1e-3 instead of about 1.5e-8. Smooth analytic predictors
+reach the same optimum (the existing analytical tests pass to their
+tolerances); objectives evaluated through adaptive integrators that previously
+stalled on step noise may now reach lower costs. No result produced through
+this API is stored in the repository: no `fit_result.json`,
+`optimizer_metadata.json` or `calibration_record.json` is committed, and
+`scripts/run_alvarez_gonzalez_2022_stage2_calibration.py` writes to a
+caller-chosen output directory whose contents are not versioned. The Gelain
+benchmarks already used a declared 1e-3 log-space step and are unaffected.
+
+Backward compatibility: all new arguments are keywords defaulting to `None`;
+`optimizer_metadata` and the profile report gain keys; `ProfileLikelihoodResult`
+gains a defaulted field. Callers that relied on scipy's default step now get
+the documented step and can see it in their records.
+
+Ambiguities and observations:
+
+- Observed while writing the zero-start test: a parameter that starts at
+  exactly zero *on a bound* is shifted by scipy to 1e-10 inside the bounds and
+  the initial trust region radius becomes 1e-10, so the fit can terminate on
+  `ftol` at about zero with `success=True`. This is scipy behaviour independent
+  of the difference step; the new warning covers the degenerate step only. A
+  guard for zero-on-bound starts is a candidate follow-up.
+- The default value rests on one recorded study and the general argument that
+  the step should exceed the square root of the integrator tolerance; a
+  predictor accurate to machine precision may declare a smaller step.
+- The constant's `source` points at the criticism branch; when CRIT-003 merges
+  it should point at the merged plan path.
+
+Risk: low to medium. The numerical change affects every API fit, is recorded
+in every result, and is covered by a test that reproduces the failure mode.
+
+Next task: merge after the criticism branch (CRIT-003) and re-point the
+constant's source; consider the zero-on-bound guard.
+
 ## CI-001 Cross-Platform Quality-Gate Repair
 
 Date: 2026-10-05

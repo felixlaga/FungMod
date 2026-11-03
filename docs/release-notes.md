@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `fit_least_squares`, `calibrate_configured_model` and `profile_likelihood`
+  declare the finite-difference step of the least-squares Jacobian
+  (`relative_difference_step`, default `DEFAULT_RELATIVE_DIFFERENCE_STEP` =
+  1e-3 relative in linear parameter space) instead of inheriting scipy's
+  1.5e-8, and record the step, its origin and the evaluation budget in
+  `optimizer_metadata`. Fits that stalled on integrator step noise may now
+  reach lower costs.
 - Fixed mixed-unit SBML trajectories, preserved PEtab training/validation/holdout separation, and rejected missing or zero export noise scales. Packaged PEtab examples resolve outside the checkout. Regenerate older affected exports.
 - Fixed thermodynamic scalar typing and pinned the checked Pyright version for local/CI parity.
 - Consolidated exploratory inhibition runners through shared unit-aware package integration and the configured inhibition kernel (FD-008 resolved).

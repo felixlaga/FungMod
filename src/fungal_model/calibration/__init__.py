@@ -17,6 +17,7 @@ from .evidence import (
 from .fitting import (
     APPROXIMATE_NORMAL_95_Z,
     BOUND_PROXIMITY_RELATIVE_TOLERANCE,
+    DEFAULT_RELATIVE_DIFFERENCE_STEP,
     FittableParameter,
     LeastSquaresCalibrationResult,
     fit_least_squares,
@@ -86,6 +87,7 @@ __all__ = [
     "run_ensemble_sampler",
     "sample_posterior",
     "BOUND_PROXIMITY_RELATIVE_TOLERANCE",
+    "DEFAULT_RELATIVE_DIFFERENCE_STEP",
     "CalibrationResult",
     "CalibrationAuditCriteria",
     "CalibrationEvidenceAudit",

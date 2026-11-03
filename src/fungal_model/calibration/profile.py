@@ -8,7 +8,7 @@ cannot prove global identifiability or automatically define confidence limits.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -16,7 +16,7 @@ import numpy as np
 
 from fungal_model.calibration.fitting import (
     LeastSquaresCalibrationResult, PredictionFunction, _build_replacements,
-    _replace_parameters, fit_least_squares,
+    _replace_parameters, _resolve_relative_difference_step, fit_least_squares,
 )
 from fungal_model.calibration.residuals import residuals_between
 from fungal_model.core.provenance import ProvenanceError, has_text
@@ -31,6 +31,9 @@ class ProfileLikelihoodResult:
     source: str
     complete: bool
     warnings: tuple[str, ...]
+    #: Settings of the nuisance refits: the finite-difference step, where it came
+    #: from, and the evaluation budget handed to each refit.
+    optimizer_settings: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -38,6 +41,7 @@ class ProfileLikelihoodResult:
             'parameter_units': dict(self.parameter_units),
             'reference_chi_squared': self.reference_chi_squared, 'source': self.source,
             'complete': self.complete, 'warnings': list(self.warnings),
+            'optimizer_settings': dict(self.optimizer_settings),
             'method': 'fixed-parameter grid with bounded local nuisance reoptimization',
             'noise_model': 'independent Gaussian errors with fixed supplied observation standard deviations',
             'claim_boundary': 'Conditional on the supplied noise model and grid; no global identifiability or automatic confidence-limit claim.',
@@ -56,7 +60,7 @@ def profile_likelihood(
     *, result: LeastSquaresCalibrationResult, predict: PredictionFunction,
     observations: Mapping[str, Quantity], residual_scales: Mapping[str, Quantity],
     grids: Mapping[str, Quantity], source: str, train_indices: Sequence[int] | None = None,
-    max_nfev: int | None = None,
+    max_nfev: int | None = None, relative_difference_step: float | None = None,
 ) -> ProfileLikelihoodResult:
     """Profile the original fit's training objective on explicit unit-bearing grids.
 
@@ -64,6 +68,12 @@ def profile_likelihood(
     scales as independent Gaussian standard deviations. Failed points remain
     explicit with null costs; they are never replaced by successful neighbours.
     Validation observations must not be passed as training observations.
+
+    The nuisance refits use ``relative_difference_step`` as their finite-difference
+    step. When it is ``None`` they reuse the step recorded in the reference fit's
+    ``optimizer_metadata`` so that the profile is computed with the optimiser that
+    produced the reference; the step used and its origin are recorded in
+    ``optimizer_settings``.
     """
     if not has_text(source):
         raise ProvenanceError('Profile likelihood requires a source for its analysis and noise assumptions.')
@@ -71,6 +81,13 @@ def profile_likelihood(
         raise ValueError('Profile likelihood requires a successful reference fit.')
     if not grids or set(observations) != set(residual_scales):
         raise ValueError('Profiles require a nonempty grid and explicit scales for every observable.')
+    if relative_difference_step is None and result.optimizer_metadata.get('relative_difference_step') is not None:
+        difference_step, step_origin = (float(result.optimizer_metadata['relative_difference_step']),
+                                        'reference fit optimizer_metadata')
+    else:
+        difference_step, step_origin = _resolve_relative_difference_step(relative_difference_step)
+    optimizer_settings = {'relative_difference_step': difference_step,
+                          'relative_difference_step_origin': step_origin, 'max_nfev': max_nfev}
     baseline = residuals_between(predict(result.fitted_parameters), observations,
                                  indices=train_indices, residual_scales=residual_scales).flattened_scaled()
     original = result.training_residuals.flattened_scaled()
@@ -107,7 +124,8 @@ def profile_likelihood(
                     fit = fit_least_squares(base_parameters=fixed, fittable_parameters=nuisance,
                         predict=predict, observations=observations, train_indices=train_indices,
                         validation_indices=(), residual_scales=residual_scales,
-                        calibration_source=source, max_nfev=max_nfev)
+                        calibration_source=source, max_nfev=max_nfev,
+                        relative_difference_step=difference_step)
                     if not fit.success or fit.training_residuals is None:
                         raise ValueError(fit.message)
                     vector = fit.training_residuals.flattened_scaled()
@@ -131,4 +149,5 @@ def profile_likelihood(
         profiles[symbol] = points
     if not complete:
         warnings.append('Some profile points failed; the profile is incomplete.')
-    return ProfileLikelihoodResult(profiles, units, reference, source, complete, tuple(warnings))
+    return ProfileLikelihoodResult(profiles, units, reference, source, complete, tuple(warnings),
+                                   optimizer_settings)

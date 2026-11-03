@@ -138,6 +138,23 @@ All notable public releases of FungMod are documented here.
 
 ### Changed
 
+- `fit_least_squares` declares its finite-difference step. The new keyword
+  `relative_difference_step` is the relative step of the forward-difference
+  Jacobian in the linear parameter space the optimiser works in; when omitted,
+  the named constant `DEFAULT_RELATIVE_DIFFERENCE_STEP` (1e-3, justified by
+  the Gelain 2020 model-criticism amendment 3, CRIT-003) applies instead of
+  scipy's default of about 1.5e-8, which differentiates the step noise of
+  adaptive ODE integrators. Every result records `relative_difference_step`,
+  `relative_difference_step_origin`, `finite_difference_parameter_space`,
+  `max_nfev` (the budget actually passed to scipy) and `max_nfev_origin` in
+  `optimizer_metadata`, including failed fits; a parameter that starts at
+  exactly zero triggers a warning because the relative step degenerates there.
+  `calibrate_configured_model` accepts and records the same keyword and hands
+  it to `profile_likelihood`, whose nuisance refits otherwise reuse the
+  reference fit's recorded step and which now reports `optimizer_settings`.
+  Numerical behaviour of fits changes only through the step: fits whose
+  trust region collapsed on integrator noise may now reach lower costs. No
+  result produced through this API is stored in the repository.
 - `EnvironmentGrid` runtime cases and the virtual-experiment registry overlay
   no longer assert that temperature and pH are inert; their status is the
   status before assembly and the assembled case decides. Metadata-only
