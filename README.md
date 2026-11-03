@@ -163,9 +163,10 @@ each implementation:
 - 1D plus uniform Cartesian 2D/3D finite-volume reaction-diffusion with explicit
   per-axis boundary conditions,
 - universal substrate metadata interfaces with PET, cellulose, lignin, starch, and chitin substrate classes,
-- least-squares calibration utilities with train/validation residual reporting
-  plus a publication-oriented evidence audit that never authorizes a
-  publication claim,
+- least-squares calibration utilities with a declared, recorded
+  finite-difference step, train/validation residual reporting and a
+  publication-oriented evidence audit that never authorizes a publication
+  claim,
 - Monte Carlo uncertainty propagation, local sensitivity analysis, and
   variance-based global sensitivity with first- and total-order indices,
 - process-centered assembly scaffolding with structured missing-process,

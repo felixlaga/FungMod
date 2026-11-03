@@ -26,6 +26,113 @@ Status key:
 - `not started`: no new long-term-roadmap implementation exists yet.
 - `blocked`: implementation needs a decision, dependency, or sourced data.
 
+## CAL-003 Declared Finite-Difference Step In The Public Least-Squares API
+
+Date: 2026-10-06
+
+Status: complete. The public calibration API declares the relative
+finite-difference step of its Jacobian instead of relying on scipy's
+machine-epsilon default. This supersedes the design of CAL-002 on the
+unmerged branch `claude/least-squares-diff-step`, which added the same
+keyword but kept scipy's default when it was omitted; that entry is not in
+this ledger because its branch has not merged.
+
+Why: the Gelain 2020 model-criticism study (CRIT-003, recorded on the
+`claude/stage-a-optimiser` chain; amendment 3 of
+`data/benchmarks/gelain_2020_criticism/plan.json`) found that scipy's default
+step of about 1.5e-8 differentiates the adaptive ODE integrator's step noise:
+residual-derivative norms of weakly entering parameters were fifteen times
+their converged values, the trust region collapsed and the fit stopped 1.3
+percent above the minimum COPASI found. A log-space step of 1e-3 fixed it.
+The research benchmarks (`research/gelain_culture.py`, `gelain_joint.py`,
+`gelain_criticism.py`) read `log_parameter_difference_step` from their frozen
+plans; `fit_least_squares` passed nothing.
+
+Changed:
+
+- `calibration/fitting.py`: `fit_least_squares(..., diff_step=None)`. The
+  optimizer works in linear parameter space (each parameter's numeric value in
+  its declared units), so the step is scipy's relative step there: each
+  parameter is perturbed by `diff_step` times its current absolute value.
+  `None` selects the named constant `DEFAULT_RELATIVE_DIFFERENCE_STEP`
+  (`delta_fit_rel`, 1e-3, a `Parameter` whose source and notes carry the
+  CRIT-003 justification). `resolve_difference_step` refuses non-finite
+  values and values outside the open interval (0, 1). `optimizer_metadata`
+  gains `method`, `max_nfev` (the budget in force; scipy's 100 evaluations
+  per fitted parameter when none was given) with `max_nfev_origin`,
+  `finite_difference_step` with `finite_difference_step_origin` (`caller` or
+  `delta_fit_rel`) and `finite_difference_step_definition`, on both the
+  success and the exception path, so `fit_result.json` carries them. A
+  parameter whose initial or fitted value is exactly zero records a warning
+  that scipy substituted its machine-epsilon absolute step there, because a
+  relative step is undefined at zero.
+- `calibration/configured.py`: `calibrate_configured_model(...,
+  diff_step=None)` threads the step to the fit and to the profile refits; the
+  metadata lands in `optimizer_metadata.json` and `calibration_record.json`.
+- `calibration/profile.py`: `profile_likelihood(..., diff_step=None)` uses
+  the caller's step, else the step recorded in the reference fit's
+  `optimizer_metadata`, else the named default, and records it with
+  `max_nfev` under `nuisance_optimizer` (report schema `1.1.0`).
+- `calibration/__init__.py` exports `DEFAULT_RELATIVE_DIFFERENCE_STEP` and
+  `resolve_difference_step`; `docs/api.md` lists them.
+- Docs: `docs/calibration-evidence.md` gains the section "Finite-difference
+  step of the Jacobian"; README capability bullet; `CHANGELOG.md`.
+
+Not changed: scipy's stopping tolerances (`ftol`, `xtol`, `gtol` stay at
+scipy's 1e-8 and are not yet declared or recorded); the research benchmarks
+and their frozen plans; every registry record, dataset and recorded result.
+
+Tests: `tests/test_calibration.py` (artificial stiff pool chain integrated
+by LSODA at rtol 1e-3 and atol 1e-6 from the midpoint of the bounds: scipy's
+default step, reproduced exactly by passing the square root of machine
+epsilon with every bound at or above one, stops on the step tolerance at
+cost 5.6e-4 while the declared step reaches 3.1e-8 with a smaller projected
+gradient and recovers three of the four artificial constants within 5
+percent; the default is the named constant and is recorded with its origin
+and the budget in the result and in `fit_result.json`; a caller step and
+budget are used and recorded; 0, 1, negative, NaN, infinite and boolean
+steps refuse; a zero-valued initial parameter records the warning; the
+exception path records the step), `tests/test_configured_synthetic_calibration.py`
+(default and caller steps recorded in the bundle files and threaded into the
+profile's `nuisance_optimizer`; an invalid step refuses),
+`tests/test_profile_likelihood.py` (the profile reuses the reference fit's
+step, a caller override wins, a reference without a recorded step falls back
+to the named default, the saved report carries `nuisance_optimizer`).
+
+Commands: `ruff check src tests` passed; `pyright` 0 errors in
+`src/fungal_model/calibration`, and 5 pre-existing `reportMissingImports`
+errors in `standards/` for the optional `libsbml`/`libsedml` packages, which
+are not installed in this environment; `pytest` on `test_calibration.py`,
+`test_profile_likelihood.py`, `test_calibration_evidence.py`,
+`test_configured_synthetic_calibration.py`, `test_calibration_config_contract.py`,
+`test_bayesian_calibration.py`, `test_research_runner_guardrails.py` and
+`test_guardrails_public_api.py`: 88 passed. `mkdocs build --strict` could not
+run: mkdocs is not installed in this environment.
+
+Scientific impact: fits through `fit_least_squares`,
+`calibrate_configured_model` and `profile_likelihood` now differentiate with a
+relative step of 1e-3 instead of 1.5e-8 and may stop at a lower cost than
+before when the predictions come from an adaptive integrator; on analytic
+models the fitted values agree to the optimizer tolerances. No recorded result
+in the repository was produced through these functions: the only script that
+calls them (`scripts/run_alvarez_gonzalez_2022_stage2_calibration.py`) writes
+to the ignored `outputs/` directory, and the Gelain benchmarks use their own
+plan-declared steps. Nothing was regenerated.
+
+Backward compatibility: new keyword arguments only; `LeastSquaresCalibrationResult`
+and `ProfileLikelihoodResult` keep their fields (the profile result gains an
+optional `nuisance_optimizer` field with an empty default); `optimizer_metadata`
+gains keys; the profile report schema moves from `1.0.0` to `1.1.0`. Code that
+relied on scipy's default step now gets 1e-3 and a recorded origin.
+
+Ambiguities: the step is relative, so a parameter crossing exactly zero during
+the search is only detected at the initial and fitted points; a problem whose
+natural scale is far from the parameter magnitude may want a caller-declared
+step. Risk: low.
+
+Next task: declare and record `ftol`, `xtol` and `gtol` the same way, and
+merge this with CAL-002 when `claude/least-squares-diff-step` lands.
+
 ## CI-001 Cross-Platform Quality-Gate Repair
 
 Date: 2026-10-05

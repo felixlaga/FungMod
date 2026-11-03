@@ -17,9 +17,11 @@ from .evidence import (
 from .fitting import (
     APPROXIMATE_NORMAL_95_Z,
     BOUND_PROXIMITY_RELATIVE_TOLERANCE,
+    DEFAULT_RELATIVE_DIFFERENCE_STEP,
     FittableParameter,
     LeastSquaresCalibrationResult,
     fit_least_squares,
+    resolve_difference_step,
 )
 from .residuals import (
     CalibrationResiduals,
@@ -112,7 +114,9 @@ __all__ = [
     "ValidationRelationship",
     "audit_calibration_evidence",
     "calibrate_configured_model",
+    "DEFAULT_RELATIVE_DIFFERENCE_STEP",
     "fit_least_squares",
+    "resolve_difference_step",
     "residuals_between",
     "sequential_train_validation_split",
 ]

@@ -5,7 +5,9 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from fungal_model.calibration import FittableParameter, fit_least_squares, profile_likelihood
+from fungal_model.calibration import (
+    DEFAULT_RELATIVE_DIFFERENCE_STEP, FittableParameter, fit_least_squares, profile_likelihood,
+)
 from fungal_model.core.parameters import Parameter, ParameterSet
 from fungal_model.core.units import Q_
 
@@ -74,3 +76,33 @@ def test_profile_rejects_invalid_context(case):
     with pytest.raises(ValueError):
         profile_likelihood(result=fit, predict=predict, observations=observations,
             residual_scales=scales, grids=grids, source='Artificial example')
+
+
+def test_profile_reuses_reference_fit_difference_step_unless_overridden(tmp_path):
+    fit, predict, observations, scales = fixture()
+    common = dict(predict=predict, observations=observations, residual_scales=scales,
+                  grids={'a': Q_([1, 2], 'dimensionless')}, source='Artificial example')
+
+    inherited = profile_likelihood(result=fit, **common)
+    assert inherited.complete
+    assert inherited.nuisance_optimizer['finite_difference_step'] == fit.optimizer_metadata['finite_difference_step'] == 1e-3
+    assert inherited.nuisance_optimizer['finite_difference_step_origin'] == 'reference fit optimizer_metadata'
+    assert inherited.nuisance_optimizer['max_nfev'] is None
+    assert inherited.nuisance_optimizer['max_nfev_origin'].startswith('scipy default')
+
+    overridden = profile_likelihood(result=fit, **common, diff_step=5e-4, max_nfev=30)
+    assert overridden.nuisance_optimizer == {
+        'method': 'trf', 'max_nfev': 30, 'max_nfev_origin': 'caller',
+        'finite_difference_step': 5e-4, 'finite_difference_step_origin': 'caller',
+    }
+    saved = json.loads(overridden.save(tmp_path).read_text())
+    assert saved['schema_version'] == '1.1.0'
+    assert saved['nuisance_optimizer']['finite_difference_step'] == 5e-4
+
+    bare = replace(fit, optimizer_metadata={})
+    fallback = profile_likelihood(result=bare, **common)
+    assert fallback.nuisance_optimizer['finite_difference_step'] == DEFAULT_RELATIVE_DIFFERENCE_STEP.value
+    assert fallback.nuisance_optimizer['finite_difference_step_origin'] == DEFAULT_RELATIVE_DIFFERENCE_STEP.symbol
+
+    with pytest.raises(ValueError, match='diff_step'):
+        profile_likelihood(result=fit, **common, diff_step=1.0)

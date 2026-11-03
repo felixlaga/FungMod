@@ -24,6 +24,46 @@ Approximate normal confidence intervals are not clipped to optimizer bounds.
 An interval extending outside those bounds produces an explicit warning that
 the local approximation may be unsuitable.
 
+## Finite-difference step of the Jacobian
+
+`fit_least_squares(...)` optimizes in linear parameter space: each fitted
+parameter is its numeric value in its declared units, bounded by its
+`FittableParameter`. scipy's trust-region reflective method approximates the
+Jacobian by forward differences, and the relative step of those differences is
+declared rather than left to scipy. `diff_step` perturbs each parameter by that
+fraction of its current absolute value; `None` selects the named constant
+`DEFAULT_RELATIVE_DIFFERENCE_STEP` (1e-3), whose `source` and `notes` carry
+its justification. scipy's own default, the square root of machine epsilon
+(about 1.5e-8), differentiates the step noise of an adaptive ODE integrator. In
+the Gelain 2020 model-criticism study (ledger entry CRIT-003) the residual
+derivatives of weakly entering parameters came out fifteen times their
+converged values, the trust region collapsed and the fit stopped 1.3 percent
+above the minimum that COPASI found; a relative step of 1e-3 removed the
+problem, and that is the value the public API now declares. The test
+`tests/test_calibration.py` reproduces the failure on an artificial stiff pool
+chain integrated by LSODA at a relative tolerance of 1e-3: scipy's step stops at
+a cost orders of magnitude above the declared step's.
+
+The step in force, its origin (`caller` or the constant's symbol
+`delta_fit_rel`), the evaluation budget `max_nfev` in force and its origin are
+recorded in `optimizer_metadata`, so `fit_result.json`,
+`optimizer_metadata.json` and `calibration_record.json` state them.
+`calibrate_configured_model(..., diff_step=...)` passes the step to the fit and
+to the profile-likelihood nuisance refits. `profile_likelihood(...)` otherwise
+reuses the step recorded in its reference fit, so that the profile reoptimizes
+with the optimizer that produced the reference, and reports what it used under
+`nuisance_optimizer`.
+
+Choose a smaller step only when the predictions are smooth to well below it,
+for example an analytic model or an integrator run at tolerances far tighter
+than the step, and a larger one when the integrator tolerances are looser than
+1e-3. Values outside the open interval (0, 1) are refused. A relative step is
+undefined for a parameter whose value is exactly zero; scipy then substitutes
+its machine-epsilon absolute step for that parameter and the fit records a
+warning naming it. A fit recorded before the step was declared may stop at a
+different, usually higher, cost than a refit with the declared step; the
+recorded step says which optimizer produced a given result.
+
 The research runners report descriptive residuals and convergence diagnostics.
 They do not declare a mechanism required or falsified from a training-error
 threshold. Cross-source summary schema `2.0.0` removes the previous

@@ -7,7 +7,11 @@ from dataclasses import replace
 import pytest
 
 from fungal_model import run_configured_model
-from fungal_model.calibration import ConfiguredCalibrationError, calibrate_configured_model
+from fungal_model.calibration import (
+    DEFAULT_RELATIVE_DIFFERENCE_STEP,
+    ConfiguredCalibrationError,
+    calibrate_configured_model,
+)
 from fungal_model.core.units import Q_
 from fungal_model.data import (
     GaussianNoise,
@@ -445,3 +449,44 @@ def test_configured_profile_is_saved_with_training_only_objective(tmp_path):
     assert profile['complete']
     assert len(profile['profiles']['k_ab']) == 3
     assert json.loads((tmp_path/'optimizer_metadata.json').read_text())['profile_likelihood'] == profile
+
+
+def test_configured_calibration_records_and_threads_the_difference_step(tmp_path: Path) -> None:
+    dataset = _generated_dataset(tmp_path)
+    common = dict(
+        model_config=MODEL_CONFIG, dataset=dataset, parameter_symbols=["k_ab"], observable_mapping=_mapping(),
+        initial_guess={"k_ab": 0.03}, bounds={"k_ab": (0.0, 1.0)},
+        split={"method": "by_time", "train_fraction": 0.7, "validation_fraction": 0.3},
+    )
+
+    default = calibrate_configured_model(**common, output_dir=tmp_path / "default")
+    assert default.success
+    assert default.optimizer_metadata["finite_difference_step"] == DEFAULT_RELATIVE_DIFFERENCE_STEP.value
+    assert default.optimizer_metadata["finite_difference_step_origin"] == DEFAULT_RELATIVE_DIFFERENCE_STEP.symbol
+    assert default.optimizer_metadata["max_nfev"] == 100
+    saved = json.loads((tmp_path / "default" / "optimizer_metadata.json").read_text(encoding="utf-8"))
+    assert saved["finite_difference_step"] == 1.0e-3
+    assert saved["finite_difference_step_origin"] == "delta_fit_rel"
+    record = json.loads((tmp_path / "default" / "calibration_record.json").read_text(encoding="utf-8"))
+    assert record["optimizer_metadata"]["finite_difference_step"] == 1.0e-3
+
+    declared = calibrate_configured_model(
+        **common, diff_step=2.0e-3, max_nfev=50,
+        profile_grids={"k_ab": Q_([0.05, 0.1, 0.15], "1/second")},
+        profile_source="Artificial declared independent Gaussian observation noise",
+        output_dir=tmp_path / "declared",
+    )
+    assert declared.success
+    assert declared.optimizer_metadata["finite_difference_step"] == 2.0e-3
+    assert declared.optimizer_metadata["finite_difference_step_origin"] == "caller"
+    assert declared.optimizer_metadata["max_nfev"] == 50
+    assert declared.optimizer_metadata["max_nfev_origin"] == "caller"
+    nuisance = declared.optimizer_metadata["profile_likelihood"]["nuisance_optimizer"]
+    assert nuisance["finite_difference_step"] == 2.0e-3
+    assert nuisance["finite_difference_step_origin"] == "caller"
+    assert nuisance["max_nfev"] == 50
+    saved = json.loads((tmp_path / "declared" / "optimizer_metadata.json").read_text(encoding="utf-8"))
+    assert saved["profile_likelihood"]["nuisance_optimizer"]["finite_difference_step"] == 2.0e-3
+
+    with pytest.raises(ValueError, match="diff_step"):
+        calibrate_configured_model(**common, diff_step=0.0)

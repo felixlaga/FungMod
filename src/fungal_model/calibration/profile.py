@@ -8,19 +8,22 @@ cannot prove global identifiability or automatically define confidence limits.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
 
 from fungal_model.calibration.fitting import (
-    LeastSquaresCalibrationResult, PredictionFunction, _build_replacements,
-    _replace_parameters, fit_least_squares,
+    LeastSquaresCalibrationResult, PredictionFunction, SCIPY_TRF_DEFAULT_EVALUATIONS_PER_PARAMETER,
+    SETTING_ORIGIN_CALLER, _build_replacements, _replace_parameters, fit_least_squares, resolve_difference_step,
 )
 from fungal_model.calibration.residuals import residuals_between
 from fungal_model.core.provenance import ProvenanceError, has_text
 from fungal_model.core.units import Quantity, assert_compatible
+
+#: Origin recorded when the profile reuses the finite-difference step of the reference fit.
+STEP_ORIGIN_REFERENCE_FIT = "reference fit optimizer_metadata"
 
 
 @dataclass(frozen=True)
@@ -31,13 +34,15 @@ class ProfileLikelihoodResult:
     source: str
     complete: bool
     warnings: tuple[str, ...]
+    nuisance_optimizer: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            'schema_version': '1.0.0', 'profiles': dict(self.profiles),
+            'schema_version': '1.1.0', 'profiles': dict(self.profiles),
             'parameter_units': dict(self.parameter_units),
             'reference_chi_squared': self.reference_chi_squared, 'source': self.source,
             'complete': self.complete, 'warnings': list(self.warnings),
+            'nuisance_optimizer': dict(self.nuisance_optimizer),
             'method': 'fixed-parameter grid with bounded local nuisance reoptimization',
             'noise_model': 'independent Gaussian errors with fixed supplied observation standard deviations',
             'claim_boundary': 'Conditional on the supplied noise model and grid; no global identifiability or automatic confidence-limit claim.',
@@ -52,11 +57,22 @@ class ProfileLikelihoodResult:
         return path
 
 
+def _nuisance_difference_step(result: LeastSquaresCalibrationResult, diff_step: float | None) -> tuple[float, str]:
+    """Step for the nuisance refits: the caller's, else the reference fit's recorded step, else the named default."""
+    if diff_step is not None:
+        return resolve_difference_step(diff_step)
+    recorded = result.optimizer_metadata.get('finite_difference_step')
+    if isinstance(recorded, (int, float)) and not isinstance(recorded, bool):
+        step, _ = resolve_difference_step(float(recorded))
+        return step, STEP_ORIGIN_REFERENCE_FIT
+    return resolve_difference_step(None)
+
+
 def profile_likelihood(
     *, result: LeastSquaresCalibrationResult, predict: PredictionFunction,
     observations: Mapping[str, Quantity], residual_scales: Mapping[str, Quantity],
     grids: Mapping[str, Quantity], source: str, train_indices: Sequence[int] | None = None,
-    max_nfev: int | None = None,
+    max_nfev: int | None = None, diff_step: float | None = None,
 ) -> ProfileLikelihoodResult:
     """Profile the original fit's training objective on explicit unit-bearing grids.
 
@@ -64,11 +80,31 @@ def profile_likelihood(
     scales as independent Gaussian standard deviations. Failed points remain
     explicit with null costs; they are never replaced by successful neighbours.
     Validation observations must not be passed as training observations.
+
+    ``max_nfev`` and ``diff_step`` govern the nuisance refits at each grid point.
+    ``diff_step`` is the relative finite-difference step in linear parameter
+    space; ``None`` reuses the step recorded in the reference fit's
+    ``optimizer_metadata`` so the profile reoptimizes with the optimizer that
+    produced the reference, falling back to ``DEFAULT_RELATIVE_DIFFERENCE_STEP``
+    when the reference carries none. The step and its origin are recorded under
+    ``nuisance_optimizer`` in the report.
     """
     if not has_text(source):
         raise ProvenanceError('Profile likelihood requires a source for its analysis and noise assumptions.')
     if not result.success or result.training_residuals is None:
         raise ValueError('Profile likelihood requires a successful reference fit.')
+    step, step_origin = _nuisance_difference_step(result, diff_step)
+    nuisance_optimizer: dict[str, Any] = {
+        'method': 'trf',
+        'max_nfev': max_nfev,
+        'max_nfev_origin': (
+            SETTING_ORIGIN_CALLER if max_nfev is not None
+            else (f'scipy default for method trf: {SCIPY_TRF_DEFAULT_EVALUATIONS_PER_PARAMETER} '
+                  'evaluations per nuisance parameter')
+        ),
+        'finite_difference_step': step,
+        'finite_difference_step_origin': step_origin,
+    }
     if not grids or set(observations) != set(residual_scales):
         raise ValueError('Profiles require a nonempty grid and explicit scales for every observable.')
     baseline = residuals_between(predict(result.fitted_parameters), observations,
@@ -107,7 +143,7 @@ def profile_likelihood(
                     fit = fit_least_squares(base_parameters=fixed, fittable_parameters=nuisance,
                         predict=predict, observations=observations, train_indices=train_indices,
                         validation_indices=(), residual_scales=residual_scales,
-                        calibration_source=source, max_nfev=max_nfev)
+                        calibration_source=source, max_nfev=max_nfev, diff_step=step)
                     if not fit.success or fit.training_residuals is None:
                         raise ValueError(fit.message)
                     vector = fit.training_residuals.flattened_scaled()
@@ -131,4 +167,5 @@ def profile_likelihood(
         profiles[symbol] = points
     if not complete:
         warnings.append('Some profile points failed; the profile is incomplete.')
-    return ProfileLikelihoodResult(profiles, units, reference, source, complete, tuple(warnings))
+    return ProfileLikelihoodResult(profiles, units, reference, source, complete, tuple(warnings),
+                                   nuisance_optimizer=nuisance_optimizer)
